@@ -77,9 +77,40 @@ func _ready() -> void:
 func _apply_visuals() -> void:
 	if body_rect:
 		body_rect.color = body_color
+		# Slightly longer hot-wheels silhouette
+		body_rect.offset_left = -20
+		body_rect.offset_top = -11
+		body_rect.offset_right = 20
+		body_rect.offset_bottom = 11
+	var nose := get_node_or_null("Nose") as ColorRect
+	if nose:
+		nose.color = body_color.darkened(0.25)
+		nose.offset_left = 12
+		nose.offset_top = -6
+		nose.offset_right = 24
+		nose.offset_bottom = 6
+	# Neon underglow
+	var glow := get_node_or_null("Glow") as ColorRect
+	if glow == null and body_rect:
+		glow = ColorRect.new()
+		glow.name = "Glow"
+		glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		glow.offset_left = -22
+		glow.offset_top = -13
+		glow.offset_right = 22
+		glow.offset_bottom = 13
+		glow.z_index = -1
+		add_child(glow)
+		move_child(glow, 0)
+	if glow:
+		glow.color = Color(body_color.r, body_color.g, body_color.b, 0.35)
 	if hp_bar:
 		hp_bar.max_value = max_health
 		hp_bar.value = health
+		hp_bar.offset_left = -22
+		hp_bar.offset_top = -30
+		hp_bar.offset_right = 22
+		hp_bar.offset_bottom = -22
 
 
 func set_throttle(value: float) -> void:

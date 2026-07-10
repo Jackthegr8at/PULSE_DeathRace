@@ -14,14 +14,16 @@ var end_screen: CanvasLayer
 var match_over: bool = false
 
 var _ai_colors: Array[Color] = [
-	Color(0.95, 0.4, 0.4),
-	Color(0.4, 0.65, 0.95),
-	Color(0.85, 0.55, 0.95),
-	Color(0.95, 0.7, 0.3),
+	Color(1.0, 0.28, 0.32), ## Crimson
+	Color(0.24, 0.72, 1.0), ## Electric blue
+	Color(0.75, 0.35, 1.0), ## Violet
+	Color(1.0, 0.55, 0.18), ## Orange rocket
 ]
 
 
 func _ready() -> void:
+	# Dark arena clear color
+	RenderingServer.set_default_clear_color(Color(0.04, 0.05, 0.08))
 	_spawn_track()
 	# Let track finish building geometry this frame
 	await get_tree().process_frame
@@ -83,7 +85,9 @@ func _place_car(car: Car, spawns: Array[Transform2D], index: int) -> void:
 func _spawn_ui() -> void:
 	hud = HUDScene.instantiate()
 	add_child(hud)
-	if hud.has_method("set_player"):
+	if hud.has_method("setup"):
+		hud.setup(track, player)
+	elif hud.has_method("set_player"):
 		hud.set_player(player)
 
 	end_screen = EndScene.instantiate()

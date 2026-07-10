@@ -74,27 +74,36 @@ func _build_figure8() -> void:
 
 
 func _draw_background() -> void:
-	var bg := ColorRect.new()
-	bg.name = "Asphalt"
-	bg.color = Color(0.14, 0.16, 0.2)
-	bg.position = Vector2(200, 80)
-	bg.size = Vector2(1600, 880)
-	_visuals_root.add_child(bg)
+	# Industrial night arena floor (concept art mood)
+	var floor_rect := ColorRect.new()
+	floor_rect.name = "ArenaFloor"
+	floor_rect.color = Color(0.07, 0.08, 0.11)
+	floor_rect.position = Vector2(80, 20)
+	floor_rect.size = Vector2(1840, 1000)
+	_visuals_root.add_child(floor_rect)
 
-	# Soft infield tint under loops
-	_add_circle_poly(left_center, loop_radius - track_half_width - 10.0, Color(0.1, 0.22, 0.14, 0.9), _visuals_root)
-	_add_circle_poly(right_center, loop_radius - track_half_width - 10.0, Color(0.1, 0.22, 0.14, 0.9), _visuals_root)
+	# Subtle grid
+	var grid := Node2D.new()
+	grid.name = "Grid"
+	_visuals_root.add_child(grid)
+	for x in range(0, 20):
+		var v := Line2D.new()
+		v.width = 1.0
+		v.default_color = Color(1, 1, 1, 0.03)
+		v.add_point(Vector2(100 + x * 90, 40))
+		v.add_point(Vector2(100 + x * 90, 1000))
+		grid.add_child(v)
+	for y in range(0, 12):
+		var h := Line2D.new()
+		h.width = 1.0
+		h.default_color = Color(1, 1, 1, 0.03)
+		h.add_point(Vector2(100, 40 + y * 80))
+		h.add_point(Vector2(1900, 40 + y * 80))
+		grid.add_child(h)
 
-	# Track ribbons (visual only)
-	_add_ring_poly(left_center, loop_radius, track_half_width, Color(0.22, 0.25, 0.3), _visuals_root)
-	_add_ring_poly(right_center, loop_radius, track_half_width, Color(0.22, 0.25, 0.3), _visuals_root)
-
-	# Cross paint
-	var cross := ColorRect.new()
-	cross.color = Color(0.95, 0.7, 0.25, 0.35)
-	cross.size = Vector2(90, 90)
-	cross.position = (left_center + right_center) * 0.5 - cross.size * 0.5
-	_visuals_root.add_child(cross)
+	# Dark infields (inside loops)
+	_add_circle_poly(left_center, loop_radius - track_half_width - 6.0, Color(0.05, 0.06, 0.08), _visuals_root)
+	_add_circle_poly(right_center, loop_radius - track_half_width - 6.0, Color(0.05, 0.06, 0.08), _visuals_root)
 
 
 func _build_path() -> void:
@@ -102,38 +111,115 @@ func _build_path() -> void:
 	race_path.name = "RacePath"
 	var curve := Curve2D.new()
 
-	# Continuous figure-8: left loop then right loop (lemniscate-ish via two circles)
-	# Direction: start at top of left loop, go clockwise around left, through center,
-	# counterclockwise around right, back through center.
+	# Continuous figure-8: left loop then right loop
 	var segments := 48
-	# Left loop clockwise starting from top (angle -PI/2)
 	for i in segments:
 		var t := float(i) / float(segments)
 		var ang := -PI / 2.0 + t * TAU
 		var p := left_center + Vector2(cos(ang), sin(ang)) * loop_radius
 		curve.add_point(p)
 
-	# Right loop: enter from center-ish going up-right, counterclockwise from PI
 	for i in segments:
 		var t := float(i) / float(segments)
-		# Start at left side of right loop (ang = PI) going toward top then right...
 		var ang := PI - t * TAU
 		var p := right_center + Vector2(cos(ang), sin(ang)) * loop_radius
 		curve.add_point(p)
 
-	# Close toward start
 	curve.add_point(left_center + Vector2(0, -loop_radius))
 	race_path.curve = curve
 	add_child(race_path)
 
-	# Debug draw of path (subtle)
-	var line := Line2D.new()
-	line.name = "PathGuide"
-	line.width = 2.0
-	line.default_color = Color(1, 0.9, 0.3, 0.25)
-	for i in curve.get_baked_points().size():
-		line.add_point(curve.get_baked_points()[i])
-	_visuals_root.add_child(line)
+	_draw_neon_track_ribbon(curve)
+
+
+func _draw_neon_track_ribbon(curve: Curve2D) -> void:
+	## Concept-style asphalt + cyan/purple neon edges + yellow dashes.
+	var baked := curve.get_baked_points()
+	if baked.is_empty():
+		return
+
+	# Outer neon glow (wide, soft)
+	var glow := Line2D.new()
+	glow.name = "NeonGlow"
+	glow.width = track_half_width * 2.0 + 28.0
+	glow.default_color = Color(0.18, 0.75, 1.0, 0.12)
+	glow.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	glow.end_cap_mode = Line2D.LINE_CAP_ROUND
+	glow.joint_mode = Line2D.LINE_JOINT_ROUND
+	for p in baked:
+		glow.add_point(p)
+	_visuals_root.add_child(glow)
+
+	# Asphalt body
+	var asphalt := Line2D.new()
+	asphalt.name = "AsphaltRibbon"
+	asphalt.width = track_half_width * 2.0
+	asphalt.default_color = Color(0.16, 0.18, 0.22, 1.0)
+	asphalt.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	asphalt.end_cap_mode = Line2D.LINE_CAP_ROUND
+	asphalt.joint_mode = Line2D.LINE_JOINT_ROUND
+	for p in baked:
+		asphalt.add_point(p)
+	_visuals_root.add_child(asphalt)
+
+	# Inner asphalt shade
+	var asphalt_inner := Line2D.new()
+	asphalt_inner.name = "AsphaltInner"
+	asphalt_inner.width = track_half_width * 1.55
+	asphalt_inner.default_color = Color(0.12, 0.13, 0.16, 1.0)
+	asphalt_inner.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	asphalt_inner.end_cap_mode = Line2D.LINE_CAP_ROUND
+	asphalt_inner.joint_mode = Line2D.LINE_JOINT_ROUND
+	for p in baked:
+		asphalt_inner.add_point(p)
+	_visuals_root.add_child(asphalt_inner)
+
+	# Neon rails (cyan outer / purple inner) — concept art figure-8 edge lights
+	_add_neon_rail(baked, track_half_width + 2.0, Color(0.18, 0.94, 1.0, 0.9), "NeonOuter")
+	_add_neon_rail(baked, -(track_half_width + 2.0), Color(0.7, 0.3, 1.0, 0.85), "NeonInner")
+
+	# Yellow center dashes
+	var step := 18
+	var i := 0
+	while i + 8 < baked.size():
+		var seg := Line2D.new()
+		seg.width = 3.0
+		seg.default_color = Color(1.0, 0.84, 0.3, 0.7)
+		seg.add_point(baked[i])
+		seg.add_point(baked[mini(i + 6, baked.size() - 1)])
+		_visuals_root.add_child(seg)
+		i += step
+
+
+func _add_neon_rail(baked: PackedVector2Array, lateral: float, color: Color, rail_name: String) -> void:
+	var rail := Line2D.new()
+	rail.name = rail_name
+	rail.width = 6.0
+	rail.default_color = color
+	rail.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	rail.end_cap_mode = Line2D.LINE_CAP_ROUND
+	rail.joint_mode = Line2D.LINE_JOINT_ROUND
+	for i in baked.size():
+		var p: Vector2 = baked[i]
+		var prev: Vector2 = baked[maxi(i - 1, 0)]
+		var next: Vector2 = baked[mini(i + 1, baked.size() - 1)]
+		var tangent := (next - prev).normalized()
+		if tangent.length_squared() < 0.0001:
+			tangent = Vector2.RIGHT
+		var normal := Vector2(-tangent.y, tangent.x) * lateral
+		rail.add_point(p + normal)
+	_visuals_root.add_child(rail)
+	# Soft glow twin
+	var glow := Line2D.new()
+	glow.name = rail_name + "Glow"
+	glow.width = 14.0
+	glow.default_color = Color(color.r, color.g, color.b, 0.2)
+	glow.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	glow.end_cap_mode = Line2D.LINE_CAP_ROUND
+	glow.joint_mode = Line2D.LINE_JOINT_ROUND
+	for i in rail.get_point_count():
+		glow.add_point(rail.get_point_position(i))
+	_visuals_root.add_child(glow)
 
 
 func _build_walls() -> void:
@@ -184,7 +270,7 @@ func _add_outer_ring_walls(center: Vector2, radius: float, is_left: bool) -> voi
 		var vis := ColorRect.new()
 		vis.size = rect.size
 		vis.position = -rect.size * 0.5
-		vis.color = Color(0.45, 0.5, 0.58)
+		vis.color = Color(0.2, 0.22, 0.26)
 		wall.add_child(vis)
 		wall.collision_layer = 1
 		wall.collision_mask = 0
@@ -203,7 +289,7 @@ func _add_wall_rect(rect: Rect2, wall_name: String) -> void:
 	var vis := ColorRect.new()
 	vis.size = rect.size
 	vis.position = -rect.size * 0.5
-	vis.color = Color(0.4, 0.45, 0.52)
+	vis.color = Color(0.18, 0.2, 0.24)
 	wall.add_child(vis)
 	wall.collision_layer = 1
 	_walls_root.add_child(wall)
@@ -218,7 +304,7 @@ func _add_wall_circle(center: Vector2, radius: float, wall_name: String) -> void
 	circle.radius = radius
 	shape.shape = circle
 	wall.add_child(shape)
-	_add_circle_poly(Vector2.ZERO, radius, Color(0.12, 0.28, 0.16), wall)
+	_add_circle_poly(Vector2.ZERO, radius, Color(0.06, 0.07, 0.09), wall)
 	wall.collision_layer = 1
 	_walls_root.add_child(wall)
 

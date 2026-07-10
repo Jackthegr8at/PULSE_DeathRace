@@ -64,4 +64,4 @@ color = Color(1, 0.55, 0.15, 1)
 [node name="Camera2D" type="Camera2D" parent="."]
 position_smoothing_enabled = true
 position_smoothing_speed = 5.0
-zoom = Vector2(0.62, 0.62)
+zoom = Vector2(0.55, 0.55)

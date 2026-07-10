@@ -39,8 +39,15 @@ func _ready() -> void:
 
 
 func _apply_styles() -> void:
-	panel.add_theme_stylebox_override("panel", GameStyle.panel(GameStyle.SURFACE, GameStyle.BORDER, 14.0, 2.0))
+	panel.add_theme_stylebox_override(
+		"panel",
+		GameStyle.panel(Color(0.06, 0.08, 0.12, 0.92), GameStyle.BORDER_GLOW, 14.0, 1.0)
+	)
 	GameStyle.apply_label(title_label, GameStyle.ACCENT, 40)
+	# Darker full-screen backdrop if present
+	var bg := get_node_or_null("Background") as ColorRect
+	if bg:
+		bg.color = Color(0.04, 0.05, 0.08)
 	GameStyle.apply_label(subtitle, GameStyle.TEXT_MUTED, 14)
 	GameStyle.apply_label(controls_label, GameStyle.TEXT_DIM, 12)
 	GameStyle.apply_label(lap_hint, GameStyle.TEXT_MUTED, 12)
