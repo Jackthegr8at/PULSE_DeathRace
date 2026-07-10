@@ -114,18 +114,33 @@ func _spawn_vehicle(spawn: Transform3D, as_player: bool, model_path: Variant, na
 
 
 func _snap_spawn_to_ground(origin: Vector3) -> Vector3:
-	## Raycast down onto track/ground; fall back to spawn height + hover.
+	## Raycast down onto track. If miss (off mesh), pull toward SpawnPoint and retry.
 	var space := get_world_3d().direct_space_state
+	var hover := 0.55
 	if space == null:
-		return origin + Vector3(0, 0.55, 0)
-	var from := origin + Vector3(0, 8.0, 0)
-	var to := origin + Vector3(0, -20.0, 0)
-	var q := PhysicsRayQueryParameters3D.create(from, to)
-	q.collision_mask = 1 # world / grid
-	var hit := space.intersect_ray(q)
-	if hit and hit.has("position"):
-		return hit.position + Vector3(0, 0.55, 0)
-	return origin + Vector3(0, 0.55, 0)
+		return origin + Vector3(0, hover, 0)
+
+	var anchor := origin
+	if track and track.has_method("get_spawn_transform"):
+		anchor = (track.call("get_spawn_transform") as Transform3D).origin
+
+	var candidates: Array[Vector3] = [
+		origin,
+		origin.lerp(anchor, 0.35),
+		origin.lerp(anchor, 0.7),
+		anchor,
+	]
+	for c in candidates:
+		var from := c + Vector3(0, 10.0, 0)
+		var to := c + Vector3(0, -25.0, 0)
+		var q := PhysicsRayQueryParameters3D.create(from, to)
+		q.collision_mask = 0xFFFFFFFF
+		var hit := space.intersect_ray(q)
+		if hit and hit.has("position"):
+			var p: Vector3 = hit.position
+			return Vector3(c.x, p.y + hover, c.z)
+
+	return Vector3(anchor.x, anchor.y + hover, anchor.z)
 
 
 func _swap_model(veh: Vehicle, glb_path: String) -> void:

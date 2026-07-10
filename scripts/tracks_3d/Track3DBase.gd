@@ -30,21 +30,16 @@ func get_grid_map() -> GridMap:
 
 
 func get_spawn_transforms(count: int) -> Array[Transform3D]:
-	## Pack player + AI on the SpawnPoint asphalt (Kenney start). Do NOT use the
-	## approximate Path3D for placement — it drifts off the GridMap road.
+	## Single-file on the start centerline. Kenney straights are narrow — a 2-wide
+	## grid pushed rear cars onto grass. Keep everyone on SpawnPoint asphalt.
 	var base := get_spawn_transform()
 	var result: Array[Transform3D] = []
-	# Identity basis at Kenney start faces +Z down the road; keep that facing.
 	var basis := base.basis.orthonormalized()
-	var right := basis.x
-	var forward := basis.z
-	# Road is narrow: 2 columns, rows stacked slightly BEHIND start so all stay on tile
+	var forward := basis.z.normalized()
+	# One column, slight stagger behind the marker (stay on the same tile ~7–8m long)
+	var spacing := 1.35
 	for i in count:
-		var col := i % 2
-		var row := int(i / 2.0)
-		var lateral := (float(col) - 0.5) * 1.6 # ~±0.8 m from centerline
-		var along := -float(row) * 2.2 # behind spawn, still on straight
-		var origin := base.origin + right * lateral + forward * along
+		var origin := base.origin - forward * (float(i) * spacing)
 		origin.y = base.origin.y
 		result.append(Transform3D(basis, origin))
 	return result
