@@ -1,48 +1,54 @@
 # PULSE_DeathRace
 
-Top-down car combat racing prototype (Godot **4.3+**). Flash-era deathrace vibes: figure-8 track, missiles, and hybrid win conditions.
-
-## Requirements
-
-- [Godot 4.3+](https://godotengine.org/download) (4.3 or 4.4 recommended)
+3D car combat racing built on [Kenney Starter Kit Racing](https://github.com/KenneyNL/Starter-Kit-Racing) (MIT / CC0 assets).
 
 ## Run
 
-1. Open Godot → **Import** → select this folder (`project.godot`)
-2. Press **F5** (or Play). Main scene is `scenes/Setup.tscn`.
+1. Open in **Godot 4.3+** (4.6/4.7 recommended for the kit)
+2. Main scene: `scenes/Setup.tscn` (F5)
+3. Pick **mode**, **track**, **laps** → **START RACE**
+4. **Esc** returns to setup
 
-## Controls
+### Tracks
 
-| Action | Keys |
-|--------|------|
-| Accelerate | `W` / `↑` |
-| Brake / reverse | `S` / `↓` |
-| Steer | `A` `D` / `←` `→` |
-| Fire missile | `Space` |
+| Track | Scene | Notes |
+|--------|--------|--------|
+| **Starter Circuit** | `scenes/tracks_3d/TrackDefault.tscn` | Original Kenney GridMap (unchanged layout) |
+| **Figure-8 Chaos** | `scenes/tracks_3d/TrackFigure8.tscn` | New figure-8 built from the same tiles |
 
-## Match setup
+Original kit free-play scene still available: `scenes/main.tscn`.
 
-- **Hybrid** — win by finishing the set laps **or** being last car standing  
-- **Race** — win only by finishing laps first  
-- **Last Standing** — no laps; eliminate everyone else  
-- **Laps** — choosable (default 5); disabled in Last Standing  
+### Controls
+
+| Key | Action |
+|-----|--------|
+| W / ↑ | Accelerate |
+| S / ↓ | Brake / reverse |
+| A D / ← → | Steer |
+| Esc | Back to setup |
 
 ## Project layout
 
-See `docs/superpowers/specs/2026-07-10-pulse-deathrace-prototype-design.md` and `plan/feature-pulse-deathrace-prototype-1.md`.
-
 ```
-scenes/Setup.tscn     → pre-match menu
-scenes/Main.tscn      → race
-scenes/tracks/Figure8 → procedural figure-8
-scenes/cars/          → Player, AI, Missile
+scenes/Setup.tscn          → match setup (modes + tracks)
+scenes/race/Race3D.tscn    → race host (loads track + vehicle)
+scenes/tracks_3d/          → TrackDefault + TrackFigure8
+scenes/vehicle.tscn        → Kenney arcade vehicle
+scenes/main.tscn           → original kit demo (kept)
+scripts/vehicle.gd         → Kenney vehicle physics
+scripts/race/Race3D.gd     → race orchestration
 scripts/autoload/MatchConfig.gd
+legacy 2D prototype        → scenes/cars, scenes/Main.tscn, etc. (not main)
 ```
 
-## Tweaking
+## Next (DeathRace)
 
-Select a car scene / script in the inspector for `@export` values: speed, turn rate, damage, fire cooldown, AI look-ahead, detect range, etc.
+- AI opponents on path / GridMap waypoints  
+- Combat (missiles, HP)  
+- Lap detection + win modes on 3D tracks  
+- Wire Setup modes fully into race results  
 
-## Phase 1 status
+## Credits
 
-Playable solo prototype: 1 player + 4 AI, combat, modes, HUD, end screen. Placeholder art only. No blockchain / multiplayer yet.
+- **Kenney** — Starter Kit Racing (MIT code, CC0 models/audio)  
+- **PULSE** — DeathRace design, multi-map setup, combat roadmap  

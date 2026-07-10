@@ -1,0 +1,21 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/tracks_3d/TrackFigure8.gd" id="1_script"]
+[ext_resource type="MeshLibrary" uid="uid://b6myd2b7l2o2j" path="res://models/Library/mesh-library.tres" id="2_mesh"]
+
+[sub_resource type="PhysicsMaterial" id="PhysicsMaterial_track"]
+friction = 0.0
+bounce = 0.1
+
+[node name="TrackFigure8" type="Node3D"]
+script = ExtResource("1_script")
+track_display_name = "Figure-8 Chaos"
+
+[node name="GridMap" type="GridMap" parent="."]
+transform = Transform3D(0.75, 0, 0, 0, 0.75, 0, 0, 0, 0.75, 0, -0.5, 0)
+mesh_library = ExtResource("2_mesh")
+physics_material = SubResource("PhysicsMaterial_track")
+cell_size = Vector3(9.99, 1, 9.99)
+
+[node name="SpawnPoint" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -30, 0.3, -30)
