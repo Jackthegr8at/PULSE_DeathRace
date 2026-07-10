@@ -73,7 +73,8 @@ func _update_driving() -> void:
 	var desired_angle := to_target.angle()
 	var angle_diff := wrapf(desired_angle - rotation, -PI, PI)
 
-	set_steer(clampf(angle_diff * 2.2, -1.0, 1.0))
+	# Softer steer response so AI doesn't yank full lock every frame
+	set_steer(clampf(angle_diff * 1.1, -1.0, 1.0))
 
 	# Ease throttle hard on corners so AI (and pack) stay on the ribbon
 	var turn_severity := clampf(absf(angle_diff) / (PI * 0.4), 0.0, 1.0)

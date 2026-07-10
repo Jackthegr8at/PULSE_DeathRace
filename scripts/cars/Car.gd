@@ -18,8 +18,8 @@ const MissileScene: PackedScene = preload("res://scenes/cars/Missile.tscn")
 @export var brake_force: float = 520.0 ## How fast you scrub speed when holding reverse while moving forward
 @export var reverse_speed: float = 110.0
 @export var reverse_acceleration: float = 280.0
-@export var turn_speed: float = 4.6 ## Radians/sec at full steer (higher = tighter turns)
-@export var turn_speed_min_factor: float = 0.55 ## Turn authority at standstill / crawl (easier recovery)
+@export var turn_speed: float = 1.55 ## Radians/sec at full steer (~90°/s) — deliberate, not twitchy
+@export var turn_speed_min_factor: float = 0.3 ## Less turn when almost stopped (avoids spinning in place)
 @export var friction: float = 280.0 ## Coast slowdown when no throttle
 @export var wall_slowdown_factor: float = 0.4 ## Velocity kept after wall scrape
 @export var wall_bounce: float = 0.15 ## Small push-off along wall normal so you don't glue to walls
