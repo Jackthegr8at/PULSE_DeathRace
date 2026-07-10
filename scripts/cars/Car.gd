@@ -18,8 +18,9 @@ const MissileScene: PackedScene = preload("res://scenes/cars/Missile.tscn")
 @export var brake_force: float = 520.0 ## How fast you scrub speed when holding reverse while moving forward
 @export var reverse_speed: float = 110.0
 @export var reverse_acceleration: float = 280.0
-@export var turn_speed: float = 1.55 ## Radians/sec at full steer (~90°/s) — deliberate, not twitchy
-@export var turn_speed_min_factor: float = 0.3 ## Less turn when almost stopped (avoids spinning in place)
+@export var turn_speed: float = 1.55 ## Radians/sec while accelerating — deliberate at speed
+@export var turn_speed_coast: float = 3.4 ## Radians/sec with gas off — quick recovery / re-aim after a wall
+@export var turn_speed_stopped_bonus: float = 1.25 ## Extra multiplier when nearly stopped + gas off
 @export var friction: float = 280.0 ## Coast slowdown when no throttle
 @export var wall_slowdown_factor: float = 0.4 ## Velocity kept after wall scrape
 @export var wall_bounce: float = 0.15 ## Small push-off along wall normal so you don't glue to walls
@@ -115,10 +116,12 @@ func _apply_vehicle_physics(delta: float) -> void:
 	# --- Arcade top-down: you always drive where the nose points ---
 	# (Old model accumulated sideways momentum and felt like ice into walls.)
 
-	# Turn: still effective at low speed so you can unstick from walls
-	var speed_ratio := clampf(absf(_speed) / maxf(max_speed, 1.0), 0.0, 1.0)
-	var turn_factor := lerpf(turn_speed_min_factor, 1.0, speed_ratio)
-	rotation += steer_input * turn_speed * turn_factor * delta
+	# Turn: slower with gas on (stable driving); faster with gas off (wall recovery)
+	var gas_on := throttle_input > 0.05
+	var base_turn := turn_speed if gas_on else turn_speed_coast
+	if not gas_on and absf(_speed) < 40.0:
+		base_turn *= turn_speed_stopped_bonus
+	rotation += steer_input * base_turn * delta
 
 	if throttle_input > 0.05:
 		_speed += acceleration * throttle_input * delta
