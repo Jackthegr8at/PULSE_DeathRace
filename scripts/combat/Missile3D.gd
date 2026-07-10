@@ -15,8 +15,12 @@ func setup(shooter: Vehicle, dmg: float, spd: float, dir: Vector3) -> void:
 	owner_vehicle = shooter
 	damage = dmg
 	speed = spd
-	_velocity = dir.normalized() * speed
-	# Point mesh along velocity
+	var d := dir
+	d.y = 0.0
+	if d.length_squared() < 0.0001:
+		d = Vector3(0, 0, 1)
+	_velocity = d.normalized() * speed
+	# Point mesh along travel direction
 	if _velocity.length_squared() > 0.001:
 		look_at(global_position + _velocity, Vector3.UP)
 

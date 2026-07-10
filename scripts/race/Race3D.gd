@@ -95,15 +95,22 @@ func _spawn_vehicle(spawn: Transform3D, as_player: bool, model_path: Variant, na
 	if model_path != null and str(model_path) != "":
 		_swap_model(veh, str(model_path))
 
+	# Align physics sphere + visual with spawn (on-track, facing path)
+	var pos := spawn.origin + Vector3(0, 0.55, 0)
+	var basis := spawn.basis.orthonormalized()
 	var sphere := veh.get_node_or_null("Sphere") as RigidBody3D
 	if sphere:
-		sphere.global_position = spawn.origin + Vector3(0, 0.6, 0)
+		sphere.global_transform = Transform3D(Basis.IDENTITY, pos)
 		sphere.linear_velocity = Vector3.ZERO
 		sphere.angular_velocity = Vector3.ZERO
 	var container := veh.get_node_or_null("Container") as Node3D
 	if container:
-		container.global_transform = Transform3D(spawn.basis, spawn.origin)
+		# Container follows sphere in physics; set facing for first frames
+		container.global_transform = Transform3D(basis, pos - Vector3(0, 0.65, 0))
 	veh.global_position = spawn.origin
+	# Sync model yaw so first missile / AI frame faces the path
+	if veh.vehicle_model:
+		veh.vehicle_model.global_transform = Transform3D(basis, pos - Vector3(0, 0.65, 0))
 	return veh
 
 

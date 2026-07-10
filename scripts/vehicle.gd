@@ -75,14 +75,19 @@ func get_vehicle_position() -> Vector3:
 
 func get_forward() -> Vector3:
 	if vehicle_model == null:
-		return Vector3.FORWARD
-	# Kenney models: drive along local -Z (Godot convention)
-	return -vehicle_model.global_transform.basis.z
+		return Vector3(0, 0, 1)
+	# Kenney kit rolls the sphere on basis.x so travel is along +Z of the model.
+	var f: Vector3 = vehicle_model.global_transform.basis.z
+	f.y = 0.0
+	if f.length_squared() < 0.0001:
+		return Vector3(0, 0, 1)
+	return f.normalized()
 
 
 func _ready() -> void:
 	health = max_health
 	add_to_group("vehicles")
+	_ensure_hp_bar()
 	health_changed.emit(health, max_health)
 	if sphere:
 		# Vehicle spheres on layer 8 (matches kit)
@@ -177,6 +182,7 @@ func _physics_process(delta: float) -> void:
 	effect_wheels(delta)
 	effect_trails()
 	_update_lap_progress()
+	_billboard_hp_bar()
 
 
 func handle_input(_delta: float) -> void:
@@ -248,8 +254,10 @@ func try_fire() -> bool:
 	if not is_alive or match_over or _cooldown > 0.0:
 		return false
 	_cooldown = fire_cooldown
+	var forward := get_forward()
 	var missile: Area3D = MissileScene.instantiate()
-	var origin := get_vehicle_position() + Vector3(0, 0.6, 0) + get_forward() * 1.4
+	# Spawn well ahead of the nose so it never pops out the rear
+	var origin := get_vehicle_position() + Vector3(0, 0.75, 0) + forward * 2.2
 	var host := get_tree().current_scene
 	if host:
 		host.add_child(missile)
@@ -257,7 +265,7 @@ func try_fire() -> bool:
 		get_parent().add_child(missile)
 	missile.global_position = origin
 	if missile.has_method("setup"):
-		missile.setup(self, missile_damage, missile_speed, get_forward())
+		missile.setup(self, missile_damage, missile_speed, forward)
 	return true
 
 
@@ -266,6 +274,7 @@ func take_damage(amount: float, _source: Node = null) -> void:
 		return
 	health = maxf(0.0, health - amount)
 	health_changed.emit(health, max_health)
+	_update_hp_bar_visual()
 	if health <= 0.0:
 		_die()
 
@@ -280,10 +289,78 @@ func _die() -> void:
 		sphere.freeze = true
 	if vehicle_model:
 		vehicle_model.visible = false
+	if _hp_root:
+		_hp_root.visible = false
 	died.emit(self)
 	await get_tree().create_timer(0.4).timeout
 	if is_instance_valid(self):
 		queue_free()
+
+
+# --- World-space HP bar (billboard) ---
+var _hp_root: Node3D = null
+var _hp_fill: MeshInstance3D = null
+const HP_BAR_WIDTH := 1.4
+
+
+func _ensure_hp_bar() -> void:
+	if _hp_root != null:
+		return
+	_hp_root = Node3D.new()
+	_hp_root.name = "HealthBar3D"
+	add_child(_hp_root)
+	_hp_root.position = Vector3(0, 2.1, 0)
+
+	var bg := MeshInstance3D.new()
+	var bg_mesh := BoxMesh.new()
+	bg_mesh.size = Vector3(HP_BAR_WIDTH, 0.12, 0.04)
+	bg.mesh = bg_mesh
+	var bg_mat := StandardMaterial3D.new()
+	bg_mat.albedo_color = Color(0.1, 0.1, 0.1, 0.85)
+	bg_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	bg_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	bg.material_override = bg_mat
+	_hp_root.add_child(bg)
+
+	_hp_fill = MeshInstance3D.new()
+	var fill_mesh := BoxMesh.new()
+	fill_mesh.size = Vector3(HP_BAR_WIDTH, 0.1, 0.05)
+	_hp_fill.mesh = fill_mesh
+	var fill_mat := StandardMaterial3D.new()
+	fill_mat.albedo_color = Color(0.35, 0.85, 0.4, 1.0)
+	fill_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_hp_fill.material_override = fill_mat
+	_hp_root.add_child(_hp_fill)
+	_update_hp_bar_visual()
+
+
+func _update_hp_bar_visual() -> void:
+	if _hp_fill == null:
+		return
+	var ratio := clampf(health / maxf(max_health, 1.0), 0.0, 1.0)
+	_hp_fill.scale = Vector3(maxf(ratio, 0.02), 1.0, 1.0)
+	# Keep fill left-aligned on the bar
+	_hp_fill.position.x = -HP_BAR_WIDTH * 0.5 * (1.0 - ratio)
+	var mat := _hp_fill.material_override as StandardMaterial3D
+	if mat:
+		if ratio > 0.55:
+			mat.albedo_color = Color(0.35, 0.85, 0.4)
+		elif ratio > 0.28:
+			mat.albedo_color = Color(0.95, 0.75, 0.25)
+		else:
+			mat.albedo_color = Color(0.9, 0.25, 0.25)
+
+
+func _billboard_hp_bar() -> void:
+	if _hp_root == null or not is_alive:
+		return
+	# Follow vehicle position (sphere drives model)
+	_hp_root.global_position = get_vehicle_position() + Vector3(0, 2.1, 0)
+	var cam := get_viewport().get_camera_3d()
+	if cam:
+		_hp_root.look_at(cam.global_position, Vector3.UP)
+		# look_at points -Z at target; flip so bar faces camera
+		_hp_root.rotate_object_local(Vector3.UP, PI)
 
 
 func on_finish_line() -> void:

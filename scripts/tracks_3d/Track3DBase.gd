@@ -30,15 +30,35 @@ func get_grid_map() -> GridMap:
 
 
 func get_spawn_transforms(count: int) -> Array[Transform3D]:
-	## Staggered spawns near SpawnPoint for player + AI.
-	var base := get_spawn_transform()
+	## Place all cars ON the race path near the start (staggered along the ribbon).
+	_ensure_race_path()
 	var result: Array[Transform3D] = []
-	var right := base.basis.x
-	var back := base.basis.z
+	if race_path == null or race_path.curve == null or race_path.curve.get_baked_length() < 1.0:
+		var base := get_spawn_transform()
+		for i in count:
+			result.append(Transform3D(base.basis, base.origin + base.basis.z * (i * 2.0)))
+		return result
+
+	var length := race_path.curve.get_baked_length()
+	# Start a bit past the finish marker so everyone is on asphalt
+	var start_off := 2.0
+	var spacing := 3.2
 	for i in count:
-		var offset := right * ((i % 2) * 2.2 - 1.1) + back * (i * 2.4)
-		var t := Transform3D(base.basis, base.origin + offset)
-		result.append(t)
+		var off := fmod(start_off + float(i) * spacing, length)
+		var pos := race_path.to_global(race_path.curve.sample_baked(off))
+		var ahead := race_path.to_global(race_path.curve.sample_baked(fmod(off + 1.5, length)))
+		var dir := ahead - pos
+		dir.y = 0.0
+		if dir.length_squared() < 0.001:
+			dir = Vector3(0, 0, 1)
+		else:
+			dir = dir.normalized()
+		# Kenney forward is +Z — build basis with Z = drive direction
+		var basis := Basis.looking_at(dir, Vector3.UP)
+		# looking_at aligns -Z to dir; rotate 180° so +Z faces dir
+		basis = basis.rotated(Vector3.UP, PI)
+		pos.y = 0.25
+		result.append(Transform3D(basis, pos))
 	return result
 
 
@@ -51,19 +71,20 @@ func _ensure_race_path() -> void:
 		race_path.name = "RacePath"
 		add_child(race_path)
 	var curve := Curve3D.new()
-	# Approximate loop around Kenney starter circuit (world units, near spawn 3.5, 0, 5)
+	# Loop around Kenney starter circuit (spawn ~ 3.5, 0, 5 — stay on the paved loop)
 	var pts := [
-		Vector3(3.5, 0.2, 5.0),
-		Vector3(8.0, 0.2, 2.0),
-		Vector3(12.0, 0.2, -5.0),
-		Vector3(8.0, 0.2, -12.0),
-		Vector3(0.0, 0.2, -16.0),
-		Vector3(-10.0, 0.2, -12.0),
-		Vector3(-16.0, 0.2, -4.0),
-		Vector3(-14.0, 0.2, 6.0),
-		Vector3(-6.0, 0.2, 12.0),
-		Vector3(2.0, 0.2, 10.0),
-		Vector3(3.5, 0.2, 5.0),
+		Vector3(3.5, 0.25, 5.0),
+		Vector3(6.0, 0.25, 3.0),
+		Vector3(8.5, 0.25, -1.0),
+		Vector3(8.0, 0.25, -6.0),
+		Vector3(4.0, 0.25, -10.0),
+		Vector3(-1.0, 0.25, -11.0),
+		Vector3(-6.0, 0.25, -8.0),
+		Vector3(-9.0, 0.25, -3.0),
+		Vector3(-8.0, 0.25, 2.0),
+		Vector3(-4.0, 0.25, 6.0),
+		Vector3(0.5, 0.25, 7.0),
+		Vector3(3.5, 0.25, 5.0),
 	]
 	for p in pts:
 		curve.add_point(p)
