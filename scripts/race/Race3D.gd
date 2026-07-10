@@ -95,23 +95,37 @@ func _spawn_vehicle(spawn: Transform3D, as_player: bool, model_path: Variant, na
 	if model_path != null and str(model_path) != "":
 		_swap_model(veh, str(model_path))
 
-	# Align physics sphere + visual with spawn (on-track, facing path)
-	var pos := spawn.origin + Vector3(0, 0.55, 0)
+	# Snap to ground under spawn so cars sit on GridMap asphalt, not float/clip
+	var pos := _snap_spawn_to_ground(spawn.origin)
 	var basis := spawn.basis.orthonormalized()
 	var sphere := veh.get_node_or_null("Sphere") as RigidBody3D
 	if sphere:
 		sphere.global_transform = Transform3D(Basis.IDENTITY, pos)
 		sphere.linear_velocity = Vector3.ZERO
 		sphere.angular_velocity = Vector3.ZERO
+	var model_pos := pos - Vector3(0, 0.65, 0)
 	var container := veh.get_node_or_null("Container") as Node3D
 	if container:
-		# Container follows sphere in physics; set facing for first frames
-		container.global_transform = Transform3D(basis, pos - Vector3(0, 0.65, 0))
-	veh.global_position = spawn.origin
-	# Sync model yaw so first missile / AI frame faces the path
+		container.global_transform = Transform3D(basis, model_pos)
 	if veh.vehicle_model:
-		veh.vehicle_model.global_transform = Transform3D(basis, pos - Vector3(0, 0.65, 0))
+		veh.vehicle_model.global_transform = Transform3D(basis, model_pos)
+	veh.global_position = Vector3(pos.x, 0.0, pos.z)
 	return veh
+
+
+func _snap_spawn_to_ground(origin: Vector3) -> Vector3:
+	## Raycast down onto track/ground; fall back to spawn height + hover.
+	var space := get_world_3d().direct_space_state
+	if space == null:
+		return origin + Vector3(0, 0.55, 0)
+	var from := origin + Vector3(0, 8.0, 0)
+	var to := origin + Vector3(0, -20.0, 0)
+	var q := PhysicsRayQueryParameters3D.create(from, to)
+	q.collision_mask = 1 # world / grid
+	var hit := space.intersect_ray(q)
+	if hit and hit.has("position"):
+		return hit.position + Vector3(0, 0.55, 0)
+	return origin + Vector3(0, 0.55, 0)
 
 
 func _swap_model(veh: Vehicle, glb_path: String) -> void:

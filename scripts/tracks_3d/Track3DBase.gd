@@ -30,35 +30,23 @@ func get_grid_map() -> GridMap:
 
 
 func get_spawn_transforms(count: int) -> Array[Transform3D]:
-	## Place all cars ON the race path near the start (staggered along the ribbon).
-	_ensure_race_path()
+	## Pack player + AI on the SpawnPoint asphalt (Kenney start). Do NOT use the
+	## approximate Path3D for placement — it drifts off the GridMap road.
+	var base := get_spawn_transform()
 	var result: Array[Transform3D] = []
-	if race_path == null or race_path.curve == null or race_path.curve.get_baked_length() < 1.0:
-		var base := get_spawn_transform()
-		for i in count:
-			result.append(Transform3D(base.basis, base.origin + base.basis.z * (i * 2.0)))
-		return result
-
-	var length := race_path.curve.get_baked_length()
-	# Start a bit past the finish marker so everyone is on asphalt
-	var start_off := 2.0
-	var spacing := 3.2
+	# Identity basis at Kenney start faces +Z down the road; keep that facing.
+	var basis := base.basis.orthonormalized()
+	var right := basis.x
+	var forward := basis.z
+	# Road is narrow: 2 columns, rows stacked slightly BEHIND start so all stay on tile
 	for i in count:
-		var off := fmod(start_off + float(i) * spacing, length)
-		var pos := race_path.to_global(race_path.curve.sample_baked(off))
-		var ahead := race_path.to_global(race_path.curve.sample_baked(fmod(off + 1.5, length)))
-		var dir := ahead - pos
-		dir.y = 0.0
-		if dir.length_squared() < 0.001:
-			dir = Vector3(0, 0, 1)
-		else:
-			dir = dir.normalized()
-		# Kenney forward is +Z — build basis with Z = drive direction
-		var basis := Basis.looking_at(dir, Vector3.UP)
-		# looking_at aligns -Z to dir; rotate 180° so +Z faces dir
-		basis = basis.rotated(Vector3.UP, PI)
-		pos.y = 0.25
-		result.append(Transform3D(basis, pos))
+		var col := i % 2
+		var row := int(i / 2.0)
+		var lateral := (float(col) - 0.5) * 1.6 # ~±0.8 m from centerline
+		var along := -float(row) * 2.2 # behind spawn, still on straight
+		var origin := base.origin + right * lateral + forward * along
+		origin.y = base.origin.y
+		result.append(Transform3D(basis, origin))
 	return result
 
 
