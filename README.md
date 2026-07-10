@@ -41,12 +41,16 @@ scripts/autoload/MatchConfig.gd
 legacy 2D prototype        → scenes/cars, scenes/Main.tscn, etc. (not main)
 ```
 
-## Next (DeathRace)
+## Combat (current)
 
-- AI opponents on path / GridMap waypoints  
-- Combat (missiles, HP)  
-- Lap detection + win modes on 3D tracks  
-- Wire Setup modes fully into race results  
+- **Space** fires missiles (15 dmg default)  
+- **3 AI** trucks (colored models), path-follow + shoot  
+- **HP 100**, explode on death  
+- Modes: Hybrid / Race / Last Standing + lap progress on HUD  
+- Rematch / Setup end screen  
+
+Figure-8 layout still needs art pass (prefer **Starter Circuit** for playtests).  
+
 
 ## Credits
 

@@ -20,6 +20,9 @@ func _ready() -> void:
 	track_display_name = "Figure-8 Chaos"
 	_build_figure8()
 	_place_spawn()
+	# Use base path/finish helpers (approximate path until figure-8 is retuned)
+	_ensure_race_path()
+	_ensure_finish_line()
 
 
 func _build_figure8() -> void:

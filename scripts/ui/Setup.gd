@@ -61,7 +61,7 @@ func _apply_styles() -> void:
 		subtitle.text = "3D combat racing · Kenney base · pick a track"
 	if controls_label:
 		GameStyle.apply_label(controls_label, GameStyle.TEXT_DIM, 12)
-		controls_label.text = "WASD drive  ·  Esc back to setup  ·  Combat AI next"
+		controls_label.text = "WASD drive  ·  Space fire missile  ·  Esc setup"
 	if lap_hint:
 		GameStyle.apply_label(lap_hint, GameStyle.TEXT_MUTED, 12)
 	if lap_value:
@@ -133,11 +133,11 @@ func _refresh_mode_ui() -> void:
 		return
 	match _selected_mode:
 		MatchConfig.Mode.HYBRID:
-			lap_hint.text = "Win by race finish or last car standing (combat coming soon)."
+			lap_hint.text = "Win by finishing the race or eliminating everyone."
 		MatchConfig.Mode.RACE:
-			lap_hint.text = "First to finish the set laps wins."
+			lap_hint.text = "First to finish the set laps wins. Combat still active."
 		MatchConfig.Mode.LAST_STANDING:
-			lap_hint.text = "No laps — survival mode (combat coming soon)."
+			lap_hint.text = "No laps — last car alive wins."
 
 
 func _refresh_track_ui() -> void:

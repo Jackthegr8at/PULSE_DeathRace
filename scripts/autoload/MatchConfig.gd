@@ -25,7 +25,7 @@ const TRACK_DISPLAY := {
 
 var mode: Mode = Mode.HYBRID
 var lap_count: int = 5
-var ai_count: int = 0 ## AI combat comes next; 0 = solo drive for now
+var ai_count: int = 3
 var track_id: TrackId = TrackId.KENNEY_DEFAULT
 
 
@@ -56,5 +56,5 @@ func track_scene_path() -> String:
 func reset_to_defaults() -> void:
 	mode = Mode.HYBRID
 	lap_count = 5
-	ai_count = 0
+	ai_count = 3
 	track_id = TrackId.KENNEY_DEFAULT
