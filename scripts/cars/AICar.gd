@@ -12,9 +12,8 @@ extends Car
 @export var fire_cone_degrees: float = 28.0
 @export var aim_dot_min: float = 0.88 ## Cosine threshold for "facing" target
 
-var race_path: Path2D = null
-var _path_length: float = 0.0
-var _progress: float = 0.0
+## AI follow progress along race_path (inherited from Car).
+var _ai_progress: float = 0.0
 var _think_timer: float = 0.0
 
 
@@ -25,6 +24,7 @@ func _ready() -> void:
 
 
 func setup_ai(path: Path2D, color: Color, name_label: String) -> void:
+	# race_path / _path_length live on Car (also used for lap tracking)
 	race_path = path
 	body_color = color
 	display_name = name_label
@@ -32,7 +32,7 @@ func setup_ai(path: Path2D, color: Color, name_label: String) -> void:
 	if race_path and race_path.curve:
 		_path_length = race_path.curve.get_baked_length()
 		# Snap progress to nearest path point so AI doesn't cut across first
-		_progress = _nearest_offset(global_position)
+		_ai_progress = _nearest_offset(global_position)
 
 
 func _physics_process(delta: float) -> void:
@@ -55,16 +55,16 @@ func _update_driving() -> void:
 		return
 
 	# Advance progress roughly with current speed for smoother chase
-	_progress = fmod(_progress + maxf(velocity.length(), 80.0) * path_repath_rate * 0.35, _path_length)
+	_ai_progress = fmod(_ai_progress + maxf(velocity.length(), 80.0) * path_repath_rate * 0.35, _path_length)
 	# Prefer tracking near car projection
 	var near := _nearest_offset(global_position)
 	# Blend so we don't snap violently
-	if absf(near - _progress) < _path_length * 0.5:
-		_progress = lerpf(_progress, near, 0.35)
+	if absf(near - _ai_progress) < _path_length * 0.5:
+		_ai_progress = lerpf(_ai_progress, near, 0.35)
 	else:
-		_progress = near
+		_ai_progress = near
 
-	var target_offset := fmod(_progress + path_look_ahead, _path_length)
+	var target_offset := fmod(_ai_progress + path_look_ahead, _path_length)
 	var target_point := race_path.curve.sample_baked(target_offset)
 	# Path points are local to Path2D
 	var world_target := race_path.to_global(target_point)
