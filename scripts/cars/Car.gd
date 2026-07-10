@@ -12,19 +12,23 @@ signal race_finished(car: Car)
 const MissileScene: PackedScene = preload("res://scenes/cars/Missile.tscn")
 
 @export_group("Movement")
-@export var max_speed: float = 420.0
-@export var acceleration: float = 900.0
-@export var reverse_speed: float = 180.0
-@export var turn_speed: float = 3.2 ## Radians per second at full steer while moving
-@export var friction: float = 600.0
-@export var wall_slowdown_factor: float = 0.55 ## Multiplier applied to velocity on wall hit
-@export var min_speed_to_turn: float = 20.0
+## Tuned for readable figure-8 control (arcade: speed follows facing).
+@export var max_speed: float = 230.0
+@export var acceleration: float = 380.0
+@export var brake_force: float = 520.0 ## How fast you scrub speed when holding reverse while moving forward
+@export var reverse_speed: float = 110.0
+@export var reverse_acceleration: float = 280.0
+@export var turn_speed: float = 4.6 ## Radians/sec at full steer (higher = tighter turns)
+@export var turn_speed_min_factor: float = 0.55 ## Turn authority at standstill / crawl (easier recovery)
+@export var friction: float = 280.0 ## Coast slowdown when no throttle
+@export var wall_slowdown_factor: float = 0.4 ## Velocity kept after wall scrape
+@export var wall_bounce: float = 0.15 ## Small push-off along wall normal so you don't glue to walls
 
 @export_group("Combat")
 @export var max_health: float = 100.0
 @export var fire_cooldown: float = 0.55
 @export var missile_damage: float = 15.0
-@export var missile_speed: float = 700.0
+@export var missile_speed: float = 520.0
 @export var muzzle_offset: float = 28.0
 
 @export_group("Identity")
@@ -43,6 +47,8 @@ var throttle_input: float = 0.0 ## -1..1
 var steer_input: float = 0.0 ## -1..1
 var _cooldown_left: float = 0.0
 var _match_over: bool = false
+## Signed speed along facing (+ forward, - reverse). Arcade model = easy aiming.
+var _speed: float = 0.0
 
 ## Lap / race state (used when MatchConfig.uses_laps())
 var next_checkpoint: int = 0
@@ -82,6 +88,8 @@ func set_match_over(over: bool) -> void:
 	if over:
 		throttle_input = 0.0
 		steer_input = 0.0
+		_speed = 0.0
+		velocity = Vector2.ZERO
 
 
 func setup_lap_tracking(checkpoint_count: int) -> void:
@@ -104,42 +112,45 @@ func _physics_process(delta: float) -> void:
 
 
 func _apply_vehicle_physics(delta: float) -> void:
-	var speed := velocity.length()
+	# --- Arcade top-down: you always drive where the nose points ---
+	# (Old model accumulated sideways momentum and felt like ice into walls.)
 
-	# Turn more when moving; slight turn authority when nearly stopped for feel
-	var turn_factor := clampf(speed / maxf(min_speed_to_turn, 1.0), 0.15, 1.0)
-	if absf(throttle_input) > 0.05 or speed > min_speed_to_turn:
-		rotation += steer_input * turn_speed * turn_factor * delta
+	# Turn: still effective at low speed so you can unstick from walls
+	var speed_ratio := clampf(absf(_speed) / maxf(max_speed, 1.0), 0.0, 1.0)
+	var turn_factor := lerpf(turn_speed_min_factor, 1.0, speed_ratio)
+	rotation += steer_input * turn_speed * turn_factor * delta
+
+	if throttle_input > 0.05:
+		_speed += acceleration * throttle_input * delta
+	elif throttle_input < -0.05:
+		if _speed > 5.0:
+			# Holding "back" while going forward = brake (not reverse yet)
+			_speed -= brake_force * absf(throttle_input) * delta
+		else:
+			_speed -= reverse_acceleration * absf(throttle_input) * delta
+	else:
+		_speed = move_toward(_speed, 0.0, friction * delta)
+
+	_speed = clampf(_speed, -reverse_speed, max_speed)
 
 	var forward := Vector2.RIGHT.rotated(rotation)
+	velocity = forward * _speed
 
-	if throttle_input > 0.0:
-		velocity += forward * acceleration * throttle_input * delta
-	elif throttle_input < 0.0:
-		velocity += forward * acceleration * 0.7 * throttle_input * delta
-	else:
-		# Coast friction
-		var fric := friction * delta
-		if speed <= fric:
-			velocity = Vector2.ZERO
-		else:
-			velocity = velocity.move_toward(Vector2.ZERO, fric)
+	move_and_slide()
 
-	# Clamp forward/reverse max speeds
-	var max_allowed := max_speed if velocity.dot(forward) >= 0.0 else reverse_speed
-	if velocity.length() > max_allowed:
-		velocity = velocity.limit_length(max_allowed)
-
-	var collision := move_and_slide()
-	if collision or get_slide_collision_count() > 0:
-		# Slow down when scraping walls / other bodies
+	if get_slide_collision_count() > 0:
 		for i in get_slide_collision_count():
 			var col := get_slide_collision(i)
-			if col:
-				var collider := col.get_collider()
-				if collider is StaticBody2D:
-					velocity *= wall_slowdown_factor
-					break
+			if col == null:
+				continue
+			var collider := col.get_collider()
+			if collider is StaticBody2D:
+				# Kill speed and nudge off the wall so recovery is easy
+				_speed *= wall_slowdown_factor
+				velocity = forward * _speed
+				velocity += col.get_normal() * maxf(absf(_speed), 40.0) * wall_bounce
+				_speed = velocity.dot(forward)
+				break
 
 
 func try_fire() -> bool:
@@ -193,6 +204,7 @@ func _die() -> void:
 	if not is_alive:
 		return
 	is_alive = false
+	_speed = 0.0
 	velocity = Vector2.ZERO
 	if death_particles:
 		death_particles.emitting = true

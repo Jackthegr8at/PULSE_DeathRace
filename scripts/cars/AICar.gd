@@ -2,10 +2,10 @@ extends Car
 ## Basic AI: follow track Path2D with look-ahead and shoot cars in a forward cone.
 
 @export_group("AI Pathing")
-@export var path_look_ahead: float = 90.0 ## Pixels ahead along the path
+@export var path_look_ahead: float = 110.0 ## Pixels ahead along the path
 @export var path_repath_rate: float = 0.05
-@export var arrive_throttle: float = 1.0
-@export var corner_speed_factor: float = 0.75
+@export var arrive_throttle: float = 0.72 ## Not full send — easier for player to read
+@export var corner_speed_factor: float = 0.4
 
 @export_group("AI Combat")
 @export var detect_range: float = 380.0
@@ -73,10 +73,10 @@ func _update_driving() -> void:
 	var desired_angle := to_target.angle()
 	var angle_diff := wrapf(desired_angle - rotation, -PI, PI)
 
-	set_steer(clampf(angle_diff * 1.8, -1.0, 1.0))
+	set_steer(clampf(angle_diff * 2.2, -1.0, 1.0))
 
-	# Ease throttle when we need a sharp turn
-	var turn_severity := clampf(absf(angle_diff) / (PI * 0.5), 0.0, 1.0)
+	# Ease throttle hard on corners so AI (and pack) stay on the ribbon
+	var turn_severity := clampf(absf(angle_diff) / (PI * 0.4), 0.0, 1.0)
 	var thr := lerpf(arrive_throttle, corner_speed_factor, turn_severity)
 	set_throttle(thr)
 

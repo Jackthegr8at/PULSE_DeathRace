@@ -11,8 +11,8 @@ signal car_lap_line(car: Car)
 ## Centers and radii for the two loops (world units).
 @export var left_center: Vector2 = Vector2(700, 520)
 @export var right_center: Vector2 = Vector2(1300, 520)
-@export var loop_radius: float = 260.0
-@export var track_half_width: float = 78.0
+@export var loop_radius: float = 280.0
+@export var track_half_width: float = 100.0 ## Wider lane = fewer accidental wall rides
 
 var race_path: Path2D
 var spawn_markers: Array[Marker2D] = []
