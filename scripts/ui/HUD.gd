@@ -43,6 +43,10 @@ func _process(delta: float) -> void:
 	var seconds := int(_elapsed) % 60
 	var ms := int(fmod(_elapsed, 1.0) * 100.0)
 	timer_label.text = "%02d:%02d.%02d" % [minutes, seconds, ms]
+	# Live lap progress so path-tracking is visible while racing
+	if MatchConfig.uses_laps() and _player and is_instance_valid(_player) and _player.is_alive:
+		var pct := int(_player.get_lap_progress_ratio() * 100.0)
+		lap_label.text = "LAP %d / %d  (%d%%)" % [_player.laps_completed, MatchConfig.lap_count, pct]
 
 
 func _on_player_health(current: float, maximum: float) -> void:

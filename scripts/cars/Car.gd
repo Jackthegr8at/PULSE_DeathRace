@@ -52,9 +52,15 @@ var _match_over: bool = false
 var _speed: float = 0.0
 
 ## Lap / race state (used when MatchConfig.uses_laps())
-var next_checkpoint: int = 0
 var laps_completed: int = 0
-var total_checkpoints: int = 0
+var race_path: Path2D = null
+## How much of the race line we've covered this lap (world units along path).
+var _lap_distance: float = 0.0
+var _last_path_offset: float = 0.0
+var _path_length: float = 0.0
+## Fraction of full path required before S/F / wrap can count a lap.
+@export var lap_min_path_fraction: float = 0.45
+var _lap_cooldown: float = 0.0
 
 
 func _ready() -> void:
@@ -93,10 +99,18 @@ func set_match_over(over: bool) -> void:
 		velocity = Vector2.ZERO
 
 
-func setup_lap_tracking(checkpoint_count: int) -> void:
-	total_checkpoints = checkpoint_count
-	next_checkpoint = 0
+func setup_lap_tracking(path: Path2D, _checkpoint_count: int = 0) -> void:
+	## Path-progress lap counting (reliable). Checkpoints are visual only.
+	race_path = path
 	laps_completed = 0
+	_lap_distance = 0.0
+	_lap_cooldown = 0.0
+	_path_length = 0.0
+	if race_path and race_path.curve:
+		_path_length = race_path.curve.get_baked_length()
+		_last_path_offset = race_path.curve.get_closest_offset(
+			race_path.to_local(global_position)
+		)
 
 
 func _physics_process(delta: float) -> void:
@@ -105,8 +119,11 @@ func _physics_process(delta: float) -> void:
 
 	if _cooldown_left > 0.0:
 		_cooldown_left = maxf(0.0, _cooldown_left - delta)
+	if _lap_cooldown > 0.0:
+		_lap_cooldown = maxf(0.0, _lap_cooldown - delta)
 
 	_apply_vehicle_physics(delta)
+	_update_lap_progress()
 	# Keep HP bar upright in world space
 	if hp_bar:
 		hp_bar.rotation = -rotation
@@ -224,21 +241,64 @@ func _die() -> void:
 		queue_free()
 
 
-func on_checkpoint(index: int) -> void:
-	if not is_alive or not MatchConfig.uses_laps():
-		return
-	if index == next_checkpoint:
-		next_checkpoint += 1
+func on_checkpoint(_index: int) -> void:
+	## Kept for Track Area2D hooks / future UI. Laps use path progress.
+	pass
 
 
 func on_start_finish() -> void:
-	if not is_alive or not MatchConfig.uses_laps():
+	## Crossing the painted S/F line can complete a lap if we've driven enough track.
+	_try_complete_lap("start_finish_gate")
+
+
+func _update_lap_progress() -> void:
+	if not MatchConfig.uses_laps():
 		return
-	# Require all checkpoints before counting a lap (blocks reverse cheese)
-	if total_checkpoints > 0 and next_checkpoint < total_checkpoints:
+	if race_path == null or race_path.curve == null or _path_length <= 1.0:
 		return
+
+	var curve := race_path.curve
+	var local_pos := race_path.to_local(global_position)
+	var offset := curve.get_closest_offset(local_pos)
+	# Ignore updates when far off the ribbon (avoids figure-8 cross confusion a bit)
+	var on_path_point := curve.sample_baked(offset)
+	if local_pos.distance_to(on_path_point) > 140.0:
+		_last_path_offset = offset
+		return
+
+	var delta_off := offset - _last_path_offset
+	var half := _path_length * 0.5
+
+	# Forward along path
+	if delta_off > 0.0 and delta_off < half:
+		_lap_distance += delta_off
+	# Wrapped past the end of the curve (crossed start region along the race line)
+	elif _last_path_offset > _path_length * 0.72 and offset < _path_length * 0.28:
+		var wrap_forward := (_path_length - _last_path_offset) + offset
+		if wrap_forward < half:
+			_lap_distance += wrap_forward
+		_try_complete_lap("path_wrap")
+	# Large jump (figure-8 closest-point flip) — ignore, don't corrupt distance
+	elif absf(delta_off) >= half:
+		pass
+
+	_last_path_offset = offset
+
+
+func _try_complete_lap(_reason: String = "") -> void:
+	if not is_alive or not MatchConfig.uses_laps() or _match_over:
+		return
+	if _lap_cooldown > 0.0:
+		return
+	if _path_length <= 1.0:
+		return
+	# Must have driven a real portion of the figure-8 (not just sitting on S/F)
+	if _lap_distance < _path_length * lap_min_path_fraction:
+		return
+
 	laps_completed += 1
-	next_checkpoint = 0
+	_lap_distance = 0.0
+	_lap_cooldown = 2.0 ## Prevent double-count while lingering on the line
 	lap_completed.emit(self, laps_completed)
 	if laps_completed >= MatchConfig.lap_count:
 		race_finished.emit(self)
@@ -246,3 +306,10 @@ func on_start_finish() -> void:
 
 func get_forward_vector() -> Vector2:
 	return Vector2.RIGHT.rotated(rotation)
+
+
+func get_lap_progress_ratio() -> float:
+	## 0..1 progress toward the next lap (for HUD).
+	if _path_length <= 1.0:
+		return 0.0
+	return clampf(_lap_distance / _path_length, 0.0, 1.0)

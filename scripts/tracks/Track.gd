@@ -227,46 +227,33 @@ func _build_checkpoints_and_finish() -> void:
 	if race_path == null or race_path.curve == null:
 		return
 	var length := race_path.curve.get_baked_length()
-	# Place 6 checkpoints evenly; start/finish near offset 0
-	var count := 6
+	# Visual sector markers only — lap counting is path-progress based on cars.
+	var count := 4
 	checkpoint_count = count
 	for i in count:
 		var offset := length * (float(i) + 0.5) / float(count)
 		var pos := race_path.curve.sample_baked(offset)
 		var next_pos := race_path.curve.sample_baked(fmod(offset + 20.0, length))
 		var ang := (next_pos - pos).angle()
-		_add_checkpoint(i, pos, ang)
+		_add_checkpoint_marker(i, pos, ang)
 
-	# Start/finish at beginning of path (top of left loop)
+	# Wide start/finish gate (backup lap complete when enough path distance)
 	var sf_pos := race_path.curve.sample_baked(0.0)
 	var sf_next := race_path.curve.sample_baked(25.0)
 	_add_start_finish(sf_pos, (sf_next - sf_pos).angle())
 
 
-func _add_checkpoint(index: int, pos: Vector2, ang: float) -> void:
-	var area := Area2D.new()
-	area.name = "Checkpoint_%d" % index
-	area.position = pos
-	area.rotation = ang
-	area.collision_layer = 0
-	area.collision_mask = 2 # cars
-	area.monitoring = true
-	var shape := CollisionShape2D.new()
-	var rect := RectangleShape2D.new()
-	rect.size = Vector2(36, track_half_width * 2.0)
-	shape.shape = rect
-	area.add_child(shape)
+func _add_checkpoint_marker(index: int, pos: Vector2, ang: float) -> void:
+	var vis_root := Node2D.new()
+	vis_root.name = "CheckpointMark_%d" % index
+	vis_root.position = pos
+	vis_root.rotation = ang
 	var vis := ColorRect.new()
-	vis.size = Vector2(8, track_half_width * 1.6)
-	vis.position = Vector2(-4, -track_half_width * 0.8)
-	vis.color = Color(0.4, 0.7, 1.0, 0.35)
-	area.add_child(vis)
-	area.body_entered.connect(func(body: Node) -> void:
-		if body is Car:
-			(body as Car).on_checkpoint(index)
-			car_checkpoint.emit(body as Car, index)
-	)
-	_areas_root.add_child(area)
+	vis.size = Vector2(6, track_half_width * 1.6)
+	vis.position = Vector2(-3, -track_half_width * 0.8)
+	vis.color = Color(0.4, 0.7, 1.0, 0.3)
+	vis_root.add_child(vis)
+	_areas_root.add_child(vis_root)
 
 
 func _add_start_finish(pos: Vector2, ang: float) -> void:
@@ -277,19 +264,21 @@ func _add_start_finish(pos: Vector2, ang: float) -> void:
 	area.collision_layer = 0
 	area.collision_mask = 2
 	area.monitoring = true
+	area.monitorable = false
 	var shape := CollisionShape2D.new()
 	var rect := RectangleShape2D.new()
-	rect.size = Vector2(40, track_half_width * 2.2)
+	# Thick gate across the full lane so it's hard to miss
+	rect.size = Vector2(70, track_half_width * 2.6)
 	shape.shape = rect
 	area.add_child(shape)
 	var vis := ColorRect.new()
-	vis.size = Vector2(10, track_half_width * 1.8)
-	vis.position = Vector2(-5, -track_half_width * 0.9)
+	vis.size = Vector2(14, track_half_width * 2.0)
+	vis.position = Vector2(-7, -track_half_width)
 	vis.color = Color(0.4, 0.95, 0.5, 0.55)
 	area.add_child(vis)
 	var label := Label.new()
 	label.text = "S/F"
-	label.position = Vector2(-12, -track_half_width - 18)
+	label.position = Vector2(-14, -track_half_width - 20)
 	label.add_theme_font_size_override("font_size", 14)
 	label.add_theme_color_override("font_color", Color(0.6, 1.0, 0.7))
 	area.add_child(label)

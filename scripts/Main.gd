@@ -44,14 +44,13 @@ func _spawn_cars() -> void:
 	if track == null:
 		return
 	var spawns := track.get_spawn_transforms()
-	var checkpoint_count := track.get_checkpoint_count()
 	var path := track.get_race_path()
 
 	# Player at first spawn
 	player = PlayerScene.instantiate() as Car
 	_place_car(player, spawns, 0)
 	add_child(player)
-	player.setup_lap_tracking(checkpoint_count)
+	player.setup_lap_tracking(path)
 	player.died.connect(_on_car_died)
 	player.race_finished.connect(_on_car_race_finished)
 	cars.append(player)
@@ -62,7 +61,7 @@ func _spawn_cars() -> void:
 		var spawn_i := mini(i + 1, maxi(spawns.size() - 1, 0))
 		_place_car(ai, spawns, spawn_i)
 		add_child(ai)
-		ai.setup_lap_tracking(checkpoint_count)
+		ai.setup_lap_tracking(path)
 		if ai.has_method("setup_ai"):
 			var color := _ai_colors[i % _ai_colors.size()]
 			ai.setup_ai(path, color, "AI-%d" % (i + 1))
