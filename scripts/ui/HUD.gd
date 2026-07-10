@@ -256,14 +256,14 @@ func _build_ui() -> void:
 
 	# Center watermark title
 	var title := Label.new()
-	title.text = "DEATHRACE 08"
+	title.text = "PULSE DEATHRACE"
 	title.anchor_left = 0.5
 	title.anchor_right = 0.5
-	title.offset_left = -120
-	title.offset_right = 120
+	title.offset_left = -140
+	title.offset_right = 140
 	title.offset_top = 18
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	GameStyle.apply_label(title, Color(1, 1, 1, 0.12), 14)
+	GameStyle.apply_label(title, Color(0.15, 0.12, 0.08, 0.2), 14)
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(title)
 

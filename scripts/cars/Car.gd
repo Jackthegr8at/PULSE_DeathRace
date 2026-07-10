@@ -36,11 +36,15 @@ const MissileScene: PackedScene = preload("res://scenes/cars/Missile.tscn")
 @export var display_name: String = "Car"
 @export var body_color: Color = Color(0.3, 0.8, 0.45)
 
-@onready var body_rect: ColorRect = $BodyVisual
+@onready var body_rect: ColorRect = get_node_or_null("BodyVisual")
+@onready var body_sprite: Sprite2D = get_node_or_null("BodySprite")
 @onready var hp_bar: ProgressBar = $HealthBar
 @onready var muzzle: Marker2D = $Muzzle
 @onready var death_particles: CPUParticles2D = $DeathParticles
 @onready var collision_shape: CollisionShape2D = $CollisionShape2D
+
+@export var sprite_texture: Texture2D
+@export var sprite_scale: float = 0.72
 
 var health: float = 100.0
 var is_alive: bool = true
@@ -74,43 +78,48 @@ func _ready() -> void:
 	collision_mask = 1 | 2
 
 
+func set_sprite_texture(tex: Texture2D) -> void:
+	sprite_texture = tex
+	_apply_visuals()
+
+
 func _apply_visuals() -> void:
+	# Prefer cel-shaded sprite; hide placeholder shapes when present
+	if body_sprite == null:
+		body_sprite = get_node_or_null("BodySprite") as Sprite2D
+	if body_sprite == null:
+		body_sprite = Sprite2D.new()
+		body_sprite.name = "BodySprite"
+		body_sprite.z_index = 0
+		add_child(body_sprite)
+		move_child(body_sprite, 0)
+
+	var tex := sprite_texture
+	if tex == null:
+		tex = CarVisuals.load_texture(CarVisuals.PLAYER)
+	if tex:
+		body_sprite.texture = tex
+		body_sprite.scale = Vector2(sprite_scale, sprite_scale)
+		body_sprite.visible = true
 	if body_rect:
-		body_rect.color = body_color
-		# Slightly longer hot-wheels silhouette
-		body_rect.offset_left = -20
-		body_rect.offset_top = -11
-		body_rect.offset_right = 20
-		body_rect.offset_bottom = 11
+		body_rect.visible = false
 	var nose := get_node_or_null("Nose") as ColorRect
 	if nose:
-		nose.color = body_color.darkened(0.25)
-		nose.offset_left = 12
-		nose.offset_top = -6
-		nose.offset_right = 24
-		nose.offset_bottom = 6
-	# Neon underglow
+		nose.visible = false
 	var glow := get_node_or_null("Glow") as ColorRect
-	if glow == null and body_rect:
-		glow = ColorRect.new()
-		glow.name = "Glow"
-		glow.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		glow.offset_left = -22
-		glow.offset_top = -13
-		glow.offset_right = 22
-		glow.offset_bottom = 13
-		glow.z_index = -1
-		add_child(glow)
-		move_child(glow, 0)
 	if glow:
-		glow.color = Color(body_color.r, body_color.g, body_color.b, 0.35)
+		glow.visible = false
+
+	if death_particles:
+		death_particles.color = body_color.lightened(0.2)
+
 	if hp_bar:
 		hp_bar.max_value = max_health
 		hp_bar.value = health
-		hp_bar.offset_left = -22
-		hp_bar.offset_top = -30
-		hp_bar.offset_right = 22
-		hp_bar.offset_bottom = -22
+		hp_bar.offset_left = -24
+		hp_bar.offset_top = -36
+		hp_bar.offset_right = 24
+		hp_bar.offset_bottom = -28
 
 
 func set_throttle(value: float) -> void:
@@ -259,6 +268,8 @@ func _die() -> void:
 	velocity = Vector2.ZERO
 	if death_particles:
 		death_particles.emitting = true
+	if body_sprite:
+		body_sprite.visible = false
 	if body_rect:
 		body_rect.visible = false
 	if hp_bar:

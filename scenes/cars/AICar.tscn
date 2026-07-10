@@ -3,7 +3,7 @@
 [ext_resource type="Script" path="res://scripts/cars/AICar.gd" id="1_ai"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
-size = Vector2(36, 20)
+size = Vector2(48, 28)
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_hp"]
 bg_color = Color(0.9, 0.35, 0.35, 1)

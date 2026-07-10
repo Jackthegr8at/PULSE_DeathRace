@@ -47,7 +47,7 @@ func _apply_styles() -> void:
 	# Darker full-screen backdrop if present
 	var bg := get_node_or_null("Background") as ColorRect
 	if bg:
-		bg.color = Color(0.04, 0.05, 0.08)
+		bg.color = Color(0.28, 0.42, 0.26)
 	GameStyle.apply_label(subtitle, GameStyle.TEXT_MUTED, 14)
 	GameStyle.apply_label(controls_label, GameStyle.TEXT_DIM, 12)
 	GameStyle.apply_label(lap_hint, GameStyle.TEXT_MUTED, 12)

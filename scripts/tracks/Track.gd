@@ -74,36 +74,80 @@ func _build_figure8() -> void:
 
 
 func _draw_background() -> void:
-	# Industrial night arena floor (concept art mood)
+	## Painterly countryside: grass fields + soft color variation (no neon).
 	var floor_rect := ColorRect.new()
-	floor_rect.name = "ArenaFloor"
-	floor_rect.color = Color(0.07, 0.08, 0.11)
-	floor_rect.position = Vector2(80, 20)
-	floor_rect.size = Vector2(1840, 1000)
+	floor_rect.name = "GrassField"
+	floor_rect.color = Color(0.42, 0.62, 0.32)
+	floor_rect.position = Vector2(40, 0)
+	floor_rect.size = Vector2(1920, 1040)
 	_visuals_root.add_child(floor_rect)
 
-	# Subtle grid
-	var grid := Node2D.new()
-	grid.name = "Grid"
-	_visuals_root.add_child(grid)
-	for x in range(0, 20):
-		var v := Line2D.new()
-		v.width = 1.0
-		v.default_color = Color(1, 1, 1, 0.03)
-		v.add_point(Vector2(100 + x * 90, 40))
-		v.add_point(Vector2(100 + x * 90, 1000))
-		grid.add_child(v)
-	for y in range(0, 12):
-		var h := Line2D.new()
-		h.width = 1.0
-		h.default_color = Color(1, 1, 1, 0.03)
-		h.add_point(Vector2(100, 40 + y * 80))
-		h.add_point(Vector2(1900, 40 + y * 80))
-		grid.add_child(h)
+	# Soft grass patches (painterly blobs)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 42
+	for i in 28:
+		var c := Color(
+			rng.randf_range(0.34, 0.52),
+			rng.randf_range(0.55, 0.72),
+			rng.randf_range(0.24, 0.38),
+			0.55
+		)
+		var pos := Vector2(rng.randf_range(120, 1880), rng.randf_range(60, 980))
+		_add_circle_poly(pos, rng.randf_range(40, 110), c, _visuals_root)
 
-	# Dark infields (inside loops)
-	_add_circle_poly(left_center, loop_radius - track_half_width - 6.0, Color(0.05, 0.06, 0.08), _visuals_root)
-	_add_circle_poly(right_center, loop_radius - track_half_width - 6.0, Color(0.05, 0.06, 0.08), _visuals_root)
+	# Infield meadow (inside loops)
+	_add_circle_poly(left_center, loop_radius - track_half_width - 4.0, Color(0.38, 0.58, 0.3), _visuals_root)
+	_add_circle_poly(right_center, loop_radius - track_half_width - 4.0, Color(0.4, 0.6, 0.32), _visuals_root)
+
+	_scatter_props()
+
+
+func _scatter_props() -> void:
+	var tree_tex := load("res://assets/sprites/prop_tree.png") as Texture2D
+	var rock_tex := load("res://assets/sprites/prop_rock.png") as Texture2D
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	var props := Node2D.new()
+	props.name = "Props"
+	_visuals_root.add_child(props)
+
+	# Trees around the outer edge of the arena
+	for i in 14:
+		var ang := rng.randf() * TAU
+		var dist := loop_radius + track_half_width + rng.randf_range(90, 220)
+		var center := left_center if i % 2 == 0 else right_center
+		# Mix of both loops and outer ring
+		if i > 8:
+			center = (left_center + right_center) * 0.5
+			dist = rng.randf_range(420, 560)
+			ang = rng.randf() * TAU
+		var pos: Vector2 = center + Vector2(cos(ang), sin(ang)) * dist
+		# Keep off the racing line roughly
+		if pos.distance_to(left_center) < loop_radius + track_half_width + 30:
+			continue
+		if pos.distance_to(right_center) < loop_radius + track_half_width + 30:
+			continue
+		if tree_tex:
+			var spr := Sprite2D.new()
+			spr.texture = tree_tex
+			spr.position = pos
+			spr.scale = Vector2.ONE * rng.randf_range(0.7, 1.15)
+			spr.z_index = 2
+			props.add_child(spr)
+
+	for i in 10:
+		var ang := rng.randf() * TAU
+		var center := left_center if i % 2 == 0 else right_center
+		var dist := loop_radius + track_half_width + rng.randf_range(50, 140)
+		var pos: Vector2 = center + Vector2(cos(ang), sin(ang)) * dist
+		if rock_tex:
+			var spr := Sprite2D.new()
+			spr.texture = rock_tex
+			spr.position = pos
+			spr.scale = Vector2.ONE * rng.randf_range(0.45, 0.85)
+			spr.rotation = rng.randf() * TAU
+			spr.z_index = 1
+			props.add_child(spr)
 
 
 func _build_path() -> void:
@@ -111,7 +155,6 @@ func _build_path() -> void:
 	race_path.name = "RacePath"
 	var curve := Curve2D.new()
 
-	# Continuous figure-8: left loop then right loop
 	var segments := 48
 	for i in segments:
 		var t := float(i) / float(segments)
@@ -129,97 +172,62 @@ func _build_path() -> void:
 	race_path.curve = curve
 	add_child(race_path)
 
-	_draw_neon_track_ribbon(curve)
+	_draw_dirt_track_ribbon(curve)
 
 
-func _draw_neon_track_ribbon(curve: Curve2D) -> void:
-	## Concept-style asphalt + cyan/purple neon edges + yellow dashes.
+func _draw_dirt_track_ribbon(curve: Curve2D) -> void:
+	## Warm dirt / packed earth road with bold dark outlines (toon, not neon).
 	var baked := curve.get_baked_points()
 	if baked.is_empty():
 		return
 
-	# Outer neon glow (wide, soft)
-	var glow := Line2D.new()
-	glow.name = "NeonGlow"
-	glow.width = track_half_width * 2.0 + 28.0
-	glow.default_color = Color(0.18, 0.75, 1.0, 0.12)
-	glow.begin_cap_mode = Line2D.LINE_CAP_ROUND
-	glow.end_cap_mode = Line2D.LINE_CAP_ROUND
-	glow.joint_mode = Line2D.LINE_JOINT_ROUND
+	# Bold outer outline (comic ink)
+	var outline := Line2D.new()
+	outline.name = "TrackOutline"
+	outline.width = track_half_width * 2.0 + 14.0
+	outline.default_color = Color(0.12, 0.1, 0.08, 1.0)
+	outline.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	outline.end_cap_mode = Line2D.LINE_CAP_ROUND
+	outline.joint_mode = Line2D.LINE_JOINT_ROUND
 	for p in baked:
-		glow.add_point(p)
-	_visuals_root.add_child(glow)
+		outline.add_point(p)
+	_visuals_root.add_child(outline)
 
-	# Asphalt body
-	var asphalt := Line2D.new()
-	asphalt.name = "AsphaltRibbon"
-	asphalt.width = track_half_width * 2.0
-	asphalt.default_color = Color(0.16, 0.18, 0.22, 1.0)
-	asphalt.begin_cap_mode = Line2D.LINE_CAP_ROUND
-	asphalt.end_cap_mode = Line2D.LINE_CAP_ROUND
-	asphalt.joint_mode = Line2D.LINE_JOINT_ROUND
+	# Dirt body
+	var dirt := Line2D.new()
+	dirt.name = "DirtRibbon"
+	dirt.width = track_half_width * 2.0
+	dirt.default_color = Color(0.55, 0.42, 0.28, 1.0)
+	dirt.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	dirt.end_cap_mode = Line2D.LINE_CAP_ROUND
+	dirt.joint_mode = Line2D.LINE_JOINT_ROUND
 	for p in baked:
-		asphalt.add_point(p)
-	_visuals_root.add_child(asphalt)
+		dirt.add_point(p)
+	_visuals_root.add_child(dirt)
 
-	# Inner asphalt shade
-	var asphalt_inner := Line2D.new()
-	asphalt_inner.name = "AsphaltInner"
-	asphalt_inner.width = track_half_width * 1.55
-	asphalt_inner.default_color = Color(0.12, 0.13, 0.16, 1.0)
-	asphalt_inner.begin_cap_mode = Line2D.LINE_CAP_ROUND
-	asphalt_inner.end_cap_mode = Line2D.LINE_CAP_ROUND
-	asphalt_inner.joint_mode = Line2D.LINE_JOINT_ROUND
+	# Lighter packed center
+	var packed := Line2D.new()
+	packed.name = "DirtPacked"
+	packed.width = track_half_width * 1.35
+	packed.default_color = Color(0.62, 0.48, 0.32, 1.0)
+	packed.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	packed.end_cap_mode = Line2D.LINE_CAP_ROUND
+	packed.joint_mode = Line2D.LINE_JOINT_ROUND
 	for p in baked:
-		asphalt_inner.add_point(p)
-	_visuals_root.add_child(asphalt_inner)
+		packed.add_point(p)
+	_visuals_root.add_child(packed)
 
-	# Neon rails (cyan outer / purple inner) — concept art figure-8 edge lights
-	_add_neon_rail(baked, track_half_width + 2.0, Color(0.18, 0.94, 1.0, 0.9), "NeonOuter")
-	_add_neon_rail(baked, -(track_half_width + 2.0), Color(0.7, 0.3, 1.0, 0.85), "NeonInner")
-
-	# Yellow center dashes
-	var step := 18
+	# Soft cream dashed center line
+	var step := 16
 	var i := 0
-	while i + 8 < baked.size():
+	while i + 7 < baked.size():
 		var seg := Line2D.new()
 		seg.width = 3.0
-		seg.default_color = Color(1.0, 0.84, 0.3, 0.7)
+		seg.default_color = Color(0.95, 0.9, 0.7, 0.85)
 		seg.add_point(baked[i])
-		seg.add_point(baked[mini(i + 6, baked.size() - 1)])
+		seg.add_point(baked[mini(i + 5, baked.size() - 1)])
 		_visuals_root.add_child(seg)
 		i += step
-
-
-func _add_neon_rail(baked: PackedVector2Array, lateral: float, color: Color, rail_name: String) -> void:
-	var rail := Line2D.new()
-	rail.name = rail_name
-	rail.width = 6.0
-	rail.default_color = color
-	rail.begin_cap_mode = Line2D.LINE_CAP_ROUND
-	rail.end_cap_mode = Line2D.LINE_CAP_ROUND
-	rail.joint_mode = Line2D.LINE_JOINT_ROUND
-	for i in baked.size():
-		var p: Vector2 = baked[i]
-		var prev: Vector2 = baked[maxi(i - 1, 0)]
-		var next: Vector2 = baked[mini(i + 1, baked.size() - 1)]
-		var tangent := (next - prev).normalized()
-		if tangent.length_squared() < 0.0001:
-			tangent = Vector2.RIGHT
-		var normal := Vector2(-tangent.y, tangent.x) * lateral
-		rail.add_point(p + normal)
-	_visuals_root.add_child(rail)
-	# Soft glow twin
-	var glow := Line2D.new()
-	glow.name = rail_name + "Glow"
-	glow.width = 14.0
-	glow.default_color = Color(color.r, color.g, color.b, 0.2)
-	glow.begin_cap_mode = Line2D.LINE_CAP_ROUND
-	glow.end_cap_mode = Line2D.LINE_CAP_ROUND
-	glow.joint_mode = Line2D.LINE_JOINT_ROUND
-	for i in rail.get_point_count():
-		glow.add_point(rail.get_point_position(i))
-	_visuals_root.add_child(glow)
 
 
 func _build_walls() -> void:
@@ -270,7 +278,8 @@ func _add_outer_ring_walls(center: Vector2, radius: float, is_left: bool) -> voi
 		var vis := ColorRect.new()
 		vis.size = rect.size
 		vis.position = -rect.size * 0.5
-		vis.color = Color(0.2, 0.22, 0.26)
+		# Invisible collision only — visuals come from dirt outline / props
+		vis.color = Color(0.35, 0.45, 0.28, 0.0)
 		wall.add_child(vis)
 		wall.collision_layer = 1
 		wall.collision_mask = 0
@@ -289,7 +298,7 @@ func _add_wall_rect(rect: Rect2, wall_name: String) -> void:
 	var vis := ColorRect.new()
 	vis.size = rect.size
 	vis.position = -rect.size * 0.5
-	vis.color = Color(0.18, 0.2, 0.24)
+	vis.color = Color(0.45, 0.35, 0.22) # wood/fence-like barrier color
 	wall.add_child(vis)
 	wall.collision_layer = 1
 	_walls_root.add_child(wall)
@@ -304,7 +313,7 @@ func _add_wall_circle(center: Vector2, radius: float, wall_name: String) -> void
 	circle.radius = radius
 	shape.shape = circle
 	wall.add_child(shape)
-	_add_circle_poly(Vector2.ZERO, radius, Color(0.06, 0.07, 0.09), wall)
+	_add_circle_poly(Vector2.ZERO, radius, Color(0.36, 0.55, 0.28), wall)
 	wall.collision_layer = 1
 	_walls_root.add_child(wall)
 
@@ -360,13 +369,13 @@ func _add_start_finish(pos: Vector2, ang: float) -> void:
 	var vis := ColorRect.new()
 	vis.size = Vector2(14, track_half_width * 2.0)
 	vis.position = Vector2(-7, -track_half_width)
-	vis.color = Color(0.4, 0.95, 0.5, 0.55)
+	vis.color = Color(0.95, 0.88, 0.55, 0.75)
 	area.add_child(vis)
 	var label := Label.new()
 	label.text = "S/F"
 	label.position = Vector2(-14, -track_half_width - 20)
 	label.add_theme_font_size_override("font_size", 14)
-	label.add_theme_color_override("font_color", Color(0.6, 1.0, 0.7))
+	label.add_theme_color_override("font_color", Color(0.25, 0.2, 0.12))
 	area.add_child(label)
 	area.body_entered.connect(func(body: Node) -> void:
 		if body is Car:

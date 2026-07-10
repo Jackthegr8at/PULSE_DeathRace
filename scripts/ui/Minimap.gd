@@ -43,9 +43,9 @@ func _process(_delta: float) -> void:
 
 func _draw() -> void:
 	var r := Rect2(Vector2.ZERO, size)
-	# Panel fill
-	draw_rect(r, Color(0.04, 0.06, 0.1, 0.85), true)
-	draw_rect(r, Color(0.2, 0.55, 0.75, 0.4), false, 1.5)
+	# Warm ink panel
+	draw_rect(r, Color(0.18, 0.28, 0.16, 0.9), true)
+	draw_rect(r, Color(0.12, 0.1, 0.06, 0.95), false, 2.0)
 
 	if _path_points.size() < 2 or _bounds.size.x < 1.0:
 		return
@@ -55,10 +55,10 @@ func _draw() -> void:
 	for p in _path_points:
 		pts.append(_world_to_map(p, inner))
 
-	# Neon path
+	# Dirt path on grass minimap
 	if pts.size() >= 2:
-		draw_polyline(pts, Color(0.18, 0.9, 1.0, 0.55), 2.5, true)
-		draw_polyline(pts, Color(0.7, 0.3, 1.0, 0.35), 1.2, true)
+		draw_polyline(pts, Color(0.12, 0.1, 0.07, 0.9), 5.0, true)
+		draw_polyline(pts, Color(0.55, 0.42, 0.28, 0.95), 3.0, true)
 
 	# Cars
 	if get_tree() == null:

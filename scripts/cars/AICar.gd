@@ -23,11 +23,15 @@ func _ready() -> void:
 		display_name = "AI"
 
 
-func setup_ai(path: Path2D, color: Color, name_label: String) -> void:
+func setup_ai(path: Path2D, color: Color, name_label: String, sprite_path: String = "") -> void:
 	# race_path / _path_length live on Car (also used for lap tracking)
 	race_path = path
 	body_color = color
 	display_name = name_label
+	if sprite_path != "":
+		var tex := CarVisuals.load_texture(sprite_path)
+		if tex:
+			sprite_texture = tex
 	_apply_visuals()
 	if race_path and race_path.curve:
 		_path_length = race_path.curve.get_baked_length()

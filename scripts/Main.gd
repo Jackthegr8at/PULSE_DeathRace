@@ -23,7 +23,7 @@ var _ai_colors: Array[Color] = [
 
 func _ready() -> void:
 	# Dark arena clear color
-	RenderingServer.set_default_clear_color(Color(0.04, 0.05, 0.08))
+	RenderingServer.set_default_clear_color(Color(0.4, 0.58, 0.32))
 	_spawn_track()
 	# Let track finish building geometry this frame
 	await get_tree().process_frame
@@ -66,7 +66,8 @@ func _spawn_cars() -> void:
 		ai.setup_lap_tracking(path)
 		if ai.has_method("setup_ai"):
 			var color := _ai_colors[i % _ai_colors.size()]
-			ai.setup_ai(path, color, "AI-%d" % (i + 1))
+			var sprite_path: String = CarVisuals.AI_LIST[i % CarVisuals.AI_LIST.size()]
+			ai.setup_ai(path, color, "AI-%d" % (i + 1), sprite_path)
 		ai.died.connect(_on_car_died)
 		ai.race_finished.connect(_on_car_race_finished)
 		cars.append(ai)

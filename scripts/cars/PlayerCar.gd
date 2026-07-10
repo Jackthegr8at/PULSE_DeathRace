@@ -7,11 +7,11 @@ extends Car
 
 
 func _ready() -> void:
-	super._ready()
 	display_name = "Player"
-	if body_color == Color(0.3, 0.8, 0.45):
-		body_color = Color(0.29, 0.87, 0.5)
-		_apply_visuals()
+	body_color = Color(0.25, 0.75, 0.4)
+	if sprite_texture == null:
+		sprite_texture = CarVisuals.load_texture(CarVisuals.PLAYER)
+	super._ready()
 	if camera and camera_enabled:
 		camera.enabled = true
 		camera.make_current()
