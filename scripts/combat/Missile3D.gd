@@ -6,10 +6,10 @@ extends Area3D
 @export var damage: float = 15.0
 @export var lifetime: float = 2.5
 ## Scale the imported GLB (tweak if too big/small in game).
-@export var model_scale: float = 1.0
+@export var model_scale: float = 0.25
 ## Local rotation (degrees) so the GLB nose matches Area3D -Z (look_at forward).
-## Common: (90,0,0) if the model points +Y; (0,180,0) if it points +Z.
-@export var model_rotation_degrees: Vector3 = Vector3(0, 0, 0)
+## 180° Y flips nose when the mesh faces the wrong way along Z.
+@export var model_rotation_degrees: Vector3 = Vector3(0, 180, 0)
 
 var owner_vehicle: Vehicle = null
 var _velocity: Vector3 = Vector3.ZERO
