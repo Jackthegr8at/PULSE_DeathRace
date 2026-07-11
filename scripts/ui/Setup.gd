@@ -27,8 +27,8 @@ extends Control
 var _selected_mode: MatchConfig.Mode = MatchConfig.Mode.HYBRID
 var _selected_track: MatchConfig.TrackId = MatchConfig.TrackId.KENNEY_DEFAULT
 var _lap_count: int = 5
-var _crate_count: int = 8
-var _missiles_per_crate: int = 1
+var _crate_count: int = 5
+var _missiles_per_crate: int = 2
 var _mode_buttons: Array[Button] = []
 var _track_buttons: Array[Button] = []
 

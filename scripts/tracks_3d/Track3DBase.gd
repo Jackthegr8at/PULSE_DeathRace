@@ -211,14 +211,37 @@ func _spawn_missile_pickups() -> void:
 	var n := maxi(MatchConfig.crate_count, 0)
 	if n == 0:
 		return
-	# Spread pickups around the lap, starting after first_pickup_path_fraction
-	var usable := 1.0 - first_pickup_path_fraction
-	for i in n:
-		var t := first_pickup_path_fraction + usable * (float(i) + 0.5) / float(n)
-		var offset := length * t
+
+	# Random path offsets (skip start grid), with a soft min spacing so crates don't stack
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	var min_frac := first_pickup_path_fraction
+	var min_spacing := maxf(length * 0.06, 4.0) # at least ~4m or 6% of lap apart
+	var chosen_offsets: Array[float] = []
+	var attempts := 0
+	var max_attempts := n * 40
+	while chosen_offsets.size() < n and attempts < max_attempts:
+		attempts += 1
+		var off := rng.randf_range(length * min_frac, length * 0.98)
+		var ok := true
+		for existing in chosen_offsets:
+			var dist := absf(off - existing)
+			dist = mini(dist, length - dist) # wrap-aware distance
+			if dist < min_spacing:
+				ok = false
+				break
+		if ok:
+			chosen_offsets.append(off)
+
+	# If RNG couldn't place enough (short track), fill remaining evenly
+	while chosen_offsets.size() < n:
+		var t := min_frac + (1.0 - min_frac) * (float(chosen_offsets.size()) + 0.5) / float(n)
+		chosen_offsets.append(length * t)
+
+	for i in chosen_offsets.size():
+		var offset: float = chosen_offsets[i]
 		var local_pos := path.curve.sample_baked(offset)
 		var world_pos := path.to_global(local_pos)
-		# Slight lateral offset alternating so crates sit on the road edge of centerline
 		var ahead := path.to_global(path.curve.sample_baked(fmod(offset + 1.0, length)))
 		var tangent := ahead - world_pos
 		tangent.y = 0.0
@@ -227,7 +250,10 @@ func _spawn_missile_pickups() -> void:
 		else:
 			tangent = Vector3(0, 0, 1)
 		var side := Vector3.UP.cross(tangent).normalized()
-		var lateral := side * (0.7 if i % 2 == 0 else -0.7)
+		# Random side of the road + slight jitter so layout varies each race
+		var lateral_sign := 1.0 if rng.randf() > 0.5 else -1.0
+		var lateral_amt := rng.randf_range(0.35, 0.95)
+		var lateral := side * lateral_sign * lateral_amt
 
 		var pickup: Area3D = MissilePickupScene.instantiate()
 		root.add_child(pickup)
