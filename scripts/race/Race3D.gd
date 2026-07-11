@@ -76,10 +76,12 @@ func _spawn_field() -> void:
 			ai.display_name = "AI-%d" % (i + 1)
 		ai.died.connect(_on_vehicle_died)
 		ai.race_finished.connect(_on_race_finished)
-		# Slightly easier targets
+		# Slightly easier than the player; small variety so packs don't clone
 		ai.max_health = 100.0
 		ai.health = 100.0
-		ai.ai_throttle = 0.65
+		ai.ai_throttle = 0.72 + float(i % 3) * 0.04
+		ai.ai_corner_throttle = 0.46
+		ai.path_look_ahead = 5.2 + float(i % 3) * 0.4
 		vehicles.append(ai)
 
 	_update_alive_hud()

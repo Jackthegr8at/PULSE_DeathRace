@@ -1,0 +1,68 @@
+<h2>How do you win in the v1 prototype?</h2>
+<p class="subtitle">Figure-8 chaos is set. This decides the core loop and UI for phase 1. Click to select.</p>
+
+<div class="cards">
+  <div class="card" data-choice="last_standing" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#1a1a2e;padding:20px;min-height:150px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;">
+      <div style="display:flex;gap:10px;align-items:flex-end;">
+        <div style="width:28px;height:18px;background:#48bb78;border-radius:3px;"></div>
+        <div style="width:28px;height:18px;background:#fc8181;border-radius:3px;opacity:0.25;position:relative;">
+          <span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fc8181;font-size:18px;">✕</span>
+        </div>
+        <div style="width:28px;height:18px;background:#63b3ed;border-radius:3px;opacity:0.25;position:relative;">
+          <span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#63b3ed;font-size:18px;">✕</span>
+        </div>
+        <div style="width:28px;height:18px;background:#d6bcfa;border-radius:3px;opacity:0.25;position:relative;">
+          <span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#d6bcfa;font-size:18px;">✕</span>
+        </div>
+      </div>
+      <div style="background:#2d3748;color:#f6e05e;padding:6px 16px;border-radius:6px;font-family:monospace;font-size:13px;">
+        YOU WIN — LAST CAR STANDING
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Last Car Standing</h3>
+      <p>Pure combat. Kill everyone else. Laps are optional flavor (or skip them in v1).</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="race_first" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#1a1a2e;padding:20px;min-height:150px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;">
+      <div style="color:#a0aec0;font-family:monospace;font-size:12px;">LAP 3 / 3</div>
+      <div style="display:flex;flex-direction:column;gap:4px;width:80%;">
+        <div style="display:flex;justify-content:space-between;background:#2d3748;padding:4px 8px;border-radius:4px;font-size:11px;color:#48bb78;"><span>1. YOU</span><span>✓</span></div>
+        <div style="display:flex;justify-content:space-between;background:#2d3748;padding:4px 8px;border-radius:4px;font-size:11px;color:#a0aec0;"><span>2. AI-1</span><span>…</span></div>
+        <div style="display:flex;justify-content:space-between;background:#2d3748;padding:4px 8px;border-radius:4px;font-size:11px;color:#a0aec0;"><span>3. AI-2</span><span>DEAD</span></div>
+      </div>
+      <div style="background:#2d3748;color:#68d391;padding:6px 16px;border-radius:6px;font-family:monospace;font-size:13px;">
+        YOU WIN — FINISHED FIRST
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Race First (combat secondary)</h3>
+      <p>Cross the finish after N laps. Shooting slows / kills rivals so you can pull ahead.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="hybrid" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#1a1a2e;padding:20px;min-height:150px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;">
+      <div style="display:flex;gap:16px;font-family:monospace;font-size:11px;color:#a0aec0;">
+        <span>LAP 2/3</span>
+        <span>ALIVE 3/4</span>
+      </div>
+      <div style="background:#553c9a;color:#e9d8fd;padding:8px 12px;border-radius:6px;font-family:monospace;font-size:11px;text-align:center;line-height:1.4;max-width:90%;">
+        Win by finishing race<br/>OR eliminate all others
+      </div>
+      <div style="display:flex;gap:8px;">
+        <span style="background:#2d3748;color:#68d391;padding:4px 8px;border-radius:4px;font-size:10px;">RACE WIN</span>
+        <span style="background:#2d3748;color:#f6e05e;padding:4px 8px;border-radius:4px;font-size:10px;">WIPEOUT</span>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Hybrid (recommended for DeathRace vibe)</h3>
+      <p>Either finish first after N laps, or be the last car alive. Matches Flash-era death race energy.</p>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:1.5rem;">Your original brief mentioned both lap UI and last-standing — hybrid ties those together.</p>

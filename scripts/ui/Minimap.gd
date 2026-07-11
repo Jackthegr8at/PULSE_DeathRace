@@ -44,8 +44,9 @@ func _process(_delta: float) -> void:
 func _draw() -> void:
 	var r := Rect2(Vector2.ZERO, size)
 	# Warm ink panel
-	draw_rect(r, Color(0.18, 0.28, 0.16, 0.9), true)
-	draw_rect(r, Color(0.12, 0.1, 0.06, 0.95), false, 2.0)
+	draw_rect(r, GameStyle.FIELD.darkened(0.38), true)
+	draw_rect(r, GameStyle.INK, false, 3.0)
+	draw_rect(r.grow(-5.0), Color(0.92, 0.76, 0.42, 0.08), false, 2.0)
 
 	if _path_points.size() < 2 or _bounds.size.x < 1.0:
 		return
@@ -57,8 +58,8 @@ func _draw() -> void:
 
 	# Dirt path on grass minimap
 	if pts.size() >= 2:
-		draw_polyline(pts, Color(0.12, 0.1, 0.07, 0.9), 5.0, true)
-		draw_polyline(pts, Color(0.55, 0.42, 0.28, 0.95), 3.0, true)
+		draw_polyline(pts, GameStyle.INK, 7.0, true)
+		draw_polyline(pts, GameStyle.EARTH, 4.0, true)
 
 	# Cars
 	if get_tree() == null:
@@ -73,8 +74,8 @@ func _draw() -> void:
 		var col := car.body_color
 		if car == player:
 			col = GameStyle.SUCCESS
-		draw_circle(mp, 4.0 if car == player else 3.0, col)
-		draw_arc(mp, 4.5 if car == player else 3.5, 0, TAU, 12, col.lightened(0.3), 1.0)
+		draw_circle(mp, 5.0 if car == player else 3.5, GameStyle.INK)
+		draw_circle(mp, 3.5 if car == player else 2.5, col)
 
 
 func _world_to_map(world: Vector2, inner: Rect2) -> Vector2:

@@ -1,0 +1,53 @@
+<h2>Got it — mode setup is in scope</h2>
+<p class="subtitle">Pre-match setup will let you pick race length (or pure last-standing). Next: how many AI in the prototype default?</p>
+
+<div class="mockup" style="margin-bottom:1.5rem;">
+  <div class="mockup-header">Preview: Match Setup (phase 1)</div>
+  <div class="mockup-body" style="background:#1a1a2e;padding:20px;font-family:monospace;color:#e2e8f0;">
+    <div style="text-align:center;color:#f6e05e;font-size:16px;margin-bottom:16px;">PULSE DEATHRACE</div>
+    <div style="display:grid;gap:10px;max-width:280px;margin:0 auto;">
+      <div style="background:#2d3748;padding:10px;border-radius:6px;">
+        <div style="font-size:10px;color:#a0aec0;margin-bottom:4px;">MODE</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <span style="background:#553c9a;padding:4px 8px;border-radius:4px;font-size:11px;">HYBRID</span>
+          <span style="background:#1a202c;padding:4px 8px;border-radius:4px;font-size:11px;opacity:0.7;">RACE ONLY</span>
+          <span style="background:#1a202c;padding:4px 8px;border-radius:4px;font-size:11px;opacity:0.7;">LAST STANDING</span>
+        </div>
+      </div>
+      <div style="background:#2d3748;padding:10px;border-radius:6px;">
+        <div style="font-size:10px;color:#a0aec0;margin-bottom:4px;">LAPS (disabled in Last Standing)</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <span style="opacity:0.5;">◀</span>
+          <span style="color:#68d391;">5</span>
+          <span style="opacity:0.5;">▶</span>
+        </div>
+      </div>
+      <div style="background:#48bb78;color:#1a202c;text-align:center;padding:10px;border-radius:6px;font-weight:bold;">START RACE</div>
+    </div>
+  </div>
+</div>
+
+<h3 style="margin-bottom:0.75rem;">Default AI opponents in v1?</h3>
+<div class="options">
+  <div class="option" data-choice="ai_3" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>3 AI (4 cars total)</h3>
+      <p>Clearer chaos, easier to read on a figure-8. Slightly less CPU for pathing.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="ai_4" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>4 AI (5 cars total) <span style="opacity:0.7;font-size:0.85em">(recommended)</span></h3>
+      <p>Fuller grid for deathrace feel. Still simple for prototype.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="ai_export" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>4 default + setup slider later</h3>
+      <p>Ship 4 AI now; setup only tunes mode/laps in v1. Opponent count comes next phase.</p>
+    </div>
+  </div>
+</div>

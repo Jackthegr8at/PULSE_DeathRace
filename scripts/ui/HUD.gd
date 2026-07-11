@@ -254,18 +254,27 @@ func _build_ui() -> void:
 	_panel_margin(nitro_panel, nitro_box)
 	br.add_child(nitro_panel)
 
-	# Center watermark title
+	# Center painted title banner
+	var title_panel := PanelContainer.new()
+	title_panel.anchor_left = 0.5
+	title_panel.anchor_right = 0.5
+	title_panel.offset_left = -170
+	title_panel.offset_right = 170
+	title_panel.offset_top = 14
+	title_panel.offset_bottom = 58
+	title_panel.add_theme_stylebox_override(
+		"panel", GameStyle.concept_panel(GameStyle.WOOD, GameStyle.INK, 12.0, 3.0)
+	)
+	title_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var title := Label.new()
 	title.text = "PULSE DEATHRACE"
-	title.anchor_left = 0.5
-	title.anchor_right = 0.5
-	title.offset_left = -140
-	title.offset_right = 140
-	title.offset_top = 18
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	GameStyle.apply_label(title, Color(0.15, 0.12, 0.08, 0.2), 14)
+	GameStyle.apply_label(title, GameStyle.TEXT, 20)
+	title.add_theme_color_override("font_outline_color", GameStyle.INK)
+	title.add_theme_constant_override("outline_size", 4)
 	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	root.add_child(title)
+	title_panel.add_child(title)
+	root.add_child(title_panel)
 
 	# Controls hint bottom center
 	controls_hint = Label.new()

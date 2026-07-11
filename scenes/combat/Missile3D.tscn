@@ -1,21 +1,20 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene format=3 uid="uid://i2ogb8trn8k8"]
 
-[ext_resource type="Script" path="res://scripts/combat/Missile3D.gd" id="1_script"]
-[ext_resource type="PackedScene" path="res://scenes/combat/missile.glb" id="2_missile"]
+[ext_resource type="Script" uid="uid://cf6en3wm5pmti" path="res://scripts/combat/Missile3D.gd" id="1_script"]
+[ext_resource type="PackedScene" uid="uid://u56vtkrw60sa" path="res://scenes/combat/missile.glb" id="2_missile"]
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_hit"]
 radius = 0.4
 
-[node name="Missile3D" type="Area3D"]
+[node name="Missile3D" type="Area3D" unique_id=204940511]
 collision_layer = 16
 collision_mask = 9
-monitoring = true
 script = ExtResource("1_script")
-model_scale = 0.25
-model_rotation_degrees = Vector3(0, 180, 0)
+speed = 23.0
+model_scale = 0.4
 
-[node name="Model" parent="." instance=ExtResource("2_missile")]
+[node name="Model" parent="." unique_id=32670216 instance=ExtResource("2_missile")]
 transform = Transform3D(-0.25, 0, 0, 0, 0.25, 0, 0, 0, -0.25, 0, 0, 0)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1533063137]
 shape = SubResource("SphereShape3D_hit")

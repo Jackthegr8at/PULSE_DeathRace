@@ -2,13 +2,19 @@ class_name GameStyle
 extends RefCounted
 ## Warm painterly UI palette (adventure-game feel, minimal neon).
 
-const BG := Color("1a2218")
-const BG_DEEP := Color("121812")
-const SURFACE := Color(0.12, 0.16, 0.12, 0.88)
-const SURFACE_RAISED := Color(0.16, 0.2, 0.15, 0.92)
-const SURFACE_HOVER := Color(0.22, 0.28, 0.2, 0.95)
-const BORDER := Color(0.2, 0.16, 0.1, 0.85)
-const BORDER_GLOW := Color(0.45, 0.38, 0.22, 0.9)
+const BG := Color("294b2b")
+const BG_DEEP := Color("17251a")
+const SURFACE := Color(0.15, 0.18, 0.13, 0.94)
+const SURFACE_RAISED := Color(0.27, 0.20, 0.12, 0.96)
+const SURFACE_HOVER := Color(0.38, 0.29, 0.16, 0.98)
+const BORDER := Color(0.08, 0.07, 0.05, 0.96)
+const BORDER_GLOW := Color(0.82, 0.58, 0.22, 0.98)
+const INK := Color("17160f")
+const WOOD := Color("9b552d")
+const WOOD_LIGHT := Color("d17d3e")
+const FIELD := Color("5b9d43")
+const EARTH := Color("b9773e")
+const SKY := Color("77c8be")
 
 const ACCENT := Color("e8b84a") ## Warm gold
 const ACCENT_DIM := Color("b8892e")
@@ -54,8 +60,16 @@ static func chip(bg: Color = SURFACE_RAISED, border: Color = BORDER) -> StyleBox
 
 
 static func glass_chip() -> StyleBoxFlat:
-	## Dark translucent chip with warm ink border (comic card, not neon glass).
-	return chip(Color(0.1, 0.14, 0.1, 0.82), Color(0.15, 0.12, 0.08, 0.95))
+	## Painted wood/metal badge: warm surface, comic ink outline, soft lift.
+	return concept_panel(Color(0.12, 0.15, 0.1, 0.94), BORDER, 10.0, 3.0)
+
+
+static func concept_panel(bg: Color = SURFACE, border: Color = BORDER, radius: float = 12.0, border_w: float = 3.0) -> StyleBoxFlat:
+	var s := panel(bg, border, radius, border_w)
+	s.shadow_color = Color(0.03, 0.04, 0.02, 0.55)
+	s.shadow_size = 8
+	s.shadow_offset = Vector2(0, 4)
+	return s
 
 
 static func button_normal(bg: Color = SURFACE_RAISED, border: Color = BORDER) -> StyleBoxFlat:

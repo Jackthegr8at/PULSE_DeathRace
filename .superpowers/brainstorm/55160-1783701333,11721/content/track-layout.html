@@ -1,0 +1,77 @@
+<h2>Which track shape for the prototype?</h2>
+<p class="subtitle">This is the closed course cars race and fight on. Click to select.</p>
+
+<div class="cards">
+  <div class="card" data-choice="oval" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#1a1a2e;padding:24px;display:flex;align-items:center;justify-content:center;min-height:160px;">
+      <svg width="200" height="120" viewBox="0 0 200 120">
+        <!-- Outer oval wall -->
+        <ellipse cx="100" cy="60" rx="90" ry="50" fill="none" stroke="#4a5568" stroke-width="8"/>
+        <!-- Inner oval (infield) -->
+        <ellipse cx="100" cy="60" rx="45" ry="22" fill="#16213e" stroke="#4a5568" stroke-width="8"/>
+        <!-- Track surface -->
+        <ellipse cx="100" cy="60" rx="78" ry="42" fill="none" stroke="#2d3748" stroke-width="22"/>
+        <!-- Start/finish -->
+        <line x1="100" y1="10" x2="100" y2="38" stroke="#f6e05e" stroke-width="3" stroke-dasharray="4 3"/>
+        <!-- Cars -->
+        <rect x="92" y="14" width="10" height="6" rx="1" fill="#48bb78" transform="rotate(0 97 17)"/>
+        <rect x="70" y="20" width="10" height="6" rx="1" fill="#fc8181" transform="rotate(-40 75 23)"/>
+        <rect x="130" y="22" width="10" height="6" rx="1" fill="#63b3ed" transform="rotate(35 135 25)"/>
+      </svg>
+    </div>
+    <div class="card-body">
+      <h3>A — Simple Oval</h3>
+      <p>Easiest AI pathing. Classic arena feel. Fast to build and debug.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="figure8" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#1a1a2e;padding:24px;display:flex;align-items:center;justify-content:center;min-height:160px;">
+      <svg width="200" height="120" viewBox="0 0 200 120">
+        <!-- Left loop -->
+        <ellipse cx="60" cy="60" rx="45" ry="40" fill="none" stroke="#2d3748" stroke-width="18"/>
+        <!-- Right loop -->
+        <ellipse cx="140" cy="60" rx="45" ry="40" fill="none" stroke="#2d3748" stroke-width="18"/>
+        <!-- Crossing highlight -->
+        <rect x="90" y="50" width="20" height="20" fill="#f6ad55" opacity="0.35"/>
+        <text x="100" y="64" text-anchor="middle" fill="#f6ad55" font-size="10" font-family="sans-serif">X</text>
+        <!-- Walls hint -->
+        <ellipse cx="60" cy="60" rx="52" ry="47" fill="none" stroke="#4a5568" stroke-width="3"/>
+        <ellipse cx="140" cy="60" rx="52" ry="47" fill="none" stroke="#4a5568" stroke-width="3"/>
+        <!-- Cars -->
+        <rect x="30" y="30" width="10" height="6" rx="1" fill="#48bb78" transform="rotate(-50 35 33)"/>
+        <rect x="155" y="75" width="10" height="6" rx="1" fill="#fc8181" transform="rotate(40 160 78)"/>
+        <rect x="95" y="55" width="10" height="6" rx="1" fill="#63b3ed"/>
+      </svg>
+    </div>
+    <div class="card-body">
+      <h3>B — Figure-8</h3>
+      <p>Crossroads chaos. More Flash-game energy. Slightly harder AI + collision setup.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="rounded_rect" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#1a1a2e;padding:24px;display:flex;align-items:center;justify-content:center;min-height:160px;">
+      <svg width="200" height="120" viewBox="0 0 200 120">
+        <!-- Outer wall -->
+        <rect x="15" y="12" width="170" height="96" rx="28" fill="none" stroke="#4a5568" stroke-width="6"/>
+        <!-- Track -->
+        <rect x="28" y="24" width="144" height="72" rx="20" fill="none" stroke="#2d3748" stroke-width="20"/>
+        <!-- Infield -->
+        <rect x="55" y="42" width="90" height="36" rx="10" fill="#16213e" stroke="#4a5568" stroke-width="4"/>
+        <!-- Start/finish -->
+        <line x1="100" y1="12" x2="100" y2="34" stroke="#f6e05e" stroke-width="3" stroke-dasharray="4 3"/>
+        <!-- Cars -->
+        <rect x="92" y="18" width="10" height="6" rx="1" fill="#48bb78"/>
+        <rect x="155" y="50" width="10" height="6" rx="1" fill="#fc8181" transform="rotate(90 160 53)"/>
+        <rect x="40" y="55" width="10" height="6" rx="1" fill="#63b3ed" transform="rotate(90 45 58)"/>
+      </svg>
+    </div>
+    <div class="card-body">
+      <h3>C — Rounded Rectangle</h3>
+      <p>Long straights for shooting, tight corners for combat. Good middle ground.</p>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:1.5rem;">Recommended for v1: <strong>A — Simple Oval</strong> (fastest path to a playable prototype).</p>

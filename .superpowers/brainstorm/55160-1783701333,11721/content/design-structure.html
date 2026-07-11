@@ -1,0 +1,56 @@
+<h2>Design §1 — Project structure</h2>
+<p class="subtitle">Approach 2: shared car, track scenes, match config. Confirm this layout before we go deeper.</p>
+
+<div class="section">
+  <pre style="background:#1a1a2e;color:#e2e8f0;padding:16px;border-radius:8px;font-size:12px;line-height:1.5;overflow:auto;margin:0;">PULSE_DeathRace/
+├── project.godot
+├── scenes/
+│   ├── Setup.tscn          # mode + laps → START
+│   ├── Main.tscn           # race root (Node2D)
+│   ├── ui/
+│   │   ├── HUD.tscn        # timer, laps, HP, alive count
+│   │   └── EndScreen.tscn  # You Win / Game Over
+│   ├── cars/
+│   │   ├── Car.tscn        # shared CharacterBody2D
+│   │   └── Missile.tscn    # Area2D projectile
+│   └── tracks/
+│       └── Figure8.tscn      # walls + Path2D + spawn points
+├── scripts/
+│   ├── autoload/
+│   │   └── MatchConfig.gd  # mode, lap_count, apply from Setup
+│   ├── cars/
+│   │   ├── Car.gd          # physics, health, shoot, explode
+│   │   ├── PlayerCar.gd    # input → car API
+│   │   ├── AICar.gd        # path follow + shoot
+│   │   └── Missile.gd
+│   ├── tracks/
+│   │   └── Track.gd        # spawn points, path, lap checkpoints
+│   ├── ui/
+│   │   ├── Setup.gd
+│   │   ├── HUD.gd
+│   │   └── EndScreen.gd
+│   └── Main.gd             # spawn cars, win checks, camera
+└── docs/                   # design specs (later)</pre>
+</div>
+
+<div class="pros-cons">
+  <div class="pros">
+    <h4>Why this shape</h4>
+    <ul>
+      <li>New map = new scene under <code>tracks/</code></li>
+      <li>Modes/laps live in MatchConfig, not hardcode</li>
+      <li>Car logic once; player/AI only control intent</li>
+      <li>Clear extraction points for option-3 components later</li>
+    </ul>
+  </div>
+  <div class="cons">
+    <h4>Phase 1 limits</h4>
+    <ul>
+      <li>One track (Figure-8) only</li>
+      <li>Placeholder shapes, no art pipeline</li>
+      <li>No blockchain / XPR</li>
+    </ul>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:1rem;">Does §1 look right? Reply yes / changes, then we’ll cover cars &amp; combat.</p>

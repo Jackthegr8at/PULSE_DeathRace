@@ -9,10 +9,10 @@ signal car_lap_line(car: Car)
 @export var track_scale: float = 1.0
 
 ## Centers and radii for the two loops (world units).
-@export var left_center: Vector2 = Vector2(700, 520)
-@export var right_center: Vector2 = Vector2(1300, 520)
+@export var left_center: Vector2 = Vector2(635, 550)
+@export var right_center: Vector2 = Vector2(1410, 550)
 @export var loop_radius: float = 280.0
-@export var track_half_width: float = 100.0 ## Wider lane = fewer accidental wall rides
+@export var track_half_width: float = 110.0 ## Matches the painted road width
 
 var race_path: Path2D
 var spawn_markers: Array[Marker2D] = []
@@ -21,6 +21,7 @@ var checkpoint_count: int = 0
 var _walls_root: Node2D
 var _visuals_root: Node2D
 var _areas_root: Node2D
+var _using_concept_backdrop: bool = false
 
 
 func _ready() -> void:
@@ -74,10 +75,23 @@ func _build_figure8() -> void:
 
 
 func _draw_background() -> void:
-	## Painterly countryside: grass fields + soft color variation (no neon).
+	## Use the finished painted playfield as the visual foundation; gameplay remains procedural.
+	var concept_texture := load("res://assets/concept/figure8_playfield_painted.png") as Texture2D
+	if concept_texture:
+		_using_concept_backdrop = true
+		var backdrop := Sprite2D.new()
+		backdrop.name = "PaintedPlayfield"
+		backdrop.texture = concept_texture
+		backdrop.position = Vector2(1023, 520)
+		backdrop.scale = Vector2(1.15, 1.106)
+		backdrop.z_index = -10
+		_visuals_root.add_child(backdrop)
+		return
+
+	## Fallback procedural countryside if the painted playfield is unavailable.
 	var floor_rect := ColorRect.new()
 	floor_rect.name = "GrassField"
-	floor_rect.color = Color(0.42, 0.62, 0.32)
+	floor_rect.color = Color(0.34, 0.62, 0.26)
 	floor_rect.position = Vector2(40, 0)
 	floor_rect.size = Vector2(1920, 1040)
 	_visuals_root.add_child(floor_rect)
@@ -87,9 +101,9 @@ func _draw_background() -> void:
 	rng.seed = 42
 	for i in 28:
 		var c := Color(
-			rng.randf_range(0.34, 0.52),
-			rng.randf_range(0.55, 0.72),
-			rng.randf_range(0.24, 0.38),
+				rng.randf_range(0.28, 0.48),
+				rng.randf_range(0.50, 0.75),
+				rng.randf_range(0.18, 0.34),
 			0.55
 		)
 		var pos := Vector2(rng.randf_range(120, 1880), rng.randf_range(60, 980))
@@ -100,6 +114,7 @@ func _draw_background() -> void:
 	_add_circle_poly(right_center, loop_radius - track_half_width - 4.0, Color(0.4, 0.6, 0.32), _visuals_root)
 
 	_scatter_props()
+	_scatter_grass_and_flowers()
 
 
 func _scatter_props() -> void:
@@ -149,6 +164,79 @@ func _scatter_props() -> void:
 			spr.z_index = 1
 			props.add_child(spr)
 
+	_add_arena_fences()
+
+
+func _scatter_grass_and_flowers() -> void:
+	## Small painted blades and flowers break up the procedural field into a hand-placed look.
+	var details := Node2D.new()
+	details.name = "GrassAndFlowers"
+	details.z_index = 1
+	_visuals_root.add_child(details)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 91
+	for i in 110:
+		var pos := Vector2(rng.randf_range(90, 1870), rng.randf_range(55, 985))
+		if _near_racing_surface(pos, 46.0):
+			continue
+		var blade_color := Color("2c6d31").lightened(rng.randf_range(0.0, 0.35))
+		for j in 3:
+			var blade := Polygon2D.new()
+			var x := float(j - 1) * 4.0
+			blade.polygon = PackedVector2Array([
+				pos + Vector2(x - 2.0, 4.0),
+				pos + Vector2(x + 1.0, -rng.randf_range(7.0, 14.0)),
+				pos + Vector2(x + 4.0, 4.0),
+			])
+			blade.color = blade_color
+			details.add_child(blade)
+		if i % 4 == 0:
+			var flower := Polygon2D.new()
+			flower.polygon = _circle_points(pos + Vector2(5, -5), 3.0, 8)
+			flower.color = Color("f5c85b") if i % 8 == 0 else Color("d46c76")
+			details.add_child(flower)
+
+
+func _near_racing_surface(pos: Vector2, padding: float) -> bool:
+	for center in [left_center, right_center]:
+		var radial := absf(pos.distance_to(center) - loop_radius)
+		if radial < track_half_width + padding:
+			return true
+	return false
+
+
+func _circle_points(center: Vector2, radius: float, count: int) -> PackedVector2Array:
+	var points := PackedVector2Array()
+	for i in count:
+		var angle := TAU * float(i) / float(count)
+		points.append(center + Vector2(cos(angle), sin(angle)) * radius)
+	return points
+
+
+func _add_arena_fences() -> void:
+	## Decorative fence rails and pennants keep the empty field lively without collision.
+	var fence := Node2D.new()
+	fence.name = "PaintedFences"
+	fence.z_index = 3
+	_visuals_root.add_child(fence)
+	var points := [Vector2(120, 140), Vector2(560, 86), Vector2(1420, 86), Vector2(1830, 150), Vector2(1840, 900), Vector2(1450, 980), Vector2(470, 980), Vector2(100, 880)]
+	for i in points.size():
+		var a: Vector2 = points[i]
+		var b: Vector2 = points[(i + 1) % points.size()]
+		var rail := Line2D.new()
+		rail.width = 6.0
+		rail.default_color = Color("5b3824")
+		rail.add_point(a)
+		rail.add_point(b)
+		fence.add_child(rail)
+		for j in 2:
+			var post := ColorRect.new()
+			post.color = Color("3b291c")
+			post.size = Vector2(10, 30)
+			post.position = a.lerp(b, (float(j) + 0.35) / 2.0) - post.size * 0.5
+			post.rotation = (b - a).angle()
+			fence.add_child(post)
+
 
 func _build_path() -> void:
 	race_path = Path2D.new()
@@ -172,7 +260,8 @@ func _build_path() -> void:
 	race_path.curve = curve
 	add_child(race_path)
 
-	_draw_dirt_track_ribbon(curve)
+	if not _using_concept_backdrop:
+		_draw_dirt_track_ribbon(curve)
 
 
 func _draw_dirt_track_ribbon(curve: Curve2D) -> void:
@@ -185,7 +274,7 @@ func _draw_dirt_track_ribbon(curve: Curve2D) -> void:
 	var outline := Line2D.new()
 	outline.name = "TrackOutline"
 	outline.width = track_half_width * 2.0 + 14.0
-	outline.default_color = Color(0.12, 0.1, 0.08, 1.0)
+	outline.default_color = Color(0.12, 0.08, 0.05, 1.0)
 	outline.begin_cap_mode = Line2D.LINE_CAP_ROUND
 	outline.end_cap_mode = Line2D.LINE_CAP_ROUND
 	outline.joint_mode = Line2D.LINE_JOINT_ROUND
@@ -197,7 +286,7 @@ func _draw_dirt_track_ribbon(curve: Curve2D) -> void:
 	var dirt := Line2D.new()
 	dirt.name = "DirtRibbon"
 	dirt.width = track_half_width * 2.0
-	dirt.default_color = Color(0.55, 0.42, 0.28, 1.0)
+	dirt.default_color = Color(0.62, 0.36, 0.18, 1.0)
 	dirt.begin_cap_mode = Line2D.LINE_CAP_ROUND
 	dirt.end_cap_mode = Line2D.LINE_CAP_ROUND
 	dirt.joint_mode = Line2D.LINE_JOINT_ROUND
@@ -209,7 +298,7 @@ func _draw_dirt_track_ribbon(curve: Curve2D) -> void:
 	var packed := Line2D.new()
 	packed.name = "DirtPacked"
 	packed.width = track_half_width * 1.35
-	packed.default_color = Color(0.62, 0.48, 0.32, 1.0)
+	packed.default_color = Color(0.74, 0.47, 0.25, 1.0)
 	packed.begin_cap_mode = Line2D.LINE_CAP_ROUND
 	packed.end_cap_mode = Line2D.LINE_CAP_ROUND
 	packed.joint_mode = Line2D.LINE_JOINT_ROUND
@@ -223,11 +312,33 @@ func _draw_dirt_track_ribbon(curve: Curve2D) -> void:
 	while i + 7 < baked.size():
 		var seg := Line2D.new()
 		seg.width = 3.0
-		seg.default_color = Color(0.95, 0.9, 0.7, 0.85)
+		seg.default_color = Color(1.0, 0.86, 0.50, 0.92)
 		seg.add_point(baked[i])
 		seg.add_point(baked[mini(i + 5, baked.size() - 1)])
 		_visuals_root.add_child(seg)
 		i += step
+
+	# Painted tire scuffs and dust flecks along the racing line.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 101
+	for k in range(0, baked.size(), 4):
+		var p: Vector2 = baked[k]
+		var next_p: Vector2 = baked[(k + 1) % baked.size()]
+		var tangent := (next_p - p).normalized()
+		var normal := Vector2(-tangent.y, tangent.x)
+		var center := p + normal * rng.randf_range(-track_half_width * 0.62, track_half_width * 0.62)
+		var length := rng.randf_range(8.0, 22.0)
+		var width := rng.randf_range(2.0, 5.0)
+		var fleck := Polygon2D.new()
+		fleck.polygon = PackedVector2Array([
+			center - tangent * length * 0.5 - normal * width,
+			center + tangent * length * 0.5 - normal * width,
+			center + tangent * length * 0.5 + normal * width,
+			center - tangent * length * 0.5 + normal * width,
+		])
+		fleck.color = Color(0.36, 0.18, 0.08, rng.randf_range(0.10, 0.24))
+		fleck.z_index = 1
+		_visuals_root.add_child(fleck)
 
 
 func _build_walls() -> void:
@@ -298,7 +409,7 @@ func _add_wall_rect(rect: Rect2, wall_name: String) -> void:
 	var vis := ColorRect.new()
 	vis.size = rect.size
 	vis.position = -rect.size * 0.5
-	vis.color = Color(0.45, 0.35, 0.22) # wood/fence-like barrier color
+	vis.color = Color(0.45, 0.35, 0.22, 0.0 if _using_concept_backdrop else 1.0) # collision wall; art is in the backdrop
 	wall.add_child(vis)
 	wall.collision_layer = 1
 	_walls_root.add_child(wall)
@@ -313,7 +424,8 @@ func _add_wall_circle(center: Vector2, radius: float, wall_name: String) -> void
 	circle.radius = radius
 	shape.shape = circle
 	wall.add_child(shape)
-	_add_circle_poly(Vector2.ZERO, radius, Color(0.36, 0.55, 0.28), wall)
+	if not _using_concept_backdrop:
+		_add_circle_poly(Vector2.ZERO, radius, Color(0.36, 0.55, 0.28), wall)
 	wall.collision_layer = 1
 	_walls_root.add_child(wall)
 
@@ -339,6 +451,8 @@ func _build_checkpoints_and_finish() -> void:
 
 
 func _add_checkpoint_marker(index: int, pos: Vector2, ang: float) -> void:
+	if _using_concept_backdrop:
+		return
 	var vis_root := Node2D.new()
 	vis_root.name = "CheckpointMark_%d" % index
 	vis_root.position = pos
@@ -366,17 +480,18 @@ func _add_start_finish(pos: Vector2, ang: float) -> void:
 	rect.size = Vector2(70, track_half_width * 2.6)
 	shape.shape = rect
 	area.add_child(shape)
-	var vis := ColorRect.new()
-	vis.size = Vector2(14, track_half_width * 2.0)
-	vis.position = Vector2(-7, -track_half_width)
-	vis.color = Color(0.95, 0.88, 0.55, 0.75)
-	area.add_child(vis)
-	var label := Label.new()
-	label.text = "S/F"
-	label.position = Vector2(-14, -track_half_width - 20)
-	label.add_theme_font_size_override("font_size", 14)
-	label.add_theme_color_override("font_color", Color(0.25, 0.2, 0.12))
-	area.add_child(label)
+	if not _using_concept_backdrop:
+		var vis := ColorRect.new()
+		vis.size = Vector2(14, track_half_width * 2.0)
+		vis.position = Vector2(-7, -track_half_width)
+		vis.color = Color(0.95, 0.88, 0.55, 0.75)
+		area.add_child(vis)
+		var label := Label.new()
+		label.text = "S/F"
+		label.position = Vector2(-14, -track_half_width - 20)
+		label.add_theme_font_size_override("font_size", 14)
+		label.add_theme_color_override("font_color", Color(0.25, 0.2, 0.12))
+		area.add_child(label)
 	area.body_entered.connect(func(body: Node) -> void:
 		if body is Car:
 			(body as Car).on_start_finish()

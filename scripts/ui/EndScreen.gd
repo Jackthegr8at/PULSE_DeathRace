@@ -23,7 +23,7 @@ func _ready() -> void:
 func _apply_styles() -> void:
 	panel.add_theme_stylebox_override(
 		"panel",
-		GameStyle.panel(GameStyle.SURFACE, GameStyle.BORDER, 14.0, 2.0)
+		GameStyle.concept_panel(GameStyle.SURFACE, GameStyle.INK, 16.0, 3.0)
 	)
 	GameStyle.apply_label(detail_label, GameStyle.TEXT_MUTED, 15)
 	var primary := GameStyle.button_primary()

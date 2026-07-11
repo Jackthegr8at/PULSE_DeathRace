@@ -1,9 +1,16 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/cars/Missile.gd" id="1_missile"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_hit"]
 size = Vector2(14, 6)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_glow"]
+bg_color = Color(1, 0.78, 0.22, 0.45)
+corner_radius_top_left = 3
+corner_radius_top_right = 3
+corner_radius_bottom_right = 3
+corner_radius_bottom_left = 3
 
 [node name="Missile" type="Area2D"]
 collision_layer = 4
@@ -25,6 +32,15 @@ offset_top = -2.0
 offset_right = -8.0
 offset_bottom = 2.0
 color = Color(0.85, 0.35, 0.15, 0.5)
+
+[node name="Glow" type="Panel" parent="."]
+z_index = -1
+offset_left = -13.0
+offset_top = -7.0
+offset_right = 15.0
+offset_bottom = 7.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_glow")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 shape = SubResource("RectangleShape2D_hit")

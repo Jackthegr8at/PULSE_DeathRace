@@ -1,0 +1,55 @@
+<h2>Design §2 — Cars, physics &amp; combat</h2>
+<p class="subtitle">Shared vehicle core. Player and AI only send intent.</p>
+
+<div class="section">
+  <h3>Car (CharacterBody2D)</h3>
+  <ul>
+    <li><strong>Physics:</strong> accelerate / brake-reverse / rotate while moving; linear friction when coasting</li>
+    <li><strong>Exports:</strong> max_speed, acceleration, reverse_speed, turn_speed, friction, max_health, fire_cooldown, missile_damage, wall_slowdown_factor</li>
+    <li><strong>API:</strong> <code>set_throttle()</code>, <code>set_steer()</code>, <code>try_fire()</code> — controllers call these</li>
+    <li><strong>Wall hit:</strong> collision with StaticBody2D walls → multiply velocity (slowdown), no HP loss in v1</li>
+    <li><strong>HP bar:</strong> ProgressBar (or ColorRect) above car, billboard-style (no rotation with car, or slight offset)</li>
+    <li><strong>Death:</strong> HP ≤ 0 → CPUParticles2D burst + queue_free (or hide + disable) → emit <code>died</code></li>
+  </ul>
+</div>
+
+<div class="section">
+  <h3>Controllers</h3>
+  <div class="split">
+    <div class="mockup">
+      <div class="mockup-header">PlayerCar</div>
+      <div class="mockup-body" style="font-size:13px;">
+        WASD / Arrows → throttle &amp; steer<br/>
+        Space → try_fire()<br/>
+        Camera2D as child of player (or Main follows player)
+      </div>
+    </div>
+    <div class="mockup">
+      <div class="mockup-header">AICar</div>
+      <div class="mockup-body" style="font-size:13px;">
+        Follow track Path2D waypoints<br/>
+        Steer toward look-ahead point<br/>
+        If target in range + LOS cone → try_fire()
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Missile (Area2D)</h3>
+  <ul>
+    <li>Spawns at car nose, constant velocity in facing direction</li>
+    <li><strong>Damage:</strong> default 15 (export 10–20 range)</li>
+    <li>On body/area enter car → apply damage, free self; free on wall hit or lifetime timeout</li>
+    <li>Ignore owner (no self-hit) for a short grace or by reference</li>
+  </ul>
+</div>
+
+<div class="section">
+  <h3>Signals (clean seams → option 3 later)</h3>
+  <p style="font-family:monospace;font-size:13px;background:#1a1a2e;color:#9ae6b4;padding:12px;border-radius:6px;">
+    health_changed(current, max) · died · fired
+  </p>
+</div>
+
+<p class="subtitle">Does §2 look right? Then §3: figure-8 track, laps, AI pathing.</p>

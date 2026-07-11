@@ -42,18 +42,27 @@ const MissileScene: PackedScene = preload("res://scenes/combat/Missile3D.tscn")
 @export var max_missile_ammo: int = 3
 
 @export_group("AI")
-@export var path_look_ahead: float = 7.0
-@export var ai_throttle: float = 0.75
-@export var ai_corner_throttle: float = 0.38
-@export var ai_steer_gain: float = 2.0
+@export var path_look_ahead: float = 5.5
+@export var ai_throttle: float = 0.78
+@export var ai_corner_throttle: float = 0.48
+@export var ai_steer_gain: float = 2.1
 @export var detect_range: float = 22.0
-@export var fire_dot_min: float = 0.82
+## Must be this aligned with target to actually fire (missile still goes straight forward).
+@export var fire_dot_min: float = 0.93
+## Looser cone to *start* a short aim steer toward the target.
+@export var fire_acquire_dot_min: float = 0.55
+## Max seconds spent pointing at a target before giving up.
+@export var ai_aim_time_max: float = 0.4
+## How hard to turn toward the target while aiming (0–1 blend over path steer).
+@export var ai_aim_steer_weight: float = 0.72
 
 var health: float = 100.0
 var missile_ammo: int = 0
 var is_alive: bool = true
 var match_over: bool = false
 var _cooldown: float = 0.0
+var _ai_aim_target: Vehicle = null
+var _ai_aim_timer: float = 0.0
 
 var race_path: Path3D = null
 var _path_length: float = 0.0
@@ -143,8 +152,8 @@ func _physics_process(delta: float) -> void:
 		if Input.is_action_just_pressed("bounce"):
 			try_fire()
 	else:
+		_ai_combat(delta)
 		_ai_drive(delta)
-		_ai_combat()
 
 	var direction = sign(linear_speed)
 	if direction == 0:
@@ -202,46 +211,95 @@ func _ai_drive(_delta: float) -> void:
 	if race_path == null or race_path.curve == null or _path_length <= 1.0:
 		input.z = 0.4
 		input.x = 0.0
+		_ai_apply_aim_steer()
 		return
+
 	var pos := get_vehicle_position()
-	var near := race_path.curve.get_closest_offset(race_path.to_local(pos))
+	var curve := race_path.curve
+	var near := curve.get_closest_offset(race_path.to_local(pos))
 	_ai_progress = near
-	var target_off := fmod(near + path_look_ahead + _path_length, _path_length)
-	var target := race_path.to_global(race_path.curve.sample_baked(target_off))
-	var tangent_off := fmod(target_off + 4.0 + _path_length, _path_length)
-	var tangent_target := race_path.to_global(race_path.curve.sample_baked(tangent_off))
+
+	var path_point := race_path.to_global(curve.sample_baked(near))
+	var path_error := pos - path_point
+	path_error.y = 0.0
+
+	# Slightly shorter look-ahead than the original 7 when off-line / turning hard
+	var look_ahead := path_look_ahead
+	if path_error.length() > 2.5:
+		look_ahead = path_look_ahead * 0.75
+
+	var target_off := fmod(near + look_ahead + _path_length, _path_length)
+	var target := race_path.to_global(curve.sample_baked(target_off))
+	# If drifting off centerline, bias aim slightly back toward the path
+	if path_error.length() > 1.5:
+		target = target.lerp(path_point, clampf((path_error.length() - 1.5) / 5.0, 0.0, 0.3))
+
 	var to_target := target - pos
 	to_target.y = 0.0
 	if to_target.length_squared() < 0.01:
 		input.z = ai_throttle
 		input.x = 0.0
+		_ai_apply_aim_steer()
 		return
 
 	var forward := get_forward()
 	forward.y = 0.0
-	forward = forward.normalized()
-	var path_tangent := tangent_target - target
+	if forward.length_squared() < 0.0001:
+		forward = Vector3(0, 0, 1)
+	else:
+		forward = forward.normalized()
+
+	var tangent_off := fmod(target_off + 3.0 + _path_length, _path_length)
+	var path_tangent := race_path.to_global(curve.sample_baked(tangent_off)) - target
 	path_tangent.y = 0.0
+	if path_tangent.length_squared() < 0.0001:
+		path_tangent = to_target
 	path_tangent = path_tangent.normalized()
-	var desired := (path_tangent * 0.7 + to_target.normalized() * 0.3).normalized()
+
+	# Mostly chase the look-ahead point; a little path heading (original 70/30 was too wall-cutty)
+	var desired := (to_target.normalized() * 0.65 + path_tangent * 0.35).normalized()
 	var cross_y := forward.cross(desired).y
 	var dot := clampf(forward.dot(desired), -1.0, 1.0)
 	input.x = clampf(-cross_y * ai_steer_gain, -1.0, 1.0)
-	var turn_pen := clampf((1.0 - dot) * 1.5 + absf(cross_y) * 0.6, 0.0, 1.0)
-	input.z = lerpf(ai_throttle, ai_corner_throttle, turn_pen)
 
-	var path_point := race_path.to_global(race_path.curve.sample_baked(near))
-	var path_error := pos - path_point
-	path_error.y = 0.0
-	if path_error.length() > 4.0:
-		var recovery_cross := forward.cross((target - pos).normalized()).y
-		input.x = clampf(-recovery_cross * (ai_steer_gain + 0.8), -1.0, 1.0)
-		input.z = minf(input.z, 0.48)
+	# Light corner ease only — stay fast on straights
+	var turn_pen := clampf((1.0 - dot) * 1.1 + absf(cross_y) * 0.45, 0.0, 1.0)
+	input.z = lerpf(ai_throttle, ai_corner_throttle, turn_pen * 0.85)
+
+	# Only slow down if badly off the road
+	if path_error.length() > 5.0:
+		input.x = clampf(-forward.cross(to_target.normalized()).y * (ai_steer_gain + 0.6), -1.0, 1.0)
+		input.z = minf(input.z, 0.55)
+
+	# After path steer: briefly point the nose at a combat target (fair aim)
+	_ai_apply_aim_steer()
 
 
-func _ai_combat() -> void:
-	if _cooldown > 0.0 or match_over or missile_ammo <= 0:
+func _ai_apply_aim_steer() -> void:
+	if _ai_aim_target == null or not is_instance_valid(_ai_aim_target):
 		return
+	if not _ai_aim_target.is_alive:
+		_ai_clear_aim()
+		return
+	var to_enemy := _ai_aim_target.get_vehicle_position() - get_vehicle_position()
+	to_enemy.y = 0.0
+	if to_enemy.length_squared() < 0.01:
+		return
+	var forward := get_forward()
+	var dir := to_enemy.normalized()
+	var cross_y := forward.cross(dir).y
+	var aim_steer := clampf(-cross_y * (ai_steer_gain + 0.8), -1.0, 1.0)
+	input.x = lerpf(input.x, aim_steer, clampf(ai_aim_steer_weight, 0.0, 1.0))
+	# Ease throttle a bit so the turn can actually land before the shot
+	input.z = minf(input.z, lerpf(ai_throttle, ai_corner_throttle, 0.55))
+
+
+func _ai_clear_aim() -> void:
+	_ai_aim_target = null
+	_ai_aim_timer = 0.0
+
+
+func _ai_pick_fire_target(acquire_dot: float) -> Vehicle:
 	var best: Vehicle = null
 	var best_dist := detect_range
 	var forward := get_forward()
@@ -257,12 +315,50 @@ func _ai_combat() -> void:
 		if dist > best_dist or dist < 1.0:
 			continue
 		var dir := offset.normalized()
-		if forward.dot(dir) < fire_dot_min:
+		if forward.dot(dir) < acquire_dot:
 			continue
 		best_dist = dist
 		best = other
-	if best:
-		try_fire()
+	return best
+
+
+func _ai_combat(delta: float) -> void:
+	if match_over or not is_alive or missile_ammo <= 0 or _cooldown > 0.0:
+		_ai_clear_aim()
+		return
+
+	# Keep or acquire a target in a wide forward cone, then steer (in _ai_drive) before firing
+	if _ai_aim_target != null and is_instance_valid(_ai_aim_target) and _ai_aim_target.is_alive:
+		var offset := _ai_aim_target.get_vehicle_position() - get_vehicle_position()
+		var dist := offset.length()
+		offset.y = 0.0
+		if dist > detect_range * 1.15 or dist < 1.0 or offset.length_squared() < 0.01:
+			_ai_clear_aim()
+		else:
+			_ai_aim_timer += delta
+			var dir := offset.normalized()
+			var align := get_forward().dot(dir)
+			# Lined up enough → fire straight (same as player)
+			if align >= fire_dot_min:
+				try_fire()
+				_ai_clear_aim()
+				return
+			# Timed out without a clean line → drop the attempt (don't waste ammo)
+			if _ai_aim_timer >= ai_aim_time_max:
+				_ai_clear_aim()
+			return
+
+	_ai_clear_aim()
+	var candidate := _ai_pick_fire_target(fire_acquire_dot_min)
+	if candidate:
+		_ai_aim_target = candidate
+		_ai_aim_timer = 0.0
+		# Already perfectly lined up this frame — shoot immediately
+		var to_c := candidate.get_vehicle_position() - get_vehicle_position()
+		to_c.y = 0.0
+		if to_c.length_squared() > 0.01 and get_forward().dot(to_c.normalized()) >= fire_dot_min:
+			try_fire()
+			_ai_clear_aim()
 
 
 func add_missiles(amount: int) -> bool:

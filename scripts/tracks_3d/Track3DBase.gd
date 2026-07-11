@@ -176,14 +176,53 @@ func _build_path_from_grid() -> bool:
 		race_path.name = "RacePath"
 		add_child(race_path)
 	var curve := Curve3D.new()
-	curve.bake_interval = 0.4
-	for point in points:
-		curve.add_point(point)
+	curve.bake_interval = 0.25
+	# Densify + soft-round corners so AI centerline doesn't chord into walls
+	var dense := _densify_centerline(points)
+	for point in dense:
+		curve.add_point(race_path.to_local(point) if race_path.is_inside_tree() else point)
 	# Close path back to start for laps
-	if points.size() > 2:
-		curve.add_point(points[0])
+	if dense.size() > 2:
+		var first: Vector3 = dense[0]
+		curve.add_point(race_path.to_local(first) if race_path.is_inside_tree() else first)
 	race_path.curve = curve
 	return true
+
+
+func _densify_centerline(world_points: Array[Vector3]) -> Array[Vector3]:
+	## Insert midpoints between cell centers so corners are gradual, not one sharp knee.
+	if world_points.size() < 2:
+		return world_points
+	var out: Array[Vector3] = []
+	for i in world_points.size():
+		var a: Vector3 = world_points[i]
+		out.append(a)
+		var b: Vector3 = world_points[(i + 1) % world_points.size()]
+		# Skip wrap midpoint until we close the loop in the caller if open chain
+		if i == world_points.size() - 1:
+			break
+		var mid := a.lerp(b, 0.5)
+		# On sharp turns, pull midpoint slightly toward the outside of the bend
+		# so the racing line is less "cut the apex into the wall".
+		if i > 0:
+			var prev: Vector3 = world_points[i - 1]
+			var d0 := (a - prev)
+			var d1 := (b - a)
+			d0.y = 0.0
+			d1.y = 0.0
+			if d0.length_squared() > 0.001 and d1.length_squared() > 0.001:
+				d0 = d0.normalized()
+				d1 = d1.normalized()
+				var turn := d0.cross(d1).y
+				if absf(turn) > 0.35:
+					# turn > 0 = left turn; outside of corner is to the right of travel
+					var left := Vector3(-d0.z, 0.0, d0.x).normalized()
+					var outside: Vector3 = -left if turn > 0.0 else left
+					# Nudge midpoint slightly outward so AI doesn't hug the inside wall
+					mid += outside * 0.55
+		mid.y = a.y
+		out.append(mid)
+	return out
 
 
 func _pick_start_cell(grid: GridMap, road_cells: Array[Vector3i], marker: Marker3D) -> Vector3i:

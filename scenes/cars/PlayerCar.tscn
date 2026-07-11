@@ -15,6 +15,7 @@ motion_mode = 1
 script = ExtResource("1_player")
 body_color = Color(0.29, 0.87, 0.5, 1)
 display_name = "Player"
+sprite_scale = 0.08
 
 [node name="BodyVisual" type="ColorRect" parent="."]
 offset_left = -18.0
@@ -64,4 +65,4 @@ color = Color(1, 0.55, 0.15, 1)
 [node name="Camera2D" type="Camera2D" parent="."]
 position_smoothing_enabled = true
 position_smoothing_speed = 5.0
-zoom = Vector2(0.58, 0.58)
+zoom = Vector2(0.82, 0.82)

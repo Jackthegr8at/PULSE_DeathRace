@@ -1,0 +1,73 @@
+<h2>Design §3 — Figure-8 track, laps &amp; AI pathing</h2>
+<p class="subtitle">Built for chaos now; more maps later = drop-in track scenes.</p>
+
+<div class="section">
+  <div class="mockup">
+    <div class="mockup-header">Figure8.tscn (top-down schematic)</div>
+    <div class="mockup-body" style="background:#0f1419;display:flex;justify-content:center;padding:20px;">
+      <svg width="320" height="180" viewBox="0 0 320 180">
+        <!-- asphalt loops -->
+        <ellipse cx="110" cy="90" rx="70" ry="55" fill="none" stroke="#3d4f5f" stroke-width="28"/>
+        <ellipse cx="210" cy="90" rx="70" ry="55" fill="none" stroke="#3d4f5f" stroke-width="28"/>
+        <!-- outer walls simplified -->
+        <ellipse cx="110" cy="90" rx="88" ry="72" fill="none" stroke="#718096" stroke-width="4"/>
+        <ellipse cx="210" cy="90" rx="88" ry="72" fill="none" stroke="#718096" stroke-width="4"/>
+        <!-- path direction -->
+        <ellipse cx="110" cy="90" rx="70" ry="55" fill="none" stroke="#f6e05e" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.8"/>
+        <ellipse cx="210" cy="90" rx="70" ry="55" fill="none" stroke="#f6e05e" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.8"/>
+        <!-- crossing -->
+        <rect x="148" y="78" width="24" height="24" fill="#ed8936" opacity="0.35"/>
+        <text x="160" y="94" text-anchor="middle" fill="#fbd38d" font-size="10" font-family="sans-serif">X</text>
+        <!-- start/finish -->
+        <line x1="110" y1="28" x2="110" y2="52" stroke="#68d391" stroke-width="3"/>
+        <text x="110" y="22" text-anchor="middle" fill="#68d391" font-size="9" font-family="sans-serif">S/F</text>
+        <!-- checkpoints -->
+        <circle cx="40" cy="90" r="4" fill="#63b3ed"/>
+        <circle cx="110" cy="145" r="4" fill="#63b3ed"/>
+        <circle cx="160" cy="90" r="4" fill="#63b3ed"/>
+        <circle cx="210" cy="35" r="4" fill="#63b3ed"/>
+        <circle cx="280" cy="90" r="4" fill="#63b3ed"/>
+        <!-- spawns -->
+        <rect x="100" y="38" width="8" height="5" fill="#48bb78"/>
+        <rect x="90" y="42" width="8" height="5" fill="#fc8181"/>
+        <rect x="110" y="42" width="8" height="5" fill="#63b3ed"/>
+        <rect x="100" y="48" width="8" height="5" fill="#d6bcfa"/>
+        <rect x="90" y="52" width="8" height="5" fill="#f6ad55"/>
+      </svg>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Track scene contents</h3>
+  <ul>
+    <li><strong>Walls:</strong> StaticBody2D + CollisionPolygon2D (outer bounds + infield islands). Visuals: Polygon2D or ColorRect placeholders</li>
+    <li><strong>RacePath:</strong> Path2D / Curve2D through both loops (one continuous race line through the X)</li>
+    <li><strong>SpawnPoints:</strong> Marker2D nodes (5) near start — Main places player + 4 AI</li>
+    <li><strong>Checkpoints:</strong> Area2Ds along the path (ordered). Prevents reverse-lap cheese</li>
+    <li><strong>StartFinish:</strong> Area2D; lap++ only if all checkpoints cleared this loop</li>
+    <li><strong>Track.gd API:</strong> get_path(), get_spawn_transforms(), checkpoint count — maps stay swappable</li>
+  </ul>
+</div>
+
+<div class="section">
+  <h3>Laps (when mode uses them)</h3>
+  <ul>
+    <li>Each car tracks: current checkpoint index, laps completed</li>
+    <li>Race win: first car to reach <code>MatchConfig.lap_count</code> after valid S/F crossing</li>
+    <li>Last Standing mode: lap UI hidden / counters inactive</li>
+  </ul>
+</div>
+
+<div class="section">
+  <h3>AI pathing (basic but playable)</h3>
+  <ul>
+    <li>Progress along Path2D with look-ahead offset (export: path_look_ahead)</li>
+    <li>Steer toward target point; throttle high on straights, ease near sharp curve samples</li>
+    <li><strong>Combat:</strong> pick nearest living car in forward cone + range → try_fire on cooldown</li>
+    <li>No advanced avoidance in v1 (bumping OK — chaos road)</li>
+    <li>Optional light rubber-band later — not v1</li>
+  </ul>
+</div>
+
+<p class="subtitle">Does §3 look right? Then §4: modes, setup UI, HUD, win flow.</p>

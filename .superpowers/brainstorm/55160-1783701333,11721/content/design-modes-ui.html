@@ -1,0 +1,61 @@
+<h2>Design §4 — Modes, setup, HUD &amp; win flow</h2>
+<p class="subtitle">MatchConfig is the single source of truth for a race session.</p>
+
+<div class="section">
+  <h3>MatchConfig (Autoload)</h3>
+  <pre style="background:#1a1a2e;color:#9ae6b4;padding:12px;border-radius:8px;font-size:12px;margin:0;">enum Mode { HYBRID, RACE, LAST_STANDING }
+mode: Mode = HYBRID
+lap_count: int = 5          # ignored when LAST_STANDING
+ai_count: int = 4           # fixed in v1; easy to expose later
+track_scene_path: String    # default Figure8; multi-map later</pre>
+</div>
+
+<div class="section">
+  <h3>Setup.tscn (main menu / pre-match)</h3>
+  <div class="mockup">
+    <div class="mockup-header">Setup</div>
+    <div class="mockup-body" style="background:#1a1a2e;color:#e2e8f0;font-family:monospace;padding:16px;text-align:center;">
+      <div style="color:#f6e05e;margin-bottom:12px;">PULSE DEATHRACE</div>
+      <div style="font-size:12px;margin-bottom:8px;">MODE: [ Hybrid | Race | Last Standing ]</div>
+      <div style="font-size:12px;margin-bottom:8px;">LAPS: ◀ 5 ▶ <span style="opacity:0.5;font-size:10px;">(hidden/disabled if Last Standing)</span></div>
+      <div style="background:#48bb78;color:#1a202c;display:inline-block;padding:8px 24px;border-radius:4px;margin-top:8px;">START</div>
+    </div>
+  </div>
+  <ul>
+    <li>START writes MatchConfig → <code>get_tree().change_scene_to_file("Main.tscn")</code></li>
+    <li>Lap options: e.g. 3 / 5 / 7 (or spinbox 1–99); default <strong>5</strong></li>
+  </ul>
+</div>
+
+<div class="section">
+  <h3>HUD (during race)</h3>
+  <ul>
+    <li>Match timer (elapsed)</li>
+    <li>Player lap <code>current / total</code> (hidden in Last Standing)</li>
+    <li>Player HP (numeric and/or bar) — also bar above car</li>
+    <li>Cars remaining (alive count)</li>
+    <li>Mode label (optional, small)</li>
+  </ul>
+</div>
+
+<div class="section">
+  <h3>Win / lose rules</h3>
+  <table style="width:100%;font-size:13px;border-collapse:collapse;">
+    <tr style="background:#2d3748;"><th style="padding:8px;text-align:left;">Mode</th><th style="padding:8px;text-align:left;">Player wins</th><th style="padding:8px;text-align:left;">Player loses</th></tr>
+    <tr><td style="padding:8px;"><strong>Last Standing</strong></td><td style="padding:8px;">Only living car left is player</td><td style="padding:8px;">Player dies</td></tr>
+    <tr style="background:#1a202c;"><td style="padding:8px;"><strong>Race</strong></td><td style="padding:8px;">Player finishes required laps first</td><td style="padding:8px;">Player dies <em>or</em> an AI finishes first</td></tr>
+    <tr><td style="padding:8px;"><strong>Hybrid</strong></td><td style="padding:8px;">Race finish first <em>or</em> last standing</td><td style="padding:8px;">Player dies <em>or</em> AI finishes race first</td></tr>
+  </table>
+  <p style="font-size:13px;margin-top:8px;">On end: pause physics / freeze cars → show EndScreen (“You Win!” / “Game Over”) → buttons: <strong>Rematch</strong> (reload Main) · <strong>Setup</strong> (back to menu).</p>
+</div>
+
+<div class="section">
+  <h3>Main.gd responsibilities</h3>
+  <ul>
+    <li>Instance track, spawn 1 player + 4 AI at markers</li>
+    <li>Connect <code>died</code> / lap signals → evaluate win conditions</li>
+    <li>Drive HUD; own or reparent Camera2D on player</li>
+  </ul>
+</div>
+
+<p class="subtitle">Does §4 look right? If yes, full design is complete and we’ll write the spec doc next.</p>
