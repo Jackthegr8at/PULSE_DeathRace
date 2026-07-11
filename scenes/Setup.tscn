@@ -51,7 +51,7 @@ grow_vertical = 2
 
 [node name="Panel" type="PanelContainer" parent="Center"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(500, 600)
+custom_minimum_size = Vector2(520, 720)
 layout_mode = 2
 
 [node name="Margin" type="MarginContainer" parent="Center/Panel"]
@@ -192,6 +192,78 @@ vertical_alignment = 1
 [node name="LapPlus" type="Button" parent="Center/Panel/Margin/VBox/SectionLaps/LapRow"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(48, 48)
+layout_mode = 2
+text = "+"
+
+[node name="SectionCrates" type="VBoxContainer" parent="Center/Panel/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="CratesCaption" type="Label" parent="Center/Panel/Margin/VBox/SectionCrates"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.58, 0.66, 1)
+theme_override_font_sizes/font_size = 11
+text = "MISSILE CRATES"
+
+[node name="CrateCountRow" type="HBoxContainer" parent="Center/Panel/Margin/VBox/SectionCrates"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="CrateCountLabel" type="Label" parent="Center/Panel/Margin/VBox/SectionCrates/CrateCountRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Crates on track"
+
+[node name="CrateCountMinus" type="Button" parent="Center/Panel/Margin/VBox/SectionCrates/CrateCountRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+text = "−"
+
+[node name="CrateCountValue" type="Label" parent="Center/Panel/Margin/VBox/SectionCrates/CrateCountRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(40, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "8"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="CrateCountPlus" type="Button" parent="Center/Panel/Margin/VBox/SectionCrates/CrateCountRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+text = "+"
+
+[node name="MissilesPerCrateRow" type="HBoxContainer" parent="Center/Panel/Margin/VBox/SectionCrates"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="MissilesPerCrateLabel" type="Label" parent="Center/Panel/Margin/VBox/SectionCrates/MissilesPerCrateRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Missiles per crate"
+
+[node name="MissilesPerCrateMinus" type="Button" parent="Center/Panel/Margin/VBox/SectionCrates/MissilesPerCrateRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(40, 40)
+layout_mode = 2
+text = "−"
+
+[node name="MissilesPerCrateValue" type="Label" parent="Center/Panel/Margin/VBox/SectionCrates/MissilesPerCrateRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(40, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 22
+text = "1"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="MissilesPerCratePlus" type="Button" parent="Center/Panel/Margin/VBox/SectionCrates/MissilesPerCrateRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(40, 40)
 layout_mode = 2
 text = "+"
 

@@ -10,7 +10,6 @@ var race_path: Path3D = null
 
 const MissilePickupScene: PackedScene = preload("res://scenes/combat/MissilePickup.tscn")
 
-@export var missile_pickup_count: int = 8
 @export var first_pickup_path_fraction: float = 0.18 ## Skip start stretch so no free spam at grid
 
 func _ready() -> void:
@@ -209,7 +208,9 @@ func _spawn_missile_pickups() -> void:
 	root.name = "Pickups"
 	add_child(root)
 
-	var n := maxi(missile_pickup_count, 1)
+	var n := maxi(MatchConfig.crate_count, 0)
+	if n == 0:
+		return
 	# Spread pickups around the lap, starting after first_pickup_path_fraction
 	var usable := 1.0 - first_pickup_path_fraction
 	for i in n:
@@ -231,3 +232,6 @@ func _spawn_missile_pickups() -> void:
 		var pickup: Area3D = MissilePickupScene.instantiate()
 		root.add_child(pickup)
 		pickup.global_position = world_pos + lateral + Vector3(0, 0.85, 0)
+		if pickup is MissilePickup:
+			(pickup as MissilePickup).ammo_amount = MatchConfig.missiles_per_crate
+

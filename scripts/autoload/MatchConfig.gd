@@ -28,6 +28,10 @@ var lap_count: int = 5
 var ai_count: int = 3
 var track_id: TrackId = TrackId.KENNEY_DEFAULT
 
+## Missile crate settings (Setup menu)
+var crate_count: int = 8 ## How many crates spawn on the track
+var missiles_per_crate: int = 1 ## Ammo granted when collecting one crate
+
 
 func uses_laps() -> bool:
 	return mode != Mode.LAST_STANDING
@@ -58,3 +62,5 @@ func reset_to_defaults() -> void:
 	lap_count = 5
 	ai_count = 3
 	track_id = TrackId.KENNEY_DEFAULT
+	crate_count = 8
+	missiles_per_crate = 1

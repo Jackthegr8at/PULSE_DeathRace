@@ -1,5 +1,5 @@
 extends Control
-## Pre-match: mode, laps, track (Kenney default or Figure-8) → Race3D.
+## Pre-match: mode, laps, track, crate settings → Race3D.
 
 @onready var title_label: Label = %Title
 @onready var subtitle: Label = %Subtitle
@@ -13,6 +13,12 @@ extends Control
 @onready var lap_minus: Button = %LapMinus
 @onready var lap_plus: Button = %LapPlus
 @onready var lap_hint: Label = %LapHint
+@onready var crate_count_minus: Button = %CrateCountMinus
+@onready var crate_count_plus: Button = %CrateCountPlus
+@onready var crate_count_value: Label = %CrateCountValue
+@onready var missiles_per_crate_minus: Button = %MissilesPerCrateMinus
+@onready var missiles_per_crate_plus: Button = %MissilesPerCratePlus
+@onready var missiles_per_crate_value: Label = %MissilesPerCrateValue
 @onready var start_button: Button = %StartButton
 @onready var controls_label: Label = %ControlsLabel
 @onready var panel: PanelContainer = %Panel
@@ -21,6 +27,8 @@ extends Control
 var _selected_mode: MatchConfig.Mode = MatchConfig.Mode.HYBRID
 var _selected_track: MatchConfig.TrackId = MatchConfig.TrackId.KENNEY_DEFAULT
 var _lap_count: int = 5
+var _crate_count: int = 8
+var _missiles_per_crate: int = 1
 var _mode_buttons: Array[Button] = []
 var _track_buttons: Array[Button] = []
 
@@ -29,6 +37,8 @@ func _ready() -> void:
 	_selected_mode = MatchConfig.mode
 	_selected_track = MatchConfig.track_id
 	_lap_count = MatchConfig.lap_count
+	_crate_count = MatchConfig.crate_count
+	_missiles_per_crate = MatchConfig.missiles_per_crate
 
 	_mode_buttons = [mode_hybrid, mode_race, mode_last]
 	_track_buttons = [track_default, track_figure8]
@@ -40,12 +50,17 @@ func _ready() -> void:
 	track_figure8.pressed.connect(func() -> void: _select_track(MatchConfig.TrackId.FIGURE_8))
 	lap_minus.pressed.connect(func() -> void: _change_laps(-1))
 	lap_plus.pressed.connect(func() -> void: _change_laps(1))
+	crate_count_minus.pressed.connect(func() -> void: _change_crate_count(-1))
+	crate_count_plus.pressed.connect(func() -> void: _change_crate_count(1))
+	missiles_per_crate_minus.pressed.connect(func() -> void: _change_missiles_per_crate(-1))
+	missiles_per_crate_plus.pressed.connect(func() -> void: _change_missiles_per_crate(1))
 	start_button.pressed.connect(_on_start_pressed)
 
 	_apply_styles()
 	_refresh_mode_ui()
 	_refresh_track_ui()
 	_refresh_laps_ui()
+	_refresh_crate_ui()
 
 
 func _apply_styles() -> void:
@@ -61,11 +76,15 @@ func _apply_styles() -> void:
 		subtitle.text = "3D combat racing · Kenney base · pick a track"
 	if controls_label:
 		GameStyle.apply_label(controls_label, GameStyle.TEXT_DIM, 12)
-		controls_label.text = "WASD drive  ·  Grab gold crates for missiles  ·  Space fire  ·  Esc setup"
+		controls_label.text = "WASD drive  ·  Grab crates for missiles  ·  Space fire  ·  Esc setup"
 	if lap_hint:
 		GameStyle.apply_label(lap_hint, GameStyle.TEXT_MUTED, 12)
 	if lap_value:
 		GameStyle.apply_label(lap_value, GameStyle.TEXT, 28)
+	if crate_count_value:
+		GameStyle.apply_label(crate_count_value, GameStyle.TEXT, 22)
+	if missiles_per_crate_value:
+		GameStyle.apply_label(missiles_per_crate_value, GameStyle.TEXT, 22)
 	if accent_bar:
 		accent_bar.color = GameStyle.ACCENT
 
@@ -75,9 +94,12 @@ func _apply_styles() -> void:
 			b.add_theme_font_size_override("font_size", 14)
 			GameStyle.apply_button(b, GameStyle.button_ghost())
 
+	for b in [lap_minus, lap_plus, crate_count_minus, crate_count_plus, missiles_per_crate_minus, missiles_per_crate_plus]:
+		if b:
+			GameStyle.apply_button(b, GameStyle.button_ghost())
+			b.custom_minimum_size = Vector2(40, 40)
+
 	if lap_minus and lap_plus:
-		GameStyle.apply_button(lap_minus, GameStyle.button_ghost())
-		GameStyle.apply_button(lap_plus, GameStyle.button_ghost())
 		lap_minus.custom_minimum_size = Vector2(48, 48)
 		lap_plus.custom_minimum_size = Vector2(48, 48)
 
@@ -109,6 +131,16 @@ func _change_laps(delta: int) -> void:
 		return
 	_lap_count = clampi(_lap_count + delta, 1, 99)
 	_refresh_laps_ui()
+
+
+func _change_crate_count(delta: int) -> void:
+	_crate_count = clampi(_crate_count + delta, 0, 24)
+	_refresh_crate_ui()
+
+
+func _change_missiles_per_crate(delta: int) -> void:
+	_missiles_per_crate = clampi(_missiles_per_crate + delta, 1, 5)
+	_refresh_crate_ui()
 
 
 func _uses_laps() -> bool:
@@ -157,8 +189,17 @@ func _refresh_laps_ui() -> void:
 		lap_value.text = str(_lap_count) if use else "—"
 
 
+func _refresh_crate_ui() -> void:
+	if crate_count_value:
+		crate_count_value.text = str(_crate_count)
+	if missiles_per_crate_value:
+		missiles_per_crate_value.text = str(_missiles_per_crate)
+
+
 func _on_start_pressed() -> void:
 	MatchConfig.mode = _selected_mode
 	MatchConfig.track_id = _selected_track
 	MatchConfig.lap_count = _lap_count if _uses_laps() else MatchConfig.lap_count
+	MatchConfig.crate_count = _crate_count
+	MatchConfig.missiles_per_crate = _missiles_per_crate
 	get_tree().change_scene_to_file("res://scenes/race/Race3D.tscn")
