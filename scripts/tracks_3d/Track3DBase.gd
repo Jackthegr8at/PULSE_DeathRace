@@ -55,7 +55,8 @@ func _ensure_race_path() -> void:
 	race_path = get_node_or_null("RacePath") as Path3D
 	if race_path and race_path.curve and race_path.curve.get_point_count() > 2:
 		return
-	if track_display_name == "Starter Circuit" and _build_path_from_grid():
+	# Prefer path walked from real road cells (default + figure-8)
+	if _build_path_from_grid():
 		return
 	if race_path == null:
 		race_path = Path3D.new()
@@ -260,4 +261,3 @@ func _spawn_missile_pickups() -> void:
 		pickup.global_position = world_pos + lateral + Vector3(0, 0.85, 0)
 		if pickup is MissilePickup:
 			(pickup as MissilePickup).ammo_amount = MatchConfig.missiles_per_crate
-
