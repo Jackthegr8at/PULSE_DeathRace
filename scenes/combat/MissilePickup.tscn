@@ -1,20 +1,47 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=12 format=3]
 
 [ext_resource type="Script" path="res://scripts/combat/MissilePickup.gd" id="1_script"]
+[ext_resource type="PackedScene" path="res://scenes/combat/missile.glb" id="2_missile"]
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_pick"]
-radius = 1.1
+radius = 1.15
 
-[sub_resource type="BoxMesh" id="BoxMesh_crate"]
-size = Vector3(0.7, 0.7, 0.7)
+[sub_resource type="BoxMesh" id="BoxMesh_body"]
+size = Vector3(0.85, 0.55, 0.85)
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_crate"]
-albedo_color = Color(0.95, 0.75, 0.2, 1)
+[sub_resource type="BoxMesh" id="BoxMesh_lid"]
+size = Vector3(0.9, 0.12, 0.9)
+
+[sub_resource type="BoxMesh" id="BoxMesh_strap"]
+size = Vector3(0.92, 0.1, 0.12)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_ring"]
+top_radius = 0.75
+bottom_radius = 0.75
+height = 0.04
+radial_segments = 24
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_wood"]
+albedo_color = Color(0.42, 0.28, 0.14, 1)
+roughness = 0.85
+metallic = 0.05
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_lid"]
+albedo_color = Color(0.55, 0.38, 0.18, 1)
+roughness = 0.75
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_metal"]
+albedo_color = Color(0.22, 0.22, 0.24, 1)
+metallic = 0.75
+roughness = 0.4
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ring"]
+albedo_color = Color(0.95, 0.7, 0.15, 0.55)
 emission_enabled = true
-emission = Color(0.9, 0.55, 0.1, 1)
-emission_energy_multiplier = 1.4
-metallic = 0.15
-roughness = 0.45
+emission = Color(0.95, 0.55, 0.1, 1)
+emission_energy_multiplier = 1.2
+transparency = 1
+roughness = 0.5
 
 [node name="MissilePickup" type="Area3D"]
 collision_layer = 0
@@ -27,11 +54,46 @@ shape = SubResource("SphereShape3D_pick")
 
 [node name="Visual" type="Node3D" parent="."]
 
-[node name="Mesh" type="MeshInstance3D" parent="Visual"]
-mesh = SubResource("BoxMesh_crate")
-material_override = SubResource("StandardMaterial3D_crate")
+[node name="Ring" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.28, 0)
+mesh = SubResource("CylinderMesh_ring")
+material_override = SubResource("StandardMaterial3D_ring")
+
+[node name="CrateBody" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.05, 0)
+mesh = SubResource("BoxMesh_body")
+material_override = SubResource("StandardMaterial3D_wood")
+
+[node name="Lid" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.28, 0)
+mesh = SubResource("BoxMesh_lid")
+material_override = SubResource("StandardMaterial3D_lid")
+
+[node name="StrapFront" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 0.38)
+mesh = SubResource("BoxMesh_strap")
+material_override = SubResource("StandardMaterial3D_metal")
+
+[node name="StrapBack" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, -0.38)
+mesh = SubResource("BoxMesh_strap")
+material_override = SubResource("StandardMaterial3D_metal")
+
+[node name="StrapLeft" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -0.38, 0.05, 0)
+mesh = SubResource("BoxMesh_strap")
+material_override = SubResource("StandardMaterial3D_metal")
+
+[node name="StrapRight" type="MeshInstance3D" parent="Visual"]
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, 0.38, 0.05, 0)
+mesh = SubResource("BoxMesh_strap")
+material_override = SubResource("StandardMaterial3D_metal")
+
+[node name="MissileIcon" parent="Visual" instance=ExtResource("2_missile")]
+transform = Transform3D(0.07, 0, 0, 0, -3.059797e-09, 0.07, 0, -0.07, -3.059797e-09, 0, 0.62, 0)
 
 [node name="Glow" type="OmniLight3D" parent="Visual"]
-light_color = Color(1, 0.75, 0.25, 1)
-light_energy = 1.2
-omni_range = 3.5
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+light_color = Color(1, 0.7, 0.25, 1)
+light_energy = 1.0
+omni_range = 3.0

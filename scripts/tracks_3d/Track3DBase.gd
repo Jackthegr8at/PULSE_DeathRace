@@ -10,7 +10,7 @@ var race_path: Path3D = null
 
 const MissilePickupScene: PackedScene = preload("res://scenes/combat/MissilePickup.tscn")
 
-@export var missile_pickup_count: int = 6
+@export var missile_pickup_count: int = 8
 @export var first_pickup_path_fraction: float = 0.18 ## Skip start stretch so no free spam at grid
 
 func _ready() -> void:
