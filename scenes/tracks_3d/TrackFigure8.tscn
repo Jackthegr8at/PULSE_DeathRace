@@ -1,15 +1,15 @@
 [gd_scene format=3 uid="uid://dkcnxlit6c6ym"]
 
-[ext_resource type="Script" uid="uid://m0of4twyawa6" path="res://scripts/tracks_3d/Track3DBase.gd" id="1_script"]
+[ext_resource type="Script" path="res://scripts/tracks_3d/TrackFigure8.gd" id="1_script"]
 [ext_resource type="MeshLibrary" uid="uid://b6myd2b7l2o2j" path="res://models/Library/mesh-library.tres" id="2_mesh"]
 
 [sub_resource type="PhysicsMaterial" id="PhysicsMaterial_track"]
 friction = 0.0
 bounce = 0.1
 
-[node name="TrackDefault" type="Node3D" unique_id=1817246344]
+[node name="TrackFigure8" type="Node3D" unique_id=1817246344]
 script = ExtResource("1_script")
-track_display_name = "Starter Circuit"
+track_display_name = "Figure-8 Chaos"
 
 [node name="GridMap" type="GridMap" parent="." unique_id=1005425786]
 transform = Transform3D(0.75, 0, 0, 0, 0.75, 0, 0, 0, 0.75, 0, -0.5, 0)
