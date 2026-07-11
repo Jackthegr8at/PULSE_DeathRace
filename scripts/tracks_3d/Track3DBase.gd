@@ -1,22 +1,28 @@
 class_name Track3DBase
 extends Node3D
-## Base for Kenney GridMap tracks: spawn, race path, finish line.
+## Shared logic for EVERY hand-painted GridMap track.
+## No per-map car/crate files — path, crates, and finish come from this GridMap.
 
 @export var track_display_name: String = "Track"
 @export var spawn_row_spacing: float = 1.35
+@export var first_pickup_path_fraction: float = 0.12
+
+## Mesh library road items (models/Library/mesh-library.tres)
+const ROAD_ITEMS := [3, 4, 5, 6] # corner, finish, ramp, straight
+
+const MissilePickupScene: PackedScene = preload("res://scenes/combat/MissilePickup.tscn")
 
 var race_path: Path3D = null
 
 
-const MissilePickupScene: PackedScene = preload("res://scenes/combat/MissilePickup.tscn")
-
-@export var first_pickup_path_fraction: float = 0.18 ## Skip start stretch so no free spam at grid
-
 func _ready() -> void:
+	call_deferred("_setup_track_runtime")
+
+
+func _setup_track_runtime() -> void:
 	_ensure_race_path()
 	_ensure_finish_line()
-	# Wait a frame so GridMap / path are fully ready in world space
-	call_deferred("_spawn_missile_pickups")
+	_spawn_missile_pickups()
 
 
 func get_spawn_transform() -> Transform3D:
@@ -37,13 +43,10 @@ func get_grid_map() -> GridMap:
 
 
 func get_spawn_transforms(count: int) -> Array[Transform3D]:
-	## Single-file on the start centerline. Kenney straights are narrow — a 2-wide
-	## grid pushed rear cars onto grass. Keep everyone on SpawnPoint asphalt.
 	var base := get_spawn_transform()
 	var result: Array[Transform3D] = []
 	var basis := base.basis.orthonormalized()
 	var forward := basis.z.normalized()
-	# One column, slight stagger behind the marker (stay on the same tile ~7–8m long)
 	for i in count:
 		var origin := base.origin - forward * (float(i) * spawn_row_spacing)
 		origin.y = base.origin.y
@@ -51,36 +54,18 @@ func get_spawn_transforms(count: int) -> Array[Transform3D]:
 	return result
 
 
+func _is_road_item(item: int) -> bool:
+	return item in ROAD_ITEMS
+
+
 func _ensure_race_path() -> void:
 	race_path = get_node_or_null("RacePath") as Path3D
-	if race_path and race_path.curve and race_path.curve.get_point_count() > 2:
+	if race_path and race_path.curve and race_path.curve.get_baked_length() > 5.0:
 		return
-	# Prefer path walked from real road cells (default + figure-8)
 	if _build_path_from_grid():
 		return
-	if race_path == null:
-		race_path = Path3D.new()
-		race_path.name = "RacePath"
-		add_child(race_path)
-	var curve := Curve3D.new()
-	# Loop around Kenney starter circuit (spawn ~ 3.5, 0, 5 — stay on the paved loop)
-	var pts := [
-		Vector3(3.5, 0.25, 5.0),
-		Vector3(6.0, 0.25, 3.0),
-		Vector3(8.5, 0.25, -1.0),
-		Vector3(8.0, 0.25, -6.0),
-		Vector3(4.0, 0.25, -10.0),
-		Vector3(-1.0, 0.25, -11.0),
-		Vector3(-6.0, 0.25, -8.0),
-		Vector3(-9.0, 0.25, -3.0),
-		Vector3(-8.0, 0.25, 2.0),
-		Vector3(-4.0, 0.25, 6.0),
-		Vector3(0.5, 0.25, 7.0),
-		Vector3(3.5, 0.25, 5.0),
-	]
-	for p in pts:
-		curve.add_point(p)
-	race_path.curve = curve
+	push_warning("%s: could not build race path from GridMap — AI/crates may be wrong. Put SpawnPoint on a road tile and use connected track pieces." % track_display_name)
+	_build_path_around_spawn_fallback()
 
 
 func _build_path_from_grid() -> bool:
@@ -92,58 +77,98 @@ func _build_path_from_grid() -> bool:
 	var road_set: Dictionary = {}
 	for cell in grid.get_used_cells():
 		var item := grid.get_cell_item(cell)
-		if item == 3 or item == 4 or item == 6:
+		if _is_road_item(item):
 			road_cells.append(cell)
 			road_set[cell] = true
-	if road_cells.size() < 8:
+
+	if road_cells.size() < 4:
+		push_warning("%s: only %d road tiles found (need straights/corners/finish)." % [track_display_name, road_cells.size()])
 		return false
 
 	var marker := get_node_or_null("SpawnPoint") as Marker3D
-	var start_cell := road_cells[0]
-	var best_distance := INF
-	for cell in road_cells:
-		var cell_world := grid.to_global(grid.map_to_local(cell))
-		var distance := cell_world.distance_squared_to(marker.global_position if marker else global_position)
-		if distance < best_distance:
-			best_distance = distance
-			start_cell = cell
+	var start_cell := _pick_start_cell(grid, road_cells, marker)
 
+	# Walk the road graph preferring unvisited neighbors (works for loops & long tracks)
 	var points: Array[Vector3] = []
+	var visited: Dictionary = {}
 	var current := start_cell
-	var previous := Vector3i(999999, 999999, 999999)
-	var start_forward := marker.global_transform.basis.z.normalized() if marker else Vector3(0, 0, 1)
-	var directions := [Vector3i(1, 0, 0), Vector3i(-1, 0, 0), Vector3i(0, 0, 1), Vector3i(0, 0, -1)]
+	var previous := Vector3i(999999, 0, 999999)
+	var directions := [
+		Vector3i(1, 0, 0), Vector3i(-1, 0, 0),
+		Vector3i(0, 0, 1), Vector3i(0, 0, -1),
+	]
+	var start_forward := Vector3(0, 0, 1)
+	if marker:
+		start_forward = marker.global_transform.basis.z
+		start_forward.y = 0.0
+		if start_forward.length_squared() > 0.001:
+			start_forward = start_forward.normalized()
 
-	for step in road_cells.size() + 4:
+	for step in road_cells.size() + 8:
+		visited[current] = true
 		var point := grid.to_global(grid.map_to_local(current))
-		point.y = marker.global_position.y if marker else point.y + 0.25
+		point.y = marker.global_position.y if marker else 0.3
 		points.append(point)
 
 		var candidates: Array[Vector3i] = []
+		var unvisited: Array[Vector3i] = []
 		for direction in directions:
 			var next_cell: Vector3i = current + direction
-			if road_set.has(next_cell) and next_cell != previous:
-				candidates.append(next_cell)
-		if candidates.is_empty():
+			if not road_set.has(next_cell):
+				continue
+			if next_cell == previous:
+				continue
+			candidates.append(next_cell)
+			if not visited.has(next_cell):
+				unvisited.append(next_cell)
+
+		var pool: Array[Vector3i] = unvisited if unvisited.size() > 0 else candidates
+		if pool.is_empty():
 			break
 
-		var next := candidates[0]
-		if step == 0 and candidates.size() > 1:
+		var next := pool[0]
+		if step == 0 and pool.size() > 1:
+			# Leave spawn facing the player's forward direction
 			var best_dot := -INF
-			for candidate in candidates:
-				var candidate_world := grid.to_global(grid.map_to_local(candidate))
-				var candidate_dir := (candidate_world - point).normalized()
-				var candidate_dot := start_forward.dot(candidate_dir)
-				if candidate_dot > best_dot:
-					best_dot = candidate_dot
+			for candidate in pool:
+				var cw := grid.to_global(grid.map_to_local(candidate))
+				var cd := (cw - point)
+				cd.y = 0.0
+				if cd.length_squared() < 0.001:
+					continue
+				var d := start_forward.dot(cd.normalized())
+				if d > best_dot:
+					best_dot = d
 					next = candidate
+		elif pool.size() > 1:
+			# Prefer continuing straight-ish
+			var travel := point - (points[points.size() - 2] if points.size() > 1 else point)
+			travel.y = 0.0
+			if travel.length_squared() > 0.001:
+				travel = travel.normalized()
+				var best_dot := -INF
+				for candidate in pool:
+					var cw := grid.to_global(grid.map_to_local(candidate))
+					var cd := (cw - point)
+					cd.y = 0.0
+					if cd.length_squared() < 0.001:
+						continue
+					var d := travel.dot(cd.normalized())
+					if d > best_dot:
+						best_dot = d
+						next = candidate
 
 		previous = current
 		current = next
-		if current == start_cell and step > 4:
+		if current == start_cell and step > 3:
 			break
 
-	if points.size() < 8:
+	# If we didn't close the loop, try to append remaining road cells (loose order)
+	if points.size() < road_cells.size() * 0.5:
+		# incomplete walk — still usable if we got a decent chain
+		pass
+
+	if points.size() < 4:
 		return false
 
 	if race_path == null:
@@ -151,16 +176,48 @@ func _build_path_from_grid() -> bool:
 		race_path.name = "RacePath"
 		add_child(race_path)
 	var curve := Curve3D.new()
-	curve.bake_interval = 0.5
-	curve.closed = true
+	curve.bake_interval = 0.4
 	for point in points:
 		curve.add_point(point)
+	# Close path back to start for laps
+	if points.size() > 2:
+		curve.add_point(points[0])
 	race_path.curve = curve
-
-	if marker and points.size() > 1:
-		var tangent := (points[1] - points[0]).normalized()
-		marker.rotation.y = atan2(tangent.x, tangent.z)
 	return true
+
+
+func _pick_start_cell(grid: GridMap, road_cells: Array[Vector3i], marker: Marker3D) -> Vector3i:
+	# Prefer finish tile (item 4)
+	for cell in road_cells:
+		if grid.get_cell_item(cell) == 4:
+			return cell
+	# Else nearest road cell to SpawnPoint
+	var start_cell := road_cells[0]
+	var best_distance := INF
+	var anchor := marker.global_position if marker else global_position
+	for cell in road_cells:
+		var cell_world := grid.to_global(grid.map_to_local(cell))
+		var distance := cell_world.distance_squared_to(anchor)
+		if distance < best_distance:
+			best_distance = distance
+			start_cell = cell
+	return start_cell
+
+
+func _build_path_around_spawn_fallback() -> void:
+	## Last resort: small oval around SpawnPoint so crates aren't at world origin.
+	if race_path == null:
+		race_path = Path3D.new()
+		race_path.name = "RacePath"
+		add_child(race_path)
+	var o := get_spawn_transform().origin
+	var curve := Curve3D.new()
+	var r := 12.0
+	for i in 12:
+		var a := TAU * float(i) / 12.0
+		curve.add_point(o + Vector3(cos(a) * r, 0.25, sin(a) * r))
+	curve.add_point(o + Vector3(r, 0.25, 0))
+	race_path.curve = curve
 
 
 func _ensure_finish_line() -> void:
@@ -169,7 +226,7 @@ func _ensure_finish_line() -> void:
 	var area := Area3D.new()
 	area.name = "FinishLine"
 	area.collision_layer = 0
-	area.collision_mask = 8 # vehicle spheres
+	area.collision_mask = 8
 	area.monitoring = true
 	var shape := CollisionShape3D.new()
 	var box := BoxShape3D.new()
@@ -213,28 +270,25 @@ func _spawn_missile_pickups() -> void:
 	if n == 0:
 		return
 
-	# Random path offsets (skip start grid), with a soft min spacing so crates don't stack
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
 	var min_frac := first_pickup_path_fraction
-	var min_spacing := maxf(length * 0.06, 4.0) # at least ~4m or 6% of lap apart
+	var min_spacing := maxf(length * 0.05, 3.5)
 	var chosen_offsets: Array[float] = []
 	var attempts := 0
-	var max_attempts := n * 40
-	while chosen_offsets.size() < n and attempts < max_attempts:
+	while chosen_offsets.size() < n and attempts < n * 50:
 		attempts += 1
-		var off := rng.randf_range(length * min_frac, length * 0.98)
+		var off := rng.randf_range(length * min_frac, length * 0.97)
 		var ok := true
 		for existing in chosen_offsets:
 			var dist := absf(off - existing)
-			dist = mini(dist, length - dist) # wrap-aware distance
+			dist = mini(dist, length - dist)
 			if dist < min_spacing:
 				ok = false
 				break
 		if ok:
 			chosen_offsets.append(off)
 
-	# If RNG couldn't place enough (short track), fill remaining evenly
 	while chosen_offsets.size() < n:
 		var t := min_frac + (1.0 - min_frac) * (float(chosen_offsets.size()) + 0.5) / float(n)
 		chosen_offsets.append(length * t)
@@ -251,10 +305,8 @@ func _spawn_missile_pickups() -> void:
 		else:
 			tangent = Vector3(0, 0, 1)
 		var side := Vector3.UP.cross(tangent).normalized()
-		# Random side of the road + slight jitter so layout varies each race
-		var lateral_sign := 1.0 if rng.randf() > 0.5 else -1.0
-		var lateral_amt := rng.randf_range(0.35, 0.95)
-		var lateral := side * lateral_sign * lateral_amt
+		# Keep crates near centerline (on asphalt) — small lateral only
+		var lateral := side * rng.randf_range(-0.45, 0.45)
 
 		var pickup: Area3D = MissilePickupScene.instantiate()
 		root.add_child(pickup)
