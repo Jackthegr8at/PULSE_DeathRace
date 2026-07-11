@@ -61,7 +61,7 @@ func _apply_styles() -> void:
 		subtitle.text = "3D combat racing · Kenney base · pick a track"
 	if controls_label:
 		GameStyle.apply_label(controls_label, GameStyle.TEXT_DIM, 12)
-		controls_label.text = "WASD drive  ·  Space fire missile  ·  Esc setup"
+		controls_label.text = "WASD drive  ·  Grab gold crates for missiles  ·  Space fire  ·  Esc setup"
 	if lap_hint:
 		GameStyle.apply_label(lap_hint, GameStyle.TEXT_MUTED, 12)
 	if lap_value:

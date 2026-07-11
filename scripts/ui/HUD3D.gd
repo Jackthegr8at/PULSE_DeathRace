@@ -12,6 +12,7 @@ var lap_bar: ProgressBar
 var alive_label: Label
 var mode_label: Label
 var track_label: Label
+var ammo_label: Label
 var hint_label: Label
 
 
@@ -29,7 +30,10 @@ func set_player(player: Vehicle) -> void:
 	if _player:
 		if not _player.health_changed.is_connected(_on_hp):
 			_player.health_changed.connect(_on_hp)
+		if not _player.ammo_changed.is_connected(_on_ammo):
+			_player.ammo_changed.connect(_on_ammo)
 		_on_hp(_player.health, _player.max_health)
+		_on_ammo(_player.missile_ammo, _player.max_missile_ammo)
 
 
 func update_alive(n: int) -> void:
@@ -81,6 +85,11 @@ func _build() -> void:
 	hp_bar.add_theme_stylebox_override("fill", GameStyle.progress_fill(GameStyle.SUCCESS))
 	v.add_child(hp_bar)
 
+	ammo_label = Label.new()
+	ammo_label.text = "MISSILES  0 / 3"
+	GameStyle.apply_label(ammo_label, GameStyle.ACCENT, 13)
+	v.add_child(ammo_label)
+
 	lap_label = Label.new()
 	lap_label.text = "LAP 0 / %d" % MatchConfig.lap_count
 	GameStyle.apply_label(lap_label, GameStyle.INFO, 12)
@@ -112,7 +121,7 @@ func _build() -> void:
 	am.add_child(alive_label)
 
 	hint_label = Label.new()
-	hint_label.text = "WASD drive  ·  Space fire  ·  Esc setup"
+	hint_label.text = "WASD drive  ·  Pick up gold crates for missiles  ·  Space fire  ·  Esc setup"
 	hint_label.anchor_left = 0.5
 	hint_label.anchor_top = 1.0
 	hint_label.anchor_right = 0.5
@@ -149,3 +158,12 @@ func _on_hp(current: float, maximum: float) -> void:
 	hp_bar.value = current
 	var ratio := current / maxf(maximum, 1.0)
 	hp_bar.add_theme_stylebox_override("fill", GameStyle.progress_fill(GameStyle.hp_color(ratio)))
+
+
+func _on_ammo(current: int, maximum: int) -> void:
+	if ammo_label:
+		ammo_label.text = "MISSILES  %d / %d" % [current, maximum]
+		if current <= 0:
+			GameStyle.apply_label(ammo_label, GameStyle.TEXT_MUTED, 13)
+		else:
+			GameStyle.apply_label(ammo_label, GameStyle.ACCENT, 13)

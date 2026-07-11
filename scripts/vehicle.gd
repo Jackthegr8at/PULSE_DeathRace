@@ -3,6 +3,7 @@ extends Node3D
 ## Kenney arcade vehicle + DeathRace combat (HP, fire, death, optional AI input).
 
 signal health_changed(current: float, maximum: float)
+signal ammo_changed(current: int, maximum: int)
 signal died(vehicle: Vehicle)
 signal lap_completed(vehicle: Vehicle, laps: int)
 signal race_finished(vehicle: Vehicle)
@@ -33,18 +34,23 @@ const MissileScene: PackedScene = preload("res://scenes/combat/Missile3D.tscn")
 
 @export_group("Combat")
 @export var max_health: float = 100.0
-@export var fire_cooldown: float = 0.6
+@export var fire_cooldown: float = 0.85
 @export var missile_damage: float = 15.0
 @export var missile_speed: float = 32.0
+## Missiles only from road pickups (start empty).
+@export var starting_missile_ammo: int = 0
+@export var max_missile_ammo: int = 3
 
 @export_group("AI")
-@export var path_look_ahead: float = 12.0
+@export var path_look_ahead: float = 7.0
 @export var ai_throttle: float = 0.75
-@export var ai_steer_gain: float = 2.2
+@export var ai_corner_throttle: float = 0.38
+@export var ai_steer_gain: float = 2.0
 @export var detect_range: float = 22.0
 @export var fire_dot_min: float = 0.82
 
 var health: float = 100.0
+var missile_ammo: int = 0
 var is_alive: bool = true
 var match_over: bool = false
 var _cooldown: float = 0.0
@@ -86,9 +92,11 @@ func get_forward() -> Vector3:
 
 func _ready() -> void:
 	health = max_health
+	missile_ammo = starting_missile_ammo
 	add_to_group("vehicles")
 	_ensure_hp_bar()
 	health_changed.emit(health, max_health)
+	ammo_changed.emit(missile_ammo, max_missile_ammo)
 	if sphere:
 		# Vehicle spheres on layer 8 (matches kit)
 		sphere.collision_layer = 8
@@ -186,9 +194,8 @@ func _physics_process(delta: float) -> void:
 
 
 func handle_input(_delta: float) -> void:
-	if raycast and raycast.is_colliding():
-		input.x = Input.get_axis("left", "right")
-		input.z = Input.get_axis("back", "forward")
+	input.x = Input.get_axis("left", "right")
+	input.z = Input.get_axis("back", "forward")
 
 
 func _ai_drive(_delta: float) -> void:
@@ -196,16 +203,13 @@ func _ai_drive(_delta: float) -> void:
 		input.z = 0.4
 		input.x = 0.0
 		return
-	if not (raycast and raycast.is_colliding()):
-		return
-
 	var pos := get_vehicle_position()
 	var near := race_path.curve.get_closest_offset(race_path.to_local(pos))
-	_ai_progress = lerpf(_ai_progress, near, 0.25)
-	_ai_progress = fmod(_ai_progress + absf(linear_speed) * 2.0 + 0.5, _path_length)
-
-	var target_off := fmod(_ai_progress + path_look_ahead, _path_length)
+	_ai_progress = near
+	var target_off := fmod(near + path_look_ahead + _path_length, _path_length)
 	var target := race_path.to_global(race_path.curve.sample_baked(target_off))
+	var tangent_off := fmod(target_off + 4.0 + _path_length, _path_length)
+	var tangent_target := race_path.to_global(race_path.curve.sample_baked(tangent_off))
 	var to_target := target - pos
 	to_target.y = 0.0
 	if to_target.length_squared() < 0.01:
@@ -216,16 +220,27 @@ func _ai_drive(_delta: float) -> void:
 	var forward := get_forward()
 	forward.y = 0.0
 	forward = forward.normalized()
-	var desired := to_target.normalized()
+	var path_tangent := tangent_target - target
+	path_tangent.y = 0.0
+	path_tangent = path_tangent.normalized()
+	var desired := (path_tangent * 0.7 + to_target.normalized() * 0.3).normalized()
 	var cross_y := forward.cross(desired).y
-	var dot := forward.dot(desired)
-	input.x = clampf(cross_y * ai_steer_gain, -1.0, 1.0)
-	var turn_pen := clampf(1.0 - dot, 0.0, 1.0)
-	input.z = lerpf(ai_throttle, 0.35, turn_pen)
+	var dot := clampf(forward.dot(desired), -1.0, 1.0)
+	input.x = clampf(-cross_y * ai_steer_gain, -1.0, 1.0)
+	var turn_pen := clampf((1.0 - dot) * 1.5 + absf(cross_y) * 0.6, 0.0, 1.0)
+	input.z = lerpf(ai_throttle, ai_corner_throttle, turn_pen)
+
+	var path_point := race_path.to_global(race_path.curve.sample_baked(near))
+	var path_error := pos - path_point
+	path_error.y = 0.0
+	if path_error.length() > 4.0:
+		var recovery_cross := forward.cross((target - pos).normalized()).y
+		input.x = clampf(-recovery_cross * (ai_steer_gain + 0.8), -1.0, 1.0)
+		input.z = minf(input.z, 0.48)
 
 
 func _ai_combat() -> void:
-	if _cooldown > 0.0 or match_over:
+	if _cooldown > 0.0 or match_over or missile_ammo <= 0:
 		return
 	var best: Vehicle = null
 	var best_dist := detect_range
@@ -250,9 +265,24 @@ func _ai_combat() -> void:
 		try_fire()
 
 
+func add_missiles(amount: int) -> bool:
+	## Returns true if any ammo was actually added (pickup may respawn).
+	if amount <= 0 or not is_alive or match_over:
+		return false
+	if missile_ammo >= max_missile_ammo:
+		return false
+	missile_ammo = mini(max_missile_ammo, missile_ammo + amount)
+	ammo_changed.emit(missile_ammo, max_missile_ammo)
+	return true
+
+
 func try_fire() -> bool:
 	if not is_alive or match_over or _cooldown > 0.0:
 		return false
+	if missile_ammo <= 0:
+		return false
+	missile_ammo -= 1
+	ammo_changed.emit(missile_ammo, max_missile_ammo)
 	_cooldown = fire_cooldown
 	var forward := get_forward()
 	var missile: Area3D = MissileScene.instantiate()
