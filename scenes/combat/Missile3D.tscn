@@ -1,13 +1,10 @@
 [gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/combat/Missile3D.gd" id="1_script"]
+[ext_resource type="PackedScene" path="res://scenes/combat/missile.glb" id="2_missile"]
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_hit"]
-radius = 0.35
-
-[sub_resource type="CapsuleMesh" id="CapsuleMesh_body"]
-radius = 0.12
-height = 0.55
+radius = 0.4
 
 [node name="Missile3D" type="Area3D"]
 collision_layer = 16
@@ -15,9 +12,8 @@ collision_mask = 9
 monitoring = true
 script = ExtResource("1_script")
 
-[node name="Mesh" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 0, -1, 0, 1, 0, 0, 0, 0)
-mesh = SubResource("CapsuleMesh_body")
+[node name="Model" parent="." instance=ExtResource("2_missile")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 shape = SubResource("SphereShape3D_hit")
