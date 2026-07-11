@@ -67,10 +67,10 @@ func _apply_styles() -> void:
 	if panel:
 		panel.add_theme_stylebox_override(
 			"panel",
-			GameStyle.panel(Color(0.1, 0.14, 0.1, 0.94), GameStyle.BORDER, 14.0, 2.0)
+			GameStyle.comic_panel(Color(0.10, 0.14, 0.10, 0.96), 16.0)
 		)
 	if title_label:
-		GameStyle.apply_label(title_label, GameStyle.ACCENT, 36)
+		GameStyle.apply_title(title_label, GameStyle.ACCENT, 40)
 	if subtitle:
 		GameStyle.apply_label(subtitle, GameStyle.TEXT_MUTED, 14)
 		subtitle.text = "3D combat racing · Kenney base · pick a track"
@@ -80,11 +80,11 @@ func _apply_styles() -> void:
 	if lap_hint:
 		GameStyle.apply_label(lap_hint, GameStyle.TEXT_MUTED, 12)
 	if lap_value:
-		GameStyle.apply_label(lap_value, GameStyle.TEXT, 28)
+		GameStyle.apply_title(lap_value, GameStyle.TEXT, 28)
 	if crate_count_value:
-		GameStyle.apply_label(crate_count_value, GameStyle.TEXT, 22)
+		GameStyle.apply_title(crate_count_value, GameStyle.TEXT, 22)
 	if missiles_per_crate_value:
-		GameStyle.apply_label(missiles_per_crate_value, GameStyle.TEXT, 22)
+		GameStyle.apply_title(missiles_per_crate_value, GameStyle.TEXT, 22)
 	if accent_bar:
 		accent_bar.color = GameStyle.ACCENT
 
@@ -106,13 +106,13 @@ func _apply_styles() -> void:
 	if start_button:
 		var primary := GameStyle.button_primary()
 		GameStyle.apply_button(start_button, primary, GameStyle.BG_DEEP)
-		start_button.add_theme_font_size_override("font_size", 20)
-		start_button.custom_minimum_size = Vector2(0, 52)
+		start_button.add_theme_font_size_override("font_size", 22)
+		start_button.custom_minimum_size = Vector2(0, 56)
 		start_button.text = "START RACE"
 
 	var bg := get_node_or_null("Background") as ColorRect
 	if bg:
-		bg.color = Color(0.28, 0.42, 0.26)
+		bg.color = GameStyle.BG
 
 
 func _select_mode(mode: MatchConfig.Mode) -> void:
@@ -149,9 +149,11 @@ func _uses_laps() -> bool:
 
 func _paint_selected(btn: Button, on: bool) -> void:
 	if on:
-		btn.add_theme_stylebox_override("normal", GameStyle.button_selected())
-		btn.add_theme_stylebox_override("hover", GameStyle.button_selected())
-		btn.add_theme_stylebox_override("pressed", GameStyle.button_selected())
+		var sel := GameStyle.button_normal(Color(0.34, 0.26, 0.10, 0.98), GameStyle.ACCENT)
+		sel.set_border_width_all(4)
+		btn.add_theme_stylebox_override("normal", sel)
+		btn.add_theme_stylebox_override("hover", sel)
+		btn.add_theme_stylebox_override("pressed", sel)
 		btn.add_theme_color_override("font_color", GameStyle.ACCENT)
 	else:
 		GameStyle.apply_button(btn, GameStyle.button_ghost())

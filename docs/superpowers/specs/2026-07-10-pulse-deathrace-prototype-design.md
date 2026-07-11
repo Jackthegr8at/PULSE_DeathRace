@@ -207,10 +207,13 @@ var missiles_per_crate: int = 2
 - START → Race3D
 
 ### HUD3D
-- Timer, HP, ammo, cars remaining, laps when applicable, mode label
+- Comic stat card: outlined timer, mode/track chips, ink-bordered HP bar with damage flash, missile pip icons (drawn silhouettes, pulse on pickup), lap counter + bar
+- Top-right: race position ("2ND of 4", hidden in Last Standing) + ALIVE badge
+- Bottom-right: `Minimap3D` — RacePath outline (world x,z) with live vehicle dots, player highlighted gold
+- Race position computed in `Race3D` every 0.25s from `laps_completed` + lap progress ratio
 
 ### End screen
-- Win / Game Over
+- Outlined comic title (YOU WIN! / WRECKED!) + stat rows (race time, laps done, cars left)
 - Rematch (same MatchConfig) / back to Setup
 
 ### Win / lose rules
@@ -252,7 +255,7 @@ Setup UI → MatchConfig (mode, laps, track, crates, ammo/crate)
 - Kenney colormap trucks and track tiles
 - Missile GLB + cartoon-ish explosion on impact
 - Crates: slatted wooden crate (corner posts + plank slats + dark interior, flat Kenney-style two-tone wood) + mini missile preview, glow ring and omni light
-- Setup / HUD: game style helpers (`GameStyle.gd`); concept mockups under `docs/mockups/` and `assets/concept/`
+- UI: vibrant painterly toon (BotW color + Borderlands comic ink) via `GameStyle.gd` — thick black ink borders (3–4px), hard offset comic shadows (`comic_panel`), outlined titles (`apply_title`), saturated gold/green/red palette; concept mockups under `docs/mockups/` and `assets/concept/`
 
 ---
 
@@ -300,6 +303,8 @@ Setup UI → MatchConfig (mode, laps, track, crates, ammo/crate)
 | Laps | Default 5; disabled in Last Standing |
 | AI count | Default 3 (Setup adjustable) |
 | Missile damage | Default 15 |
+| UI style | Vibrant toon/comic: thick ink outlines, comic panels, outlined titles (GameStyle) |
+| HUD extras | Minimap3D from RacePath, missile pips, race position ranking in Race3D |
 | Blockchain | Deferred |
 
 ---

@@ -1,40 +1,41 @@
 class_name GameStyle
 extends RefCounted
-## Warm painterly UI palette (adventure-game feel, minimal neon).
+## Vibrant painterly toon UI (BotW-style color, Borderlands comic ink).
+## Thick black outlines, saturated colors, chunky hand-painted feel.
 
-const BG := Color("294b2b")
-const BG_DEEP := Color("17251a")
-const SURFACE := Color(0.15, 0.18, 0.13, 0.94)
-const SURFACE_RAISED := Color(0.27, 0.20, 0.12, 0.96)
-const SURFACE_HOVER := Color(0.38, 0.29, 0.16, 0.98)
-const BORDER := Color(0.08, 0.07, 0.05, 0.96)
-const BORDER_GLOW := Color(0.82, 0.58, 0.22, 0.98)
-const INK := Color("17160f")
-const WOOD := Color("9b552d")
-const WOOD_LIGHT := Color("d17d3e")
-const FIELD := Color("5b9d43")
-const EARTH := Color("b9773e")
-const SKY := Color("77c8be")
+const BG := Color("2e5a30")
+const BG_DEEP := Color("1a2c1c")
+const SURFACE := Color(0.13, 0.17, 0.12, 0.95)
+const SURFACE_RAISED := Color(0.30, 0.22, 0.12, 0.97)
+const SURFACE_HOVER := Color(0.42, 0.32, 0.17, 0.98)
+const BORDER := Color(0.05, 0.045, 0.035, 1.0)
+const BORDER_GLOW := Color(0.95, 0.68, 0.22, 1.0)
+const INK := Color("12100a")
+const WOOD := Color("a85c2e")
+const WOOD_LIGHT := Color("e08a44")
+const FIELD := Color("63b545")
+const EARTH := Color("c68042")
+const SKY := Color("6fd0c4")
 
-const ACCENT := Color("e8b84a") ## Warm gold
-const ACCENT_DIM := Color("b8892e")
-const SUCCESS := Color("5ecf6a")
-const DANGER := Color("e04b4b")
-const WARNING := Color("e8923a")
-const INFO := Color("5a9e6a") ## Soft green-teal, not electric cyan
-const PURPLE := Color("8b6bb0")
-const PINK := Color("c45c6a")
+const ACCENT := Color("ffc94d") ## Vivid warm gold
+const ACCENT_DIM := Color("c4952f")
+const SUCCESS := Color("64e070")
+const DANGER := Color("f04f4f")
+const WARNING := Color("ff9d3a")
+const INFO := Color("5fb87a") ## Soft green-teal, not electric cyan
+const PURPLE := Color("9a76c4")
+const PINK := Color("d96274")
 
-const TEXT := Color("f4f0e4")
-const TEXT_MUTED := Color("a8a090")
-const TEXT_DIM := Color("6e6858")
+const TEXT := Color("faf5e6")
+const TEXT_MUTED := Color("b5ac98")
+const TEXT_DIM := Color("776f5c")
 
-const HP_HIGH := Color("5ecf6a")
-const HP_MID := Color("e8b84a")
-const HP_LOW := Color("e04b4b")
+const HP_HIGH := Color("64e070")
+const HP_MID := Color("ffc94d")
+const HP_LOW := Color("f04f4f")
 
 
-static func panel(bg: Color = SURFACE, border: Color = BORDER, radius: float = 12.0, border_w: float = 2.0) -> StyleBoxFlat:
+static func panel(bg: Color = SURFACE, border: Color = BORDER, radius: float = 12.0, border_w: float = 3.0) -> StyleBoxFlat:
 	var s := StyleBoxFlat.new()
 	s.bg_color = bg
 	s.set_corner_radius_all(int(radius))
@@ -61,7 +62,16 @@ static func chip(bg: Color = SURFACE_RAISED, border: Color = BORDER) -> StyleBox
 
 static func glass_chip() -> StyleBoxFlat:
 	## Painted wood/metal badge: warm surface, comic ink outline, soft lift.
-	return concept_panel(Color(0.12, 0.15, 0.1, 0.94), BORDER, 10.0, 3.0)
+	return comic_panel(Color(0.12, 0.15, 0.1, 0.95), 10.0)
+
+
+static func comic_panel(bg: Color = SURFACE, radius: float = 12.0) -> StyleBoxFlat:
+	## Comic-sticker panel: thick pure-ink border + hard offset shadow.
+	var s := panel(bg, INK, radius, 4.0)
+	s.shadow_color = Color(INK.r, INK.g, INK.b, 0.85)
+	s.shadow_size = 0
+	s.shadow_offset = Vector2(4, 5)
+	return s
 
 
 static func concept_panel(bg: Color = SURFACE, border: Color = BORDER, radius: float = 12.0, border_w: float = 3.0) -> StyleBoxFlat:
@@ -77,7 +87,7 @@ static func button_normal(bg: Color = SURFACE_RAISED, border: Color = BORDER) ->
 	s.bg_color = bg
 	s.set_corner_radius_all(10)
 	s.border_color = border
-	s.set_border_width_all(2)
+	s.set_border_width_all(3)
 	s.content_margin_left = 16
 	s.content_margin_right = 16
 	s.content_margin_top = 10
@@ -144,6 +154,13 @@ static func apply_button(btn: Button, styles: Dictionary, font_color: Color = TE
 static func apply_label(label: Label, color: Color = TEXT, size: int = 14) -> void:
 	label.add_theme_color_override("font_color", color)
 	label.add_theme_font_size_override("font_size", size)
+
+
+static func apply_title(label: Label, color: Color = ACCENT, size: int = 32) -> void:
+	## Comic title: vibrant fill + thick black ink outline.
+	apply_label(label, color, size)
+	label.add_theme_color_override("font_outline_color", INK)
+	label.add_theme_constant_override("outline_size", maxi(int(size * 0.22), 4))
 
 
 static func hp_color(ratio: float) -> Color:

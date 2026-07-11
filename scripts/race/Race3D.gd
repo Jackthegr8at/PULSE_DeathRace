@@ -19,6 +19,8 @@ var vehicles: Array[Vehicle] = []
 var match_over: bool = false
 var hud: CanvasLayer = null
 var end_layer: CanvasLayer = null
+var race_path3d: Path3D = null
+var _rank_accum: float = 0.0
 
 
 func _ready() -> void:
@@ -46,6 +48,7 @@ func _spawn_field() -> void:
 	var path3d: Path3D = null
 	if track and track.has_method("get_race_path"):
 		path3d = track.call("get_race_path") as Path3D
+	race_path3d = path3d
 
 	var count := 1 + MatchConfig.ai_count
 	var spawns: Array[Transform3D] = []
@@ -185,7 +188,39 @@ func _spawn_hud() -> void:
 	add_child(hud)
 	if hud.has_method("set_player"):
 		hud.call("set_player", player)
+	if hud.has_method("set_race_path"):
+		hud.call("set_race_path", race_path3d)
 	_update_alive_hud()
+	_update_position_hud()
+
+
+func _process(delta: float) -> void:
+	if match_over:
+		return
+	_rank_accum += delta
+	if _rank_accum >= 0.25:
+		_rank_accum = 0.0
+		_update_position_hud()
+
+
+func _race_progress(veh: Vehicle) -> float:
+	return float(veh.laps_completed) + veh.get_lap_progress_ratio()
+
+
+func _update_position_hud() -> void:
+	if hud == null or not hud.has_method("update_position"):
+		return
+	if not MatchConfig.uses_laps() or player == null or not is_instance_valid(player):
+		return
+	var total := vehicles.size()
+	var place := 1
+	var mine := _race_progress(player)
+	for v in vehicles:
+		if v == player or not is_instance_valid(v) or not v.is_alive:
+			continue
+		if _race_progress(v) > mine:
+			place += 1
+	hud.call("update_position", place, total)
 
 
 func _living() -> Array[Vehicle]:
@@ -254,27 +289,27 @@ func _show_end(player_won: bool, detail: String) -> void:
 	end_layer.add_child(center)
 
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(400, 220)
-	panel.add_theme_stylebox_override("panel", GameStyle.panel())
+	panel.custom_minimum_size = Vector2(420, 260)
+	panel.add_theme_stylebox_override("panel", GameStyle.comic_panel(Color(0.10, 0.13, 0.09, 0.97), 16.0))
 	center.add_child(panel)
 
 	var margin := MarginContainer.new()
 	for s in ["margin_left", "margin_right", "margin_top", "margin_bottom"]:
-		margin.add_theme_constant_override(s, 24)
+		margin.add_theme_constant_override(s, 26)
 	panel.add_child(margin)
 
 	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 14)
+	vbox.add_theme_constant_override("separation", 12)
 	margin.add_child(vbox)
 
 	var title := Label.new()
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	if player_won:
 		title.text = "YOU WIN!"
-		GameStyle.apply_label(title, GameStyle.SUCCESS, 36)
+		GameStyle.apply_title(title, GameStyle.SUCCESS, 44)
 	else:
-		title.text = "GAME OVER"
-		GameStyle.apply_label(title, GameStyle.DANGER, 36)
+		title.text = "WRECKED!"
+		GameStyle.apply_title(title, GameStyle.DANGER, 44)
 	vbox.add_child(title)
 
 	var detail_l := Label.new()
@@ -284,14 +319,27 @@ func _show_end(player_won: bool, detail: String) -> void:
 	GameStyle.apply_label(detail_l, GameStyle.TEXT_MUTED, 14)
 	vbox.add_child(detail_l)
 
+	var stats := VBoxContainer.new()
+	stats.add_theme_constant_override("separation", 4)
+	vbox.add_child(stats)
+	var elapsed := 0.0
+	if hud and hud.has_method("get_elapsed"):
+		elapsed = hud.call("get_elapsed")
+	var m := int(elapsed) / 60
+	var s2 := int(elapsed) % 60
+	_add_stat_row(stats, "RACE TIME", "%02d:%02d" % [m, s2])
+	if MatchConfig.uses_laps() and player and is_instance_valid(player):
+		_add_stat_row(stats, "LAPS DONE", "%d / %d" % [player.laps_completed, MatchConfig.lap_count])
+	_add_stat_row(stats, "CARS LEFT", str(_living().size()))
+
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
 	row.add_theme_constant_override("separation", 12)
 	vbox.add_child(row)
 
 	var rematch := Button.new()
-	rematch.text = "Rematch"
-	rematch.custom_minimum_size = Vector2(140, 44)
+	rematch.text = "REMATCH"
+	rematch.custom_minimum_size = Vector2(140, 46)
 	GameStyle.apply_button(rematch, GameStyle.button_primary(), GameStyle.BG_DEEP)
 	rematch.pressed.connect(func() -> void:
 		get_tree().change_scene_to_file("res://scenes/race/Race3D.tscn")
@@ -299,13 +347,28 @@ func _show_end(player_won: bool, detail: String) -> void:
 	row.add_child(rematch)
 
 	var setup := Button.new()
-	setup.text = "Setup"
-	setup.custom_minimum_size = Vector2(140, 44)
+	setup.text = "SETUP"
+	setup.custom_minimum_size = Vector2(140, 46)
 	GameStyle.apply_button(setup, GameStyle.button_ghost())
 	setup.pressed.connect(func() -> void:
 		get_tree().change_scene_to_file("res://scenes/Setup.tscn")
 	)
 	row.add_child(setup)
+
+
+func _add_stat_row(parent: Control, label_text: String, value_text: String) -> void:
+	var row := HBoxContainer.new()
+	parent.add_child(row)
+	var tag := Label.new()
+	tag.text = label_text
+	tag.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	GameStyle.apply_label(tag, GameStyle.TEXT_DIM, 13)
+	row.add_child(tag)
+	var val := Label.new()
+	val.text = value_text
+	val.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	GameStyle.apply_label(val, GameStyle.ACCENT, 15)
+	row.add_child(val)
 
 
 func _unhandled_input(event: InputEvent) -> void:

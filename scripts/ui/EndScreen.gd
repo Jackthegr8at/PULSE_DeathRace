@@ -23,7 +23,7 @@ func _ready() -> void:
 func _apply_styles() -> void:
 	panel.add_theme_stylebox_override(
 		"panel",
-		GameStyle.concept_panel(GameStyle.SURFACE, GameStyle.INK, 16.0, 3.0)
+		GameStyle.comic_panel(GameStyle.SURFACE, 16.0)
 	)
 	GameStyle.apply_label(detail_label, GameStyle.TEXT_MUTED, 15)
 	var primary := GameStyle.button_primary()
@@ -42,12 +42,12 @@ func show_result(player_won: bool, detail: String = "") -> void:
 	detail_label.text = detail
 	if player_won:
 		title_label.text = "YOU WIN!"
-		GameStyle.apply_label(title_label, GameStyle.SUCCESS, 42)
+		GameStyle.apply_title(title_label, GameStyle.SUCCESS, 42)
 		if accent:
 			accent.color = GameStyle.SUCCESS
 	else:
-		title_label.text = "GAME OVER"
-		GameStyle.apply_label(title_label, GameStyle.DANGER, 42)
+		title_label.text = "WRECKED!"
+		GameStyle.apply_title(title_label, GameStyle.DANGER, 42)
 		if accent:
 			accent.color = GameStyle.DANGER
 
