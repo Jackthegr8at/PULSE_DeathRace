@@ -1,73 +1,77 @@
-# PULSE_DeathRace — Phase 1 Prototype Design
+# PULSE_DeathRace — Prototype Design
 
-**Date:** 2026-07-10  
-**Status:** Approved for implementation planning  
-**Engine:** Godot 4.3+ (2D, GDScript)  
-**Scope:** Playable solo prototype — 1 player + 4 AI, combat racing, no blockchain/XPR
+**Date:** 2026-07-10 (updated 2026-07-11)  
+**Status:** Living spec — reflects the shipped 3D prototype direction  
+**Engine:** Godot 4.7 (3D, GDScript, Jolt Physics)  
+**Base:** Kenney Starter Kit Racing (GridMap + sphere vehicles) + DeathRace combat modes  
+**Scope:** Solo prototype — player + AI, combat racing; no blockchain/XPR
 
 ---
 
 ## 1. Vision
 
-Flash-era (1998–2002) top-down car combat racing: small cars on a chaotic track, shooting missiles while racing. Phase 1 ships a solo prototype with core drive, shoot, die, and win loops. Visuals are placeholders. Multi-map and richer systems come later; architecture must not block them.
+Flash-era (1998–2002) **car combat racing**, now in **3D arcade** form: Kenney trucks on painted GridMap tracks, pick up missile crates, shoot while racing, last standing / race / hybrid win rules.
+
+An earlier **2D top-down** prototype remains in the repo under `scenes/cars/`, `scenes/tracks/`, etc., but is **not** the main entry. Main scene is `Setup.tscn` → `Race3D.tscn`.
 
 ---
 
 ## 2. Goals & Non-Goals
 
-### Goals
-- Playable figure-8 track with wall collisions and camera follow
-- Shared car physics for player and AI
-- Missiles, health, explosion/removal on death
-- Match setup: mode + lap count (including pure last-standing)
+### Goals (current)
+- Playable **3D** tracks (Starter Circuit + hand-painted Figure-8 Chaos)
+- Shared `Vehicle` physics for player and AI (Kenney sphere rigidbody)
+- Missiles with explosion FX; **ammo from road crates** only (no free fire)
+- Setup: mode, laps, track, AI count, **crate count**, **missiles per crate**
 - Hybrid / race / last-standing win conditions
-- Basic AI: follow race path + shoot when targets are in range
-- Simple HUD and end screen
+- AI: path follow + short fair “point at target then fire”
+- HUD3D + end screen
 
-### Non-Goals (phase 1)
+### Non-Goals (still deferred)
 - Blockchain / XPR / multiplayer networking
-- Polish art, audio, particles beyond a minimal death burst
-- Advanced AI (overtake logic, rubber-banding, pathfinding off-track)
-- Power-ups, weapons beyond single missile type
-- Multiple tracks (structure only — one figure-8 ships)
+- Advanced AI (overtake, rubber-banding, full pathfinding off-track)
+- Weapons beyond the single missile type
+- Production art pass beyond Kenney + missile GLB
 
 ---
 
-## 3. Architecture (Approach 2)
+## 3. Architecture
 
-**Shared car + track scenes + match config.** Can evolve toward component-style (option 3) by extracting physics, health, and weapon into child nodes without rewriting maps or modes.
+**MatchConfig autoload + Setup → Race3D + track scenes + shared Vehicle.**
 
-### Project layout
+### Project layout (3D-focused)
 
 ```
 PULSE_DeathRace/
-├── project.godot
+├── project.godot                 # main: Setup.tscn; MatchConfig autoload
+├── models/                       # Kenney meshes + mesh-library.tres
+│   └── Library/mesh-library.tres
 ├── scenes/
 │   ├── Setup.tscn
-│   ├── Main.tscn
-│   ├── ui/
-│   │   ├── HUD.tscn
-│   │   └── EndScreen.tscn
-│   ├── cars/
-│   │   ├── Car.tscn
-│   │   └── Missile.tscn
-│   └── tracks/
-│       └── Figure8.tscn
+│   ├── race/Race3D.tscn
+│   ├── vehicle.tscn              # Kenney truck + RigidBody sphere
+│   ├── combat/
+│   │   ├── Missile3D.tscn        # instances missile.glb
+│   │   ├── missile.glb
+│   │   └── MissilePickup.tscn    # wood crate + mini missile
+│   ├── tracks_3d/
+│   │   ├── TrackDefault.tscn     # starter GridMap circuit
+│   │   └── TrackFigure8.tscn     # hand-painted GridMap (editor source of truth)
+│   └── ui/                       # legacy 2D HUD assets still present
 ├── scripts/
-│   ├── autoload/
-│   │   └── MatchConfig.gd
-│   ├── cars/
-│   │   ├── Car.gd
-│   │   ├── PlayerCar.gd
-│   │   ├── AICar.gd
-│   │   └── Missile.gd
-│   ├── tracks/
-│   │   └── Track.gd
-│   ├── ui/
-│   │   ├── Setup.gd
-│   │   ├── HUD.gd
-│   │   └── EndScreen.gd
-│   └── Main.gd
+│   ├── autoload/MatchConfig.gd
+│   ├── vehicle.gd                # drive, HP, fire, AI, laps
+│   ├── race/Race3D.gd
+│   ├── tracks_3d/
+│   │   ├── Track3DBase.gd        # path from GridMap, crates, finish
+│   │   └── TrackFigure8.gd
+│   ├── combat/
+│   │   ├── Missile3D.gd
+│   │   └── MissilePickup.gd
+│   └── ui/
+│       ├── Setup.gd
+│       ├── HUD3D.gd
+│       └── EndScreen.gd
 └── docs/superpowers/specs/
 ```
 
@@ -75,84 +79,110 @@ PULSE_DeathRace/
 
 | Unit | Role |
 |------|------|
-| `MatchConfig` | Autoload session data: mode, lap_count, ai_count, track path |
-| `Setup` | Pre-match UI; writes MatchConfig; loads Main |
-| `Main` | Instances track, spawns cars, win evaluation, camera, HUD wiring |
-| `Track` / `Figure8` | Walls, Path2D, spawns, checkpoints, start/finish |
-| `Car` | Physics, health, fire, death; controller API |
-| `PlayerCar` / `AICar` | Intent only (input or AI) → car API |
-| `Missile` | Straight projectile damage |
-| `HUD` / `EndScreen` | In-race and post-race UI |
+| `MatchConfig` | Mode, laps, AI count, track id, crate_count, missiles_per_crate |
+| `Setup` | Pre-match UI → writes MatchConfig → `Race3D` |
+| `Race3D` | Load track, spawn player + AI, camera, HUD, win rules |
+| `Track3DBase` | RacePath from road GridMap cells, SpawnPoint packing, finish Area3D, random crates |
+| `TrackFigure8` | Hand-painted only — **does not** wipe/rebuild GridMap |
+| `Vehicle` | Sphere physics, combat, path AI, player input, world HP bar |
+| `Missile3D` | Forward projectile, layer hits, explosion on impact |
+| `MissilePickup` | Area3D crate; grants ammo; uses MatchConfig missiles_per_crate |
+| `HUD3D` / `EndScreen` | In-race and post-race UI |
 
-### Extensibility notes
-- New map = new scene under `scenes/tracks/` implementing the same Track API
-- Option 3 migration: extract `VehiclePhysics`, `Health`, `Weapon` as children; keep `set_throttle` / `set_steer` / `try_fire` stable
-- Avoid win logic inside Missile or AI scripts; Main (or a small MatchRules helper) owns outcomes
-
----
-
-## 4. Cars, Physics & Combat
-
-### Car (CharacterBody2D)
-Arcade top-down vehicle:
-- Accelerate, brake/reverse, rotate (prefer turning while moving for a car feel)
-- Friction when coasting
-- Collision with wall `StaticBody2D` → velocity slowdown only (no wall damage in v1)
-
-**Exported tweaks (non-exhaustive):**  
-`max_speed`, `acceleration`, `reverse_speed`, `turn_speed`, `friction`, `max_health`, `fire_cooldown`, `missile_damage`, `wall_slowdown_factor`
-
-**Controller API:**
-- `set_throttle(value: float)` — typically -1..1
-- `set_steer(value: float)` — typically -1..1
-- `try_fire()` — respects cooldown; spawns missile if ready
-
-**Health:**
-- Default `max_health = 100`
-- HP bar above car (ProgressBar or simple rects)
-- HP ≤ 0 → short particle burst, emit `died`, remove or disable car
-
-**Signals:** `health_changed(current, max)`, `died`, `fired`
-
-### Player
-- Input: WASD or arrow keys (throttle / brake-reverse / steer)
-- Space: `try_fire()`
-- Camera2D follows player (child of player or Main-smoothed follow)
-
-### AI (×4)
-- Follow track `Path2D` with look-ahead point (`path_look_ahead` export)
-- Steer toward look-ahead; high throttle on straights; ease turns if needed
-- Combat: nearest living car in forward cone + range → `try_fire()` on cooldown
-- No advanced collision avoidance in v1 (bumping is intentional chaos)
-
-### Missile (Area2D)
-- Spawn at car nose; constant velocity along car facing
-- Default damage **15** (export; design range 10–20)
-- On hit other car: apply damage, free self
-- On wall or lifetime expiry: free self
-- Ignore owner (reference and/or brief grace frames)
+### Extensibility
+- New track = scene under `scenes/tracks_3d/` with GridMap + `Track3DBase` (or subclass) + SpawnPoint
+- Road mesh library items: **3 corner, 4 finish, 5 ramp, 6 straight** (`ROAD_ITEMS`)
+- Win logic stays in Race3D / MatchConfig, not in missiles
 
 ---
 
-## 5. Track (Figure-8)
+## 4. Vehicles, Physics & Combat
 
-### Contents of `Figure8.tscn`
-- **Walls:** `StaticBody2D` + `CollisionPolygon2D` (outer boundary + infield islands)
-- **Visuals:** `Polygon2D` / colored placeholders
-- **RacePath:** single continuous `Path2D`/`Curve2D` through both loops and the crossing
-- **SpawnPoints:** five `Marker2D` nodes near start (player + 4 AI)
-- **Checkpoints:** ordered `Area2D`s along the race direction
-- **StartFinish:** `Area2D`; lap increments only if all checkpoints for the current loop were hit
+### Vehicle (`vehicle.tscn` + `vehicle.gd`)
+Kenney arcade setup:
+- Visual truck under `Container`; physics **RigidBody3D sphere** (layer **8**, mask **1|8**)
+- Throttle / reverse / steer via angular impulse on the sphere; continuous CD on
+- Ground raycast for lean/alignment
+- Collision with GridMap / static world on layer 1
 
-### Track.gd API
-- `get_race_path() -> Path2D`
-- `get_spawn_transforms() -> Array[Transform2D]`
-- Checkpoint / finish helpers as needed for lap tracking
+**Combat exports (representative):**  
+`max_health` (100), `fire_cooldown` (~0.85s), `missile_damage` (15), `missile_speed` (~32),  
+`starting_missile_ammo` (**0**), `max_missile_ammo` (3)
 
-### Lap tracking (per car, when mode uses laps)
-- Current checkpoint index, laps completed
-- Valid finish crossing → lap++
-- Race completion: laps completed ≥ `MatchConfig.lap_count`
+**Input**
+- Player: WASD / arrows; **Space** = fire (`bounce` action)
+- AI: path follow + combat aim (below)
+
+**Health**
+- HP bar billboard above vehicle
+- HP ≤ 0 → died signal; removed from contention
+
+**Signals:** `health_changed`, `ammo_changed`, `died`, `lap_completed`, `race_finished`
+
+### Missiles (`Missile3D`)
+- Mesh: `scenes/combat/missile.glb` (scale **0.25**, yaw **180°** so nose leads)
+- Spawn along **vehicle forward (+Z model)**; straight-line flight only
+- On hit (world or vehicles): damage, **explosion** particles/light/sound, free
+- Ammo required — no infinite fire
+
+### Missile crates (`MissilePickup`)
+- Spawned along RacePath (`Track3DBase`), count = `MatchConfig.crate_count` (default **5**)
+- Random offsets along path with minimum spacing
+- Pickup grants `MatchConfig.missiles_per_crate` (default **2**), up to max ammo
+- Visual: crate + small missile preview
+
+### AI driving
+- Follow `Path3D` / `Curve3D` built from connected **road** GridMap cells (cell centers, densified)
+- Pure-pursuit look-ahead (~5–6); light centerline correction; mild corner throttle
+- Tunables: `path_look_ahead`, `ai_throttle`, `ai_corner_throttle`, `ai_steer_gain`
+- Race3D staggers throttle/look-ahead slightly per AI
+
+### AI combat (fair aim — no missile cheating)
+1. **Acquire** — living vehicle in range (`detect_range` ~22) and wide forward cone (`fire_acquire_dot_min` ~0.55)
+2. **Point** — for up to `ai_aim_time_max` (~0.4s), blend steering toward that car (`ai_aim_steer_weight`)
+3. **Fire** — only if nose alignment ≥ `fire_dot_min` (~0.93)
+4. Missile still flies **straight along car forward** (same as player)
+5. If not lined up in time → cancel aim, no wasted shot
+
+Not implemented: homing missiles, auto-aim projectile direction, player-only rules.
+
+---
+
+## 5. Tracks (3D GridMap)
+
+### Mesh library notes (`models/Library/mesh-library.tres`)
+
+| Item | Name | Collision (baked) | Notes |
+|------|------|-------------------|--------|
+| 0 | decoration-empty | none | Ground fill |
+| 1 | decoration-forest | none | Visual trees |
+| 2 | decoration-tents | none | Visual tents |
+| 3 | track-corner | Concave walls | Outer curve rails |
+| 4 | track-finish | Concave side walls | Same wall shape family as straight |
+| 5 | track-ramp | **none** | Mesh currently **identical** to straight; **not** a real ramp — using as “straight” means **no side walls** (pass-through). Prefer **track-straight (6)** for normal road. Source `track-ramp.glb` missing; `track-bump.glb` exists but is not library item. |
+| 6 | track-straight | Concave side walls | Normal road piece |
+
+GridMap scale is typically **0.75**; `cell_size` ~ **9.99**. Physics engine: **Jolt**.
+
+### TrackDefault
+- Kenney starter circuit GridMap + SpawnPoint + Track3DBase logic
+
+### TrackFigure8 (“Figure-8 Chaos”)
+- **Hand-painted** GridMap in the editor is the source of truth
+- Script must **not** clear or procedurally repaint the map
+- Place **SpawnPoint** on asphalt (start/finish area); cars pack along centerline
+- RacePath auto-built by walking connected road cells from finish/spawn
+
+### Track3DBase runtime
+- `_ensure_race_path()` — walk road graph; densify midpoints; optional outward nudge on sharp bends
+- `_ensure_finish_line()` — Area3D, mask vehicles layer 8
+- `_spawn_missile_pickups()` — random along path using MatchConfig crate settings
+- `get_spawn_transforms(count)` — row behind SpawnPoint facing forward
+
+### Editor tips
+- Edit **`TrackFigure8.tscn`**, not `main.tscn` / Setup
+- Select the **GridMap** node to paint
+- **A / S** rotate tiles (visual + baked collision orientation for pieces that have shapes)
 
 ---
 
@@ -161,101 +191,93 @@ Arcade top-down vehicle:
 ### MatchConfig
 ```gdscript
 enum Mode { HYBRID, RACE, LAST_STANDING }
+enum TrackId { KENNEY_DEFAULT, FIGURE_8 }
+
 var mode: Mode = Mode.HYBRID
 var lap_count: int = 5          # ignored in LAST_STANDING
-var ai_count: int = 4           # fixed in v1 UI; easy to expose later
-var track_scene_path: String    # default Figure8
+var ai_count: int = 3
+var track_id: TrackId = TrackId.KENNEY_DEFAULT
+var crate_count: int = 5
+var missiles_per_crate: int = 2
 ```
 
 ### Setup.tscn
-- Title: PULSE DEATHRACE
-- Mode: Hybrid | Race | Last Standing
-- Laps: choosable (e.g. 3 / 5 / 7 or spinbox); default **5**; control disabled/hidden in Last Standing
-- START → write MatchConfig → change scene to Main
+- Title / mode / laps / track picker / AI count
+- **Crate count** and **missiles per crate**
+- START → Race3D
 
-### HUD (in race)
-- Elapsed timer
-- Player HP (numeric and/or bar; car also has world-space bar)
-- Cars remaining (alive count)
-- Lap `current / total` when mode is Race or Hybrid
-- Optional small mode label
+### HUD3D
+- Timer, HP, ammo, cars remaining, laps when applicable, mode label
 
 ### End screen
-- “You Win!” or “Game Over”
-- **Rematch** → reload Main (same MatchConfig)
-- **Setup** → return to Setup.tscn
+- Win / Game Over
+- Rematch (same MatchConfig) / back to Setup
 
 ### Win / lose rules
 
 | Mode | Player wins | Player loses |
 |------|-------------|--------------|
-| Last Standing | Player is only living car | Player dies |
-| Race | Player reaches lap_count first | Player dies **or** any AI reaches lap_count first |
-| Hybrid | Player race-finishes first **or** last standing | Player dies **or** AI race-finishes first |
+| Last Standing | Only living car | Player dies |
+| Race | Reaches lap_count first | Dies **or** AI finishes first |
+| Hybrid | Race-finish first **or** last standing | Dies **or** AI race-finishes first |
 
-On match end: stop further scoring (pause tree or set match_over flag), show EndScreen.
-
-### Main.gd
-1. Instance track from `MatchConfig.track_scene_path`
-2. Spawn player + `ai_count` AI at spawn markers
-3. Connect car `died` and lap events → evaluate rules
-4. Update HUD each frame / on signals
-5. Attach or follow camera on player
+On match end: `match_over`, stop scoring, show EndScreen.
 
 ---
 
 ## 7. Data Flow
 
 ```
-Setup UI → MatchConfig (mode, laps, track)
+Setup UI → MatchConfig (mode, laps, track, crates, ammo/crate)
                 ↓
-              Main
+             Race3D
                 ↓
-        Instance Track (Figure8)
+     Instance TrackDefault | TrackFigure8
                 ↓
-     Spawn Car×5 (1 Player + 4 AI)
+   Track3DBase: path + crates + finish
                 ↓
-    Car signals / lap events → Main rules
+     Spawn Vehicle×(1 + ai_count)
                 ↓
-         HUD live updates
+  Vehicle signals / finish → Race3D rules
+                ↓
+          HUD3D live
                 ↓
      EndScreen → Rematch | Setup
 ```
 
 ---
 
-## 8. Visual Style (v1)
+## 8. Visual Style
 
-- Colored rectangles/polygons for cars (distinct colors: player green, AI varied)
-- Grey walls, dark asphalt-like polygons
-- Yellow missile rectangles or small sprites
-- Default Godot UI theme acceptable for Setup/HUD/EndScreen
-- No requirement for TileMap if polygons are clearer for figure-8 walls
+- Kenney colormap trucks and track tiles
+- Missile GLB + cartoon-ish explosion on impact
+- Crates: slatted wooden crate (corner posts + plank slats + dark interior, flat Kenney-style two-tone wood) + mini missile preview, glow ring and omni light
+- Setup / HUD: game style helpers (`GameStyle.gd`); concept mockups under `docs/mockups/` and `assets/concept/`
 
 ---
 
 ## 9. Testing Checklist (manual)
 
-1. Setup: switch modes; confirm laps disable in Last Standing; START loads race
-2. Drive: WASD/arrows, reverse, wall slowdown, camera follow
-3. Combat: fire missiles, damage AI, self-hit blocked, wall destroys missile
-4. Death: HP 0 removes car, alive count updates; wipeout wins Hybrid/Last Standing
-5. Laps: checkpoints required; finishing N laps wins Race/Hybrid
-6. Loss: player death → Game Over; AI finishes first in Race/Hybrid → Game Over
-7. EndScreen: Rematch and Setup both work
+1. Setup: modes, laps hide in Last Standing, both tracks, crate settings, START
+2. Drive: WASD, reverse, walls on **straight/corner/finish**, camera follow
+3. **Ramp tiles** have no walls — use straight (6) for solid rails
+4. Combat: pick up crates, ammo limited, fire, damage, self-hit blocked, explosion
+5. AI: follow path at usable speed; short nose-point then fire when lined up; no homing
+6. Death / last standing / race laps / hybrid outcomes
+7. Figure-8: spawn on asphalt, crates on path, AI path follows painted road
+8. EndScreen: Rematch and Setup
 
 ---
 
-## 10. Future Next Steps (post phase 1)
+## 10. Future Next Steps
 
-Documented for later, not phase 1 scope:
-- More tracks under `tracks/`, track picker in Setup
-- Stronger AI (avoidance, rubber-band, difficulty)
-- Power-ups, alternate weapons, gun vs missile
-- Sounds, better art, screen shake
-- Component extraction (option 3)
+- Fix ramp item: real bump mesh + collision, or alias ramp to straight collision
+- Stronger AI (avoidance, difficulty tiers)
+- Power-ups / alternate weapons
+- More tracks + richer editor workflow
+- Audio polish, screen shake
 - Local multiplayer / online
-- Blockchain / XPR integration
+- Blockchain / XPR (still deferred)
 
 ---
 
@@ -263,12 +285,25 @@ Documented for later, not phase 1 scope:
 
 | Topic | Decision |
 |-------|----------|
-| Track shape | Figure-8 (chaos); multi-map later |
-| Architecture | Approach 2 (shared car + track scenes + MatchConfig) |
-| Evolution | Option 2 can migrate to component style (option 3) |
+| Presentation | **3D Kenney base** (pivoted from 2D top-down prototype) |
+| Entry | `Setup.tscn` → `Race3D.tscn` |
+| Tracks | Keep **both** Starter Circuit and hand-painted Figure-8 |
+| Figure-8 paint | Editor GridMap is source of truth; no procedural wipe |
+| Path / crates | Built per-map from each GridMap’s road cells — no per-map AI files |
+| Missile ammo | **Pickups only**; start empty |
+| Crate defaults | **5** crates, **2** missiles each; Setup-configurable |
+| Missile mesh | `missile.glb`, scale ¼, nose flipped 180° Y; explode on hit |
+| AI fire | Fair **point-then-shoot**; missile direction = car forward only |
+| Wall pass-through | Prefer **track-straight** over **track-ramp** (ramp has empty shapes) |
+| Physics | Jolt 3D; vehicle sphere layer 8 |
 | Win model | Hybrid default; Race and Last Standing selectable |
-| Laps | Configurable at setup; default 5; disabled in Last Standing |
-| AI count | 4 (5 cars total) |
-| Missile damage | Default 15, exportable |
-| Wall damage | None in v1 (slowdown only) |
+| Laps | Default 5; disabled in Last Standing |
+| AI count | Default 3 (Setup adjustable) |
+| Missile damage | Default 15 |
 | Blockchain | Deferred |
+
+---
+
+## 12. Legacy 2D prototype
+
+Still in repo for reference (`Car.gd`, `Figure8.tscn` 2D, etc.) but **not** the active design target. Prefer extending the 3D stack above.
