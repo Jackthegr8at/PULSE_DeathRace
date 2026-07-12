@@ -1,0 +1,38 @@
+[gd_scene format=3 uid="uid://cyqx5mlk5ywk0"]
+
+[ext_resource type="Script" uid="uid://bqctlpwodlti" path="res://scripts/cars/ModularTruck.gd" id="1_script"]
+[ext_resource type="PackedScene" uid="uid://oaju04i2h2bq" path="res://models/venom.glb" id="2_body"]
+[ext_resource type="PackedScene" uid="uid://dqahewsk1v3tb" path="res://models/wheel.glb" id="3_wheel"]
+
+[node name="VenomModular" type="Node3D" unique_id=247476192 groups=["modular_vehicle_visual"]]
+transform = Transform3D(1.5, 0, 0, 0, 1.5, 0, 0, 0, 1.5, 0, 0, 0)
+script = ExtResource("1_script")
+
+[node name="Chassis" parent="." unique_id=2028430526 instance=ExtResource("2_body")]
+transform = Transform3D(-6.338151e-08, 0, -1.45, 0, 1.4499999, 0, 1.4499999, 0, -6.338151e-08, 0, 0.38, 0)
+
+[node name="WheelFrontLeft" type="Node3D" parent="." unique_id=220062103]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.32, 0.15863502, 0.42648816)
+
+[node name="Wheel" parent="WheelFrontLeft" unique_id=1653117100 instance=ExtResource("3_wheel")]
+transform = Transform3D(-5.972984e-07, 0, 0.165, 0, 0.165, 0, -0.165, 0, -5.972984e-07, 0, 0, 0)
+
+[node name="WheelFrontRight" type="Node3D" parent="." unique_id=422829593]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.32, 0.15863502, 0.42648816)
+
+[node name="Wheel" parent="WheelFrontRight" unique_id=350164869 instance=ExtResource("3_wheel")]
+transform = Transform3D(-5.791984e-07, 0, 0.16, 0, 0.16, 0, -0.16, 0, -5.791984e-07, 0, 0, 0)
+
+[node name="WheelBackLeft" type="Node3D" parent="." unique_id=611402472]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.32, 0.15863499, -0.45891675)
+
+[node name="Wheel" parent="WheelBackLeft" unique_id=1205999877 instance=ExtResource("3_wheel")]
+transform = Transform3D(-5.972984e-07, 0, 0.165, 0, 0.165, 0, -0.165, 0, -5.972984e-07, 0, 0, 0)
+
+[node name="WheelBackRight" type="Node3D" parent="." unique_id=1284125615]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.32, 0.15863499, -0.45891675)
+
+[node name="Wheel" parent="WheelBackRight" unique_id=719306556 instance=ExtResource("3_wheel")]
+transform = Transform3D(-5.972984e-07, 0, 0.165, 0, 0.165, 0, -0.165, 0, -5.972984e-07, 0, 0, 0)
+
+[node name="UndersideAttachments" type="Node3D" parent="." unique_id=1423380148]

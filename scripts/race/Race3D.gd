@@ -5,7 +5,7 @@ const VehicleScene: PackedScene = preload("res://scenes/vehicle.tscn")
 const AI_MODELS: Array[String] = [
 	"res://scenes/vehicles/TruckRedModular.tscn",
 	"res://scenes/vehicles/TruckGreenModular.tscn",
-	"res://scenes/vehicles/TruckPurpleModular.tscn",
+	"res://scenes/vehicles/VenomModular.tscn",
 	"res://scenes/vehicles/TruckYellowModular.tscn",
 ]
 

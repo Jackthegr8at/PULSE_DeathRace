@@ -27,6 +27,7 @@ var _is_modular_model: bool = false
 var _body_rest: Vector3 = Vector3.ZERO
 var _suspension_y: float = 0.0
 var _wheel_spin: float = 0.0
+var _wheel_rest_positions: Dictionary = {}
 
 @onready var trail_left = get_node_or_null("Container/TrailLeft")
 @onready var trail_right = get_node_or_null("Container/TrailRight")
@@ -51,6 +52,17 @@ var _wheel_spin: float = 0.0
 @export var custom_wheel_track: float = 0.53
 @export var custom_wheel_base: float = 0.55
 @export var custom_wheel_height: float = 0.34
+
+@export_group("Modular Visual Suspension")
+## Radius of the source wheel mesh before its scene scale is applied.
+@export var modular_wheel_radius: float = 0.95
+@export var modular_wheel_travel_down: float = 0.08
+@export var modular_wheel_travel_up: float = 0.025
+@export var modular_wheel_ray_height: float = 2.5
+@export var modular_wheel_ray_length: float = 5.0
+## The chassis cannot visually compress farther than this below its authored height.
+@export var modular_chassis_max_drop: float = 0.12
+@export var modular_suspension_smoothing: float = 16.0
 
 @export_group("Combat")
 @export var max_health: float = 100.0
@@ -169,6 +181,10 @@ func rebind_model_parts() -> void:
 	if vehicle_body:
 		_body_rest = vehicle_body.position
 	_suspension_y = 0.0
+	_wheel_rest_positions.clear()
+	for wheel in [wheel_fl, wheel_fr, wheel_bl, wheel_br]:
+		if wheel != null:
+			_wheel_rest_positions[wheel] = wheel.position
 
 
 func _install_custom_wheels(model: Node3D) -> void:
@@ -680,6 +696,9 @@ func effect_body(delta: float) -> void:
 func effect_suspension(delta: float) -> void:
 	if vehicle_body == null:
 		return
+	if _is_modular_model:
+		_effect_modular_suspension(delta)
+		return
 	# Visual-only spring: compress on landing / hard hits, settle back to rest height
 	var vert_v := 0.0
 	if sphere:
@@ -695,6 +714,61 @@ func effect_suspension(delta: float) -> void:
 		rest = Vector3(_body_rest.x, 0.2, _body_rest.z)
 	var target_pos := rest + Vector3(0.0, _suspension_y, 0.0)
 	vehicle_body.position = vehicle_body.position.lerp(target_pos, clampf(delta * 12.0, 0.0, 1.0))
+
+
+func _effect_modular_suspension(delta: float) -> void:
+	## Visual-only wheel contact. Physics remains on Sphere; these pivots keep
+	## the rendered tyres on the road and prevent them from entering the chassis.
+	if _wheel_rest_positions.is_empty():
+		return
+	var total_delta := 0.0
+	var contact_count := 0
+	for wheel in [wheel_fl, wheel_fr, wheel_bl, wheel_br]:
+		if wheel == null or not _wheel_rest_positions.has(wheel):
+			continue
+		var parent := wheel.get_parent() as Node3D
+		if parent == null:
+			continue
+		var rest: Vector3 = _wheel_rest_positions[wheel]
+		# Ray from the wheel's authored X/Z location, not its current suspended height.
+		var authored_world := parent.to_global(Vector3(rest.x, 0.0, rest.z))
+		var hit := _get_road_hit(authored_world)
+		var target_y := rest.y
+		if not hit.is_empty():
+			var wheel_visual := wheel.get_node_or_null("Wheel") as Node3D
+			var wheel_scale: float = wheel_visual.global_transform.basis.get_scale().y if wheel_visual else wheel.global_transform.basis.get_scale().y
+			var radius := modular_wheel_radius * wheel_scale
+			var hit_position: Vector3 = hit["position"]
+			var hub_world := Vector3(authored_world.x, hit_position.y + radius, authored_world.z)
+			target_y = parent.to_local(hub_world).y
+		# The upper limit keeps tyres out of fenders; the lower limit prevents
+		# a missed/low contact from visually dropping through the road.
+		target_y = clampf(target_y, rest.y - modular_wheel_travel_down, rest.y + modular_wheel_travel_up)
+		wheel.position.y = lerpf(wheel.position.y, target_y, clampf(delta * modular_suspension_smoothing, 0.0, 1.0))
+		total_delta += target_y - rest.y
+		contact_count += 1
+
+	var body_target_y := _body_rest.y
+	if contact_count > 0:
+		body_target_y += total_delta / float(contact_count)
+	# Authored body height is the clearance reference. This makes every modular
+	# car keep its own silhouette clearance instead of applying a truck-specific
+	# absolute height to every chassis.
+	body_target_y = maxf(body_target_y, _body_rest.y - modular_chassis_max_drop)
+	vehicle_body.position.y = lerpf(vehicle_body.position.y, body_target_y, clampf(delta * modular_suspension_smoothing, 0.0, 1.0))
+
+
+func _get_road_hit(world_position: Vector3) -> Dictionary:
+	var space := get_world_3d().direct_space_state
+	if space == null:
+		return {}
+	var from := world_position + Vector3.UP * modular_wheel_ray_height
+	var to := world_position - Vector3.UP * modular_wheel_ray_length
+	var query := PhysicsRayQueryParameters3D.create(from, to)
+	query.collision_mask = 1
+	if sphere:
+		query.exclude = [sphere.get_rid()]
+	return space.intersect_ray(query)
 
 
 func effect_wheels(delta: float) -> void:
