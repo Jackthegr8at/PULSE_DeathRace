@@ -9,17 +9,24 @@ signal lap_completed(vehicle: Vehicle, laps: int)
 signal race_finished(vehicle: Vehicle)
 
 const MissileScene: PackedScene = preload("res://scenes/combat/Missile3D.tscn")
+const CustomWheelScene: PackedScene = preload("res://models/wheel.glb")
 
 # Nodes
 @onready var sphere: RigidBody3D = $Sphere
 @onready var raycast: RayCast3D = $Ground
 @onready var vehicle_model = $Container
-@onready var vehicle_body = get_node_or_null("Container/Model/body")
+var vehicle_body: Node3D = null
 
-@onready var wheel_fl = get_node_or_null("Container/Model/wheel-front-left")
-@onready var wheel_fr = get_node_or_null("Container/Model/wheel-front-right")
-@onready var wheel_bl = get_node_or_null("Container/Model/wheel-back-left")
-@onready var wheel_br = get_node_or_null("Container/Model/wheel-back-right")
+var wheel_fl: Node3D = null
+var wheel_fr: Node3D = null
+var wheel_bl: Node3D = null
+var wheel_br: Node3D = null
+## True when mesh has separate wheel nodes (Kenney-style). False for monomesh (Ravage).
+var _has_separate_wheels: bool = false
+var _is_modular_model: bool = false
+var _body_rest: Vector3 = Vector3.ZERO
+var _suspension_y: float = 0.0
+var _wheel_spin: float = 0.0
 
 @onready var trail_left = get_node_or_null("Container/TrailLeft")
 @onready var trail_right = get_node_or_null("Container/TrailRight")
@@ -31,6 +38,19 @@ const MissileScene: PackedScene = preload("res://scenes/combat/Missile3D.tscn")
 @export_group("Identity")
 @export var is_player: bool = true
 @export var display_name: String = "Vehicle"
+
+@export_group("Model")
+## Extra pitch/lean strength for body (works on monomesh or chassis node).
+@export var body_lean_strength: float = 1.0
+@export var suspension_strength: float = 0.045
+@export var suspension_max: float = 0.1
+## Monomesh only: light road bob (set 0 to disable). Full wheel spin needs separate wheel nodes.
+@export var monomesh_motion: float = 0.35
+@export var use_custom_wheels: bool = true
+@export var custom_wheel_scale: float = 0.25
+@export var custom_wheel_track: float = 0.53
+@export var custom_wheel_base: float = 0.55
+@export var custom_wheel_height: float = 0.34
 
 @export_group("Combat")
 @export var max_health: float = 100.0
@@ -103,6 +123,7 @@ func _ready() -> void:
 	health = max_health
 	missile_ammo = starting_missile_ammo
 	add_to_group("vehicles")
+	rebind_model_parts()
 	_ensure_hp_bar()
 	health_changed.emit(health, max_health)
 	ammo_changed.emit(missile_ammo, max_missile_ammo)
@@ -110,6 +131,113 @@ func _ready() -> void:
 		# Vehicle spheres on layer 8 (matches kit)
 		sphere.collision_layer = 8
 		sphere.collision_mask = 1 | 8
+
+
+## Call after swapping Container/Model (e.g. AI color trucks or custom GLB).
+func rebind_model_parts() -> void:
+	var model := get_node_or_null("Container/Model") as Node3D
+	var is_modular_model := model != null and model.is_in_group("modular_vehicle_visual")
+	_is_modular_model = is_modular_model
+	if is_modular_model:
+		# Editable modular scenes own these animation pivots directly.
+		wheel_fl = model.get_node_or_null("WheelFrontLeft") as Node3D
+		wheel_fr = model.get_node_or_null("WheelFrontRight") as Node3D
+		wheel_bl = model.get_node_or_null("WheelBackLeft") as Node3D
+		wheel_br = model.get_node_or_null("WheelBackRight") as Node3D
+		vehicle_body = model.get_node_or_null("Chassis") as Node3D
+	else:
+		wheel_fl = _find_model_node(model, [
+			"wheel-front-left", "WheelFrontLeft", "wheel_front_left", "FL", "Wheel.FL"
+		])
+		wheel_fr = _find_model_node(model, [
+			"wheel-front-right", "WheelFrontRight", "wheel_front_right", "FR", "Wheel.FR"
+		])
+		wheel_bl = _find_model_node(model, [
+			"wheel-back-left", "WheelBackLeft", "wheel_back_left", "BL", "Wheel.BL", "wheel-rear-left"
+		])
+		wheel_br = _find_model_node(model, [
+			"wheel-back-right", "WheelBackRight", "wheel_back_right", "BR", "Wheel.BR", "wheel-rear-right"
+		])
+		vehicle_body = _find_model_node(model, ["body", "Body", "chassis", "Chassis", "Hull", "hull"])
+	_has_separate_wheels = wheel_fl != null or wheel_fr != null or wheel_bl != null or wheel_br != null
+	if use_custom_wheels and model != null and not is_modular_model:
+		_install_custom_wheels(model)
+
+	# Monomesh (Ravage): no body/wheel nodes — lean/bounce the whole Model root.
+	if vehicle_body == null and model != null:
+		vehicle_body = model
+	if vehicle_body:
+		_body_rest = vehicle_body.position
+	_suspension_y = 0.0
+
+
+func _install_custom_wheels(model: Node3D) -> void:
+	## The authored wheel is visual-only: existing sphere physics stays unchanged.
+	## Each wrapper is the animation pivot used by effect_wheels().
+	var existing := model.get_node_or_null("CustomWheels")
+	if existing:
+		existing.free()
+	for old_wheel in [wheel_fl, wheel_fr, wheel_bl, wheel_br]:
+		if old_wheel != null:
+			_set_visual_visibility(old_wheel, false)
+
+	var root := Node3D.new()
+	root.name = "CustomWheels"
+	model.add_child(root)
+	wheel_fl = _create_custom_wheel(root, "WheelFrontLeft", Vector3(-custom_wheel_track, custom_wheel_height, custom_wheel_base))
+	wheel_fr = _create_custom_wheel(root, "WheelFrontRight", Vector3(custom_wheel_track, custom_wheel_height, custom_wheel_base))
+	wheel_bl = _create_custom_wheel(root, "WheelBackLeft", Vector3(-custom_wheel_track, custom_wheel_height, -custom_wheel_base))
+	wheel_br = _create_custom_wheel(root, "WheelBackRight", Vector3(custom_wheel_track, custom_wheel_height, -custom_wheel_base))
+	_has_separate_wheels = true
+
+
+func _create_custom_wheel(parent: Node3D, wheel_name: String, wheel_position: Vector3) -> Node3D:
+	var pivot := Node3D.new()
+	pivot.name = wheel_name
+	pivot.position = wheel_position
+	parent.add_child(pivot)
+	var wheel := CustomWheelScene.instantiate() as Node3D
+	if wheel == null:
+		return pivot
+	# Blender wheel is wide along local Z; rotate it so the axle runs across the car.
+	wheel.rotation.y = PI * 0.5
+	wheel.scale = Vector3.ONE * custom_wheel_scale
+	pivot.add_child(wheel)
+	return pivot
+
+
+func _set_visual_visibility(node: Node, is_visible: bool) -> void:
+	if node is VisualInstance3D:
+		(node as VisualInstance3D).visible = is_visible
+	for child in node.get_children():
+		_set_visual_visibility(child, is_visible)
+
+
+func _find_model_node(root: Node, names: Array) -> Node3D:
+	if root == null:
+		return null
+	for n in names:
+		var exact := root.find_child(str(n), true, false)
+		if exact is Node3D:
+			return exact as Node3D
+	# Case-insensitive contains match (Blender often uses mixed names)
+	var want: Array[String] = []
+	for n in names:
+		want.append(str(n).to_lower().replace("_", "-").replace(" ", ""))
+	return _find_model_node_fuzzy(root, want)
+
+
+func _find_model_node_fuzzy(node: Node, want: Array[String]) -> Node3D:
+	var key := node.name.to_lower().replace("_", "-").replace(" ", "")
+	for w in want:
+		if key == w or key.ends_with(w) or key.contains(w):
+			if node is Node3D:
+				return node as Node3D
+	for child in node.get_children():
+		var found := _find_model_node_fuzzy(child, want)
+		if found:
+			return found
+	return null
 
 
 func setup_ai(path: Path3D, name_label: String) -> void:
@@ -167,8 +295,8 @@ func _physics_process(delta: float) -> void:
 
 	if raycast and raycast.is_colliding():
 		if not colliding:
-			if vehicle_body != null:
-				vehicle_body.position = Vector3(0, 0.1, 0)
+			# Landing bump — visual suspension only
+			_suspension_y = -minf(suspension_max, 0.08)
 			input.z = 0
 		normal = raycast.get_collision_normal()
 		if vehicle_model and normal.dot(vehicle_model.global_basis.y) > 0.5:
@@ -197,6 +325,7 @@ func _physics_process(delta: float) -> void:
 	effect_engine(delta)
 	effect_body(delta)
 	effect_wheels(delta)
+	effect_suspension(delta)
 	effect_trails()
 	_update_lap_progress()
 	_billboard_hp_bar()
@@ -534,17 +663,48 @@ func get_lap_progress_ratio() -> float:
 
 
 func effect_body(delta: float) -> void:
-	calculated_lean = lerp_angle(calculated_lean, -input.x / 5 * linear_speed, delta * 5)
-	if vehicle_body != null:
-		vehicle_body.rotation.x = lerp_angle(vehicle_body.rotation.x, -(linear_speed - acceleration) / 6, delta * 10)
-		vehicle_body.rotation.z = calculated_lean
-		vehicle_body.position = vehicle_body.position.lerp(Vector3(0, 0.2, 0), delta * 5)
+	calculated_lean = lerp_angle(calculated_lean, -input.x / 5.0 * linear_speed * body_lean_strength, delta * 5)
+	if vehicle_body == null:
+		return
+	# Pitch under accel/brake + roll in turns (chassis or monomesh)
+	var pitch := clampf(-(linear_speed - acceleration) / 6.0, -0.35, 0.35) * body_lean_strength
+	# Optional light monomesh road noise (keep low until wheels are separate)
+	if not _has_separate_wheels and monomesh_motion > 0.0:
+		var t := Time.get_ticks_msec() * 0.001
+		var speed_n := clampf(absf(linear_speed), 0.0, 1.0)
+		pitch += sin(t * (10.0 + speed_n * 18.0)) * speed_n * 0.012 * monomesh_motion
+	vehicle_body.rotation.x = lerp_angle(vehicle_body.rotation.x, pitch, delta * 10)
+	vehicle_body.rotation.z = calculated_lean
+
+
+func effect_suspension(delta: float) -> void:
+	if vehicle_body == null:
+		return
+	# Visual-only spring: compress on landing / hard hits, settle back to rest height
+	var vert_v := 0.0
+	if sphere:
+		vert_v = sphere.linear_velocity.y
+	var target_compress := clampf(-vert_v * suspension_strength, -suspension_max, suspension_max)
+	# Slight squat when accelerating hard
+	target_compress -= clampf(acceleration * 0.02, 0.0, suspension_max * 0.4)
+	_suspension_y = lerpf(_suspension_y, target_compress, clampf(delta * 8.0, 0.0, 1.0))
+	var rest := _body_rest
+	# Kenney truck bodies bounced around y=0.2. Modular scenes keep their
+	# authored chassis position so editor and runtime wheel alignment match.
+	if _has_separate_wheels and not _is_modular_model:
+		rest = Vector3(_body_rest.x, 0.2, _body_rest.z)
+	var target_pos := rest + Vector3(0.0, _suspension_y, 0.0)
+	vehicle_body.position = vehicle_body.position.lerp(target_pos, clampf(delta * 12.0, 0.0, 1.0))
 
 
 func effect_wheels(delta: float) -> void:
+	_wheel_spin += acceleration * 1.15
+	if not _has_separate_wheels:
+		# Separate wheel nodes in the GLB (e.g. wheel-front-left) enable spin/steer.
+		return
 	for wheel in [wheel_fl, wheel_fr, wheel_bl, wheel_br]:
 		if wheel != null:
-			wheel.rotation.x += acceleration
+			wheel.rotation.x = _wheel_spin
 	if wheel_fl != null:
 		wheel_fl.rotation.y = lerp_angle(wheel_fl.rotation.y, -input.x / 1.5, delta * 10)
 	if wheel_fr != null:
@@ -588,9 +748,15 @@ func align_with_y(xform, new_y):
 
 
 func _on_sphere_body_entered(_body: Node) -> void:
-	if vehicle_body == null or impact_sound == null:
+	if impact_sound == null:
 		return
+	_suspension_y = -suspension_max
 	if not impact_sound.playing:
-		var impact_velocity := absf(linear_velocity.dot(vehicle_body.global_basis.z))
+		var basis_z: Vector3 = Vector3(0, 0, 1)
+		if vehicle_body != null:
+			basis_z = vehicle_body.global_basis.z
+		elif vehicle_model != null:
+			basis_z = vehicle_model.global_basis.z
+		var impact_velocity := absf(linear_velocity.dot(basis_z))
 		impact_sound.volume_db = clampf(remap(impact_velocity, 0.0, 6.0, -20.0, 0.0), -20.0, 0.0)
 		impact_sound.play()

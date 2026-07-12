@@ -3,10 +3,10 @@ extends Node3D
 
 const VehicleScene: PackedScene = preload("res://scenes/vehicle.tscn")
 const AI_MODELS: Array[String] = [
-	"res://models/vehicle-truck-red.glb",
-	"res://models/vehicle-truck-green.glb",
-	"res://models/vehicle-truck-purple.glb",
-	"res://models/vehicle-truck-yellow.glb",
+	"res://scenes/vehicles/TruckRedModular.tscn",
+	"res://scenes/vehicles/TruckGreenModular.tscn",
+	"res://scenes/vehicles/TruckPurpleModular.tscn",
+	"res://scenes/vehicles/TruckYellowModular.tscn",
 ]
 
 @onready var track_root: Node3D = $TrackRoot
@@ -108,12 +108,15 @@ func _spawn_vehicle(spawn: Transform3D, as_player: bool, model_path: Variant, na
 		sphere.global_transform = Transform3D(Basis.IDENTITY, pos)
 		sphere.linear_velocity = Vector3.ZERO
 		sphere.angular_velocity = Vector3.ZERO
-	var model_pos := pos - Vector3(0, 0.65, 0)
+	# Modular vehicle scenes are authored with their root on the road plane.
+	# Keep that editor reference at runtime instead of applying the legacy visual drop.
+	var visual_model := veh.get_node_or_null("Container/Model") as Node3D
+	var is_modular_model := visual_model != null and visual_model.is_in_group("modular_vehicle_visual")
+	var visual_drop := 0.55 if is_modular_model else 0.65
+	var model_pos := pos - Vector3(0, visual_drop, 0)
 	var container := veh.get_node_or_null("Container") as Node3D
 	if container:
 		container.global_transform = Transform3D(basis, model_pos)
-	if veh.vehicle_model:
-		veh.vehicle_model.global_transform = Transform3D(basis, model_pos)
 	veh.global_position = Vector3(pos.x, 0.0, pos.z)
 	return veh
 
@@ -154,19 +157,20 @@ func _swap_model(veh: Vehicle, glb_path: String) -> void:
 		return
 	var old := container.get_node_or_null("Model")
 	if old:
-		old.queue_free()
+		old.free()
 	var packed := load(glb_path) as PackedScene
 	if packed == null:
 		return
 	var model := packed.instantiate()
 	model.name = "Model"
 	container.add_child(model)
-	# Re-bind body reference after model swap
-	veh.vehicle_body = model.get_node_or_null("body")
-	veh.wheel_fl = model.get_node_or_null("wheel-front-left")
-	veh.wheel_fr = model.get_node_or_null("wheel-front-right")
-	veh.wheel_bl = model.get_node_or_null("wheel-back-left")
-	veh.wheel_br = model.get_node_or_null("wheel-back-right")
+	# Kenney trucks sit on y≈0; Ravage monomesh is centered — leave identity for kit trucks
+	if str(glb_path).contains("ravage"):
+		# Match Kenney truck bulk (~0.85–0.95); mesh is ~1.5×1.0×1.6 unscaled
+		model.scale = Vector3(0.88, 0.88, 0.88)
+		model.position = Vector3(0, 0.44, 0)
+	if veh.has_method("rebind_model_parts"):
+		veh.rebind_model_parts()
 
 
 func _get_spawn_transform() -> Transform3D:

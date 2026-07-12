@@ -1,6 +1,6 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene format=3 uid="uid://clf8873vtrk0v"]
 
-[ext_resource type="Script" path="res://scripts/cars/AICar.gd" id="1_ai"]
+[ext_resource type="Script" uid="uid://dmtn865e3u5dm" path="res://scripts/cars/AICar.gd" id="1_ai"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
 size = Vector2(48, 28)
@@ -8,45 +8,44 @@ size = Vector2(48, 28)
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_hp"]
 bg_color = Color(0.9, 0.35, 0.35, 1)
 
-[node name="AICar" type="CharacterBody2D"]
+[node name="AICar" type="CharacterBody2D" unique_id=73539846]
 collision_layer = 2
 collision_mask = 3
 motion_mode = 1
 script = ExtResource("1_ai")
-body_color = Color(0.95, 0.4, 0.4, 1)
 display_name = "AI"
+body_color = Color(0.95, 0.4, 0.4, 1)
 
-[node name="BodyVisual" type="ColorRect" parent="."]
+[node name="BodyVisual" type="ColorRect" parent="." unique_id=66807633]
 offset_left = -18.0
 offset_top = -10.0
 offset_right = 18.0
 offset_bottom = 10.0
 color = Color(0.95, 0.4, 0.4, 1)
 
-[node name="Nose" type="ColorRect" parent="."]
+[node name="Nose" type="ColorRect" parent="." unique_id=176126836]
 offset_left = 10.0
 offset_top = -5.0
 offset_right = 20.0
 offset_bottom = 5.0
 color = Color(0.75, 0.25, 0.25, 1)
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=843630065]
 shape = SubResource("RectangleShape2D_body")
 
-[node name="Muzzle" type="Marker2D" parent="."]
+[node name="Muzzle" type="Marker2D" parent="." unique_id=933687167]
 position = Vector2(28, 0)
 
-[node name="HealthBar" type="ProgressBar" parent="."]
+[node name="HealthBar" type="ProgressBar" parent="." unique_id=1457763437]
 offset_left = -20.0
 offset_top = -28.0
 offset_right = 20.0
 offset_bottom = -20.0
-max_value = 100.0
+theme_override_styles/fill = SubResource("StyleBoxFlat_hp")
 value = 100.0
 show_percentage = false
-theme_override_styles/fill = SubResource("StyleBoxFlat_hp")
 
-[node name="DeathParticles" type="CPUParticles2D" parent="."]
+[node name="DeathParticles" type="CPUParticles2D" parent="." unique_id=1954846855]
 emitting = false
 amount = 24
 lifetime = 0.4

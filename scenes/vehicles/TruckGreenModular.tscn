@@ -1,0 +1,32 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/cars/ModularTruck.gd" id="1_script"]
+[ext_resource type="PackedScene" path="res://models/vehicle-truck-green.glb" id="2_body"]
+[ext_resource type="PackedScene" path="res://models/wheel.glb" id="3_wheel"]
+
+[node name="TruckGreenModular" type="Node3D" groups=["modular_vehicle_visual"]]
+script = ExtResource("1_script")
+
+[node name="Chassis" parent="." instance=ExtResource("2_body")]
+
+[node name="WheelFrontLeft" type="Node3D" parent="."]
+position = Vector3(-0.55, 0.34, 0.857)
+[node name="Wheel" parent="WheelFrontLeft" instance=ExtResource("3_wheel")]
+rotation = Vector3(0, 1.5708, 0)
+scale = Vector3(0.25, 0.25, 0.25)
+[node name="WheelFrontRight" type="Node3D" parent="."]
+position = Vector3(0.55, 0.34, 0.857)
+[node name="Wheel" parent="WheelFrontRight" instance=ExtResource("3_wheel")]
+rotation = Vector3(0, 1.5708, 0)
+scale = Vector3(0.25, 0.25, 0.25)
+[node name="WheelBackLeft" type="Node3D" parent="."]
+position = Vector3(-0.55, 0.34, -0.657)
+[node name="Wheel" parent="WheelBackLeft" instance=ExtResource("3_wheel")]
+rotation = Vector3(0, 1.5708, 0)
+scale = Vector3(0.25, 0.25, 0.25)
+[node name="WheelBackRight" type="Node3D" parent="."]
+position = Vector3(0.55, 0.34, -0.657)
+[node name="Wheel" parent="WheelBackRight" instance=ExtResource("3_wheel")]
+rotation = Vector3(0, 1.5708, 0)
+scale = Vector3(0.25, 0.25, 0.25)
+[node name="UndersideAttachments" type="Node3D" parent="."]

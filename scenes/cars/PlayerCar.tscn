@@ -1,6 +1,6 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene format=3 uid="uid://dmrsyea2alnl4"]
 
-[ext_resource type="Script" path="res://scripts/cars/PlayerCar.gd" id="1_player"]
+[ext_resource type="Script" uid="uid://rrrbppx4phep" path="res://scripts/cars/PlayerCar.gd" id="1_player"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
 size = Vector2(48, 28)
@@ -8,46 +8,45 @@ size = Vector2(48, 28)
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_hp"]
 bg_color = Color(0.25, 0.85, 0.4, 1)
 
-[node name="PlayerCar" type="CharacterBody2D"]
+[node name="PlayerCar" type="CharacterBody2D" unique_id=1394585524]
 collision_layer = 2
 collision_mask = 3
 motion_mode = 1
 script = ExtResource("1_player")
-body_color = Color(0.29, 0.87, 0.5, 1)
 display_name = "Player"
+body_color = Color(0.29, 0.87, 0.5, 1)
 sprite_scale = 0.08
 
-[node name="BodyVisual" type="ColorRect" parent="."]
+[node name="BodyVisual" type="ColorRect" parent="." unique_id=336588561]
 offset_left = -18.0
 offset_top = -10.0
 offset_right = 18.0
 offset_bottom = 10.0
 color = Color(0.29, 0.87, 0.5, 1)
 
-[node name="Nose" type="ColorRect" parent="."]
+[node name="Nose" type="ColorRect" parent="." unique_id=417093373]
 offset_left = 10.0
 offset_top = -5.0
 offset_right = 20.0
 offset_bottom = 5.0
 color = Color(0.2, 0.65, 0.35, 1)
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=2013503558]
 shape = SubResource("RectangleShape2D_body")
 
-[node name="Muzzle" type="Marker2D" parent="."]
+[node name="Muzzle" type="Marker2D" parent="." unique_id=925888364]
 position = Vector2(28, 0)
 
-[node name="HealthBar" type="ProgressBar" parent="."]
+[node name="HealthBar" type="ProgressBar" parent="." unique_id=2014276088]
 offset_left = -20.0
 offset_top = -28.0
 offset_right = 20.0
 offset_bottom = -20.0
-max_value = 100.0
+theme_override_styles/fill = SubResource("StyleBoxFlat_hp")
 value = 100.0
 show_percentage = false
-theme_override_styles/fill = SubResource("StyleBoxFlat_hp")
 
-[node name="DeathParticles" type="CPUParticles2D" parent="."]
+[node name="DeathParticles" type="CPUParticles2D" parent="." unique_id=783647442]
 emitting = false
 amount = 24
 lifetime = 0.4
@@ -62,7 +61,6 @@ scale_amount_min = 2.0
 scale_amount_max = 5.0
 color = Color(1, 0.55, 0.15, 1)
 
-[node name="Camera2D" type="Camera2D" parent="."]
-position_smoothing_enabled = true
-position_smoothing_speed = 5.0
+[node name="Camera2D" type="Camera2D" parent="." unique_id=1833586456]
 zoom = Vector2(0.82, 0.82)
+position_smoothing_enabled = true
