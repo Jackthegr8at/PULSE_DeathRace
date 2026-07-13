@@ -3,10 +3,9 @@ extends Node3D
 
 const VehicleScene: PackedScene = preload("res://scenes/vehicle.tscn")
 const AI_MODELS: Array[String] = [
-	"res://scenes/vehicles/TruckRedModular.tscn",
-	"res://scenes/vehicles/TruckGreenModular.tscn",
+	"res://scenes/vehicles/WraithModular.tscn",
+	"res://scenes/vehicles/BulldozeModular.tscn",
 	"res://scenes/vehicles/VenomModular.tscn",
-	"res://scenes/vehicles/TruckYellowModular.tscn",
 ]
 
 @onready var track_root: Node3D = $TrackRoot
