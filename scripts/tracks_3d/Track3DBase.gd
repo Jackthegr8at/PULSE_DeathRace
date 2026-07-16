@@ -6,11 +6,10 @@ extends Node3D
 @export var track_display_name: String = "Track"
 @export var spawn_row_spacing: float = 1.35
 @export var first_pickup_path_fraction: float = 0.12
-
-## Mesh library road items (models/Library/mesh-library.tres)
-const ROAD_ITEMS := [3, 4, 5, 6] # corner, finish, ramp, straight
+@export var build_runtime_wall_colliders: bool = true
 
 const MissilePickupScene: PackedScene = preload("res://scenes/combat/MissilePickup.tscn")
+const MeshLibrarySourceScene: PackedScene = preload("res://models/Library/mesh-library.tscn")
 
 var race_path: Path3D = null
 
@@ -20,6 +19,7 @@ func _ready() -> void:
 
 
 func _setup_track_runtime() -> void:
+	_ensure_runtime_wall_colliders()
 	_ensure_race_path()
 	_ensure_finish_line()
 	_spawn_missile_pickups()
@@ -55,7 +55,102 @@ func get_spawn_transforms(count: int) -> Array[Transform3D]:
 
 
 func _is_road_item(item: int) -> bool:
-	return item in ROAD_ITEMS
+	# Do not rely on numeric MeshLibrary IDs: adding/reordering decoration
+	# entries changes those IDs. Road pieces are identified by their item name.
+	var grid := get_grid_map()
+	if grid == null or grid.mesh_library == null or item < 0:
+		return false
+	var item_name := grid.mesh_library.get_item_name(item).to_lower()
+	return item_name.begins_with("track-") or item_name.begins_with("road-")
+
+
+func _ensure_runtime_wall_colliders() -> void:
+	## MeshLibrary exports can lose item shapes while the visual meshes remain
+	## valid. Reuse the authored collision shapes from the source MeshLibrary
+	## scene and place them with the same cell transform as the GridMap.
+	if not build_runtime_wall_colliders:
+		return
+	if get_node_or_null("RuntimeTrackWalls") != null:
+		return
+
+	var grid: GridMap = get_grid_map()
+	if grid == null or grid.mesh_library == null:
+		return
+
+	var road_cells: Array[Vector3i] = []
+	for raw_cell in grid.get_used_cells():
+		var cell: Vector3i = raw_cell
+		var item: int = grid.get_cell_item(cell)
+		if _is_road_item(item):
+			road_cells.append(cell)
+
+	if road_cells.is_empty():
+		return
+
+	var wall_root := StaticBody3D.new()
+	wall_root.name = "RuntimeTrackWalls"
+	wall_root.collision_layer = 1
+	wall_root.collision_mask = 0
+	add_child(wall_root)
+
+	var source_root: Node3D = MeshLibrarySourceScene.instantiate() as Node3D
+	if source_root == null:
+		wall_root.queue_free()
+		return
+	# This scene is only a source of Shape3D resources. Keep its imported
+	# MeshInstance3D nodes out of rendering while we extract the collisions.
+	source_root.visible = false
+	for source_child in source_root.get_children():
+		if source_child.name != "track-corner" and source_child.name != "track-straight":
+			source_child.free()
+
+	for cell in road_cells:
+		var item: int = grid.get_cell_item(cell)
+		var item_name: String = grid.mesh_library.get_item_name(item).to_lower()
+		var source_name: String = _collision_source_item_name(item_name)
+		if source_name.is_empty():
+			continue
+
+		var source_item: Node3D = source_root.get_node_or_null(source_name) as Node3D
+		if source_item == null:
+			continue
+		var source_collision: StaticBody3D = source_item.get_node_or_null("collision") as StaticBody3D
+		if source_collision == null:
+			continue
+
+		var orientation: int = grid.get_cell_item_orientation(cell)
+		var item_basis: Basis = grid.get_basis_with_orthogonal_index(orientation)
+		var cell_transform: Transform3D = grid.global_transform * Transform3D(item_basis, grid.map_to_local(cell))
+
+		for child in source_collision.get_children():
+			var source_shape: CollisionShape3D = child as CollisionShape3D
+			if source_shape == null or source_shape.shape == null:
+				continue
+
+			var collision_shape: Shape3D = source_shape.shape
+			var target_shape: CollisionShape3D = CollisionShape3D.new()
+			target_shape.shape = collision_shape
+			wall_root.add_child(target_shape)
+			var local_shape_transform: Transform3D = source_item.transform * source_collision.transform * source_shape.transform
+			target_shape.global_transform = cell_transform * local_shape_transform
+
+	source_root.free()
+	if wall_root.get_child_count() == 0:
+		wall_root.queue_free()
+
+
+func _collision_source_item_name(item_name: String) -> String:
+	match item_name:
+		"road-corner":
+			return "track-corner"
+		"track-finish":
+			# The finish tile shares the straight segment's side barriers.
+			# Its own special collision is reserved for the lap trigger.
+			return "track-straight"
+		"track-straight":
+			return "track-straight"
+		_:
+			return ""
 
 
 func _ensure_race_path() -> void:
@@ -226,9 +321,10 @@ func _densify_centerline(world_points: Array[Vector3]) -> Array[Vector3]:
 
 
 func _pick_start_cell(grid: GridMap, road_cells: Array[Vector3i], marker: Marker3D) -> Vector3i:
-	# Prefer finish tile (item 4)
+	# Prefer the finish tile by name; its numeric MeshLibrary ID can change.
 	for cell in road_cells:
-		if grid.get_cell_item(cell) == 4:
+		var item_name := grid.mesh_library.get_item_name(grid.get_cell_item(cell)).to_lower()
+		if item_name == "track-finish" or item_name == "finish":
 			return cell
 	# Else nearest road cell to SpawnPoint
 	var start_cell := road_cells[0]

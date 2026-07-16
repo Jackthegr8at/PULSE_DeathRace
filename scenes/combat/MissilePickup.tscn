@@ -1,175 +1,25 @@
-[gd_scene load_steps=14 format=3]
+[gd_scene format=3 uid="uid://do6e6i2api5lm"]
 
-[ext_resource type="Script" path="res://scripts/combat/MissilePickup.gd" id="1_script"]
-[ext_resource type="PackedScene" path="res://scenes/combat/missile.glb" id="2_missile"]
+[ext_resource type="Script" uid="uid://bgldxsyhop80a" path="res://scripts/combat/MissilePickup.gd" id="1_script"]
+[ext_resource type="PackedScene" uid="uid://b5g8heawa1i3b" path="res://scenes/combat/crate.glb" id="2_cyc30"]
 
 [sub_resource type="SphereShape3D" id="SphereShape3D_pick"]
 radius = 1.15
 
-[sub_resource type="BoxMesh" id="BoxMesh_interior"]
-size = Vector3(0.74, 0.54, 0.74)
-
-[sub_resource type="BoxMesh" id="BoxMesh_post"]
-size = Vector3(0.12, 0.66, 0.12)
-
-[sub_resource type="BoxMesh" id="BoxMesh_slat_fb"]
-size = Vector3(0.86, 0.15, 0.07)
-
-[sub_resource type="BoxMesh" id="BoxMesh_slat_lr"]
-size = Vector3(0.07, 0.15, 0.86)
-
-[sub_resource type="BoxMesh" id="BoxMesh_top"]
-size = Vector3(0.86, 0.07, 0.24)
-
-[sub_resource type="CylinderMesh" id="CylinderMesh_ring"]
-top_radius = 0.75
-bottom_radius = 0.75
-height = 0.04
-radial_segments = 24
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_wood"]
-albedo_color = Color(0.71, 0.49, 0.26, 1)
-roughness = 0.9
-metallic = 0.0
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_wood_light"]
-albedo_color = Color(0.83, 0.62, 0.38, 1)
-roughness = 0.9
-metallic = 0.0
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_wood_dark"]
-albedo_color = Color(0.3, 0.19, 0.1, 1)
-roughness = 0.95
-metallic = 0.0
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ring"]
-albedo_color = Color(0.95, 0.7, 0.15, 0.55)
-emission_enabled = true
-emission = Color(0.95, 0.55, 0.1, 1)
-emission_energy_multiplier = 1.2
-transparency = 1
-roughness = 0.5
-
-[node name="MissilePickup" type="Area3D"]
+[node name="MissilePickup" type="Area3D" unique_id=2130097365]
 collision_layer = 0
 collision_mask = 8
-monitoring = true
 script = ExtResource("1_script")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=2145919566]
 shape = SubResource("SphereShape3D_pick")
 
-[node name="Visual" type="Node3D" parent="."]
+[node name="Visual" type="Node3D" parent="." unique_id=492037406]
 
-[node name="Ring" type="MeshInstance3D" parent="Visual"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.28, 0)
-mesh = SubResource("CylinderMesh_ring")
-material_override = SubResource("StandardMaterial3D_ring")
+[node name="crate" parent="Visual" unique_id=1254800471 instance=ExtResource("2_cyc30")]
 
-[node name="Interior" type="MeshInstance3D" parent="Visual"]
-mesh = SubResource("BoxMesh_interior")
-material_override = SubResource("StandardMaterial3D_wood_dark")
-
-[node name="PostFL" type="MeshInstance3D" parent="Visual"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.37, 0, 0.37)
-mesh = SubResource("BoxMesh_post")
-material_override = SubResource("StandardMaterial3D_wood_light")
-
-[node name="PostFR" type="MeshInstance3D" parent="Visual"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.37, 0, 0.37)
-mesh = SubResource("BoxMesh_post")
-material_override = SubResource("StandardMaterial3D_wood_light")
-
-[node name="PostBL" type="MeshInstance3D" parent="Visual"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.37, 0, -0.37)
-mesh = SubResource("BoxMesh_post")
-material_override = SubResource("StandardMaterial3D_wood_light")
-
-[node name="PostBR" type="MeshInstance3D" parent="Visual"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.37, 0, -0.37)
-mesh = SubResource("BoxMesh_post")
-material_override = SubResource("StandardMaterial3D_wood_light")
-
-[node name="SlatFrontBottom" type="MeshInstance3D" parent="Visual"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.21, 0.37)
-mesh = SubResource("BoxMesh_slat_fb")
-material_override = SubResource("StandardMaterial3D_wood")
-
-[node name="SlatFrontMid" type="MeshInstance3D" parent="Visual"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.37)
-mesh = SubResource("BoxMesh_slat_fb")
-material_override = SubResource("StandardMaterial3D_wood")
-
-[node name="SlatFrontTop" type="MeshInstance3D" parent="Visual"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.21, 0.37)
-mesh = SubResource("BoxMesh_slat_fb")
-material_override = SubResource("StandardMaterial3D_wood")
-
-[node name="SlatBackBottom" type="MeshInstance3D" parent="Visual"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.21, -0.37)
-mesh = SubResource("BoxMesh_slat_fb")
-material_override = SubResource("StandardMaterial3D_wood")
-
-[node name="SlatBackMid" type="MeshInstance3D" parent="Visual"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -0.37)
-mesh = SubResource("BoxMesh_slat_fb")
-material_override = SubResource("StandardMaterial3D_wood")
-
-[node name="SlatBackTop" type="MeshInstance3D" parent="Visual"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.21, -0.37)
-mesh = SubResource("BoxMesh_slat_fb")
-material_override = SubResource("StandardMaterial3D_wood")
-
-[node name="SlatLeftBottom" type="MeshInstance3D" parent="Visual"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.37, -0.21, 0)
-mesh = SubResource("BoxMesh_slat_lr")
-material_override = SubResource("StandardMaterial3D_wood")
-
-[node name="SlatLeftMid" type="MeshInstance3D" parent="Visual"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.37, 0, 0)
-mesh = SubResource("BoxMesh_slat_lr")
-material_override = SubResource("StandardMaterial3D_wood")
-
-[node name="SlatLeftTop" type="MeshInstance3D" parent="Visual"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.37, 0.21, 0)
-mesh = SubResource("BoxMesh_slat_lr")
-material_override = SubResource("StandardMaterial3D_wood")
-
-[node name="SlatRightBottom" type="MeshInstance3D" parent="Visual"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.37, -0.21, 0)
-mesh = SubResource("BoxMesh_slat_lr")
-material_override = SubResource("StandardMaterial3D_wood")
-
-[node name="SlatRightMid" type="MeshInstance3D" parent="Visual"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.37, 0, 0)
-mesh = SubResource("BoxMesh_slat_lr")
-material_override = SubResource("StandardMaterial3D_wood")
-
-[node name="SlatRightTop" type="MeshInstance3D" parent="Visual"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.37, 0.21, 0)
-mesh = SubResource("BoxMesh_slat_lr")
-material_override = SubResource("StandardMaterial3D_wood")
-
-[node name="TopPlankBack" type="MeshInstance3D" parent="Visual"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.33, -0.28)
-mesh = SubResource("BoxMesh_top")
-material_override = SubResource("StandardMaterial3D_wood_light")
-
-[node name="TopPlankMid" type="MeshInstance3D" parent="Visual"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.33, 0)
-mesh = SubResource("BoxMesh_top")
-material_override = SubResource("StandardMaterial3D_wood_light")
-
-[node name="TopPlankFront" type="MeshInstance3D" parent="Visual"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.33, 0.28)
-mesh = SubResource("BoxMesh_top")
-material_override = SubResource("StandardMaterial3D_wood_light")
-
-[node name="MissileIcon" parent="Visual" instance=ExtResource("2_missile")]
-transform = Transform3D(0.07, 0, 0, 0, -3.059797e-09, 0.07, 0, -0.07, -3.059797e-09, 0, 0.62, 0)
-
-[node name="Glow" type="OmniLight3D" parent="Visual"]
+[node name="Glow" type="OmniLight3D" parent="Visual" unique_id=1382449657]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
 light_color = Color(1, 0.7, 0.25, 1)
-light_energy = 1.0
+light_specular = 5.0
 omni_range = 3.0

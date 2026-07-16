@@ -2,9 +2,10 @@ extends Node3D
 ## 3D race host: track, player + AI, combat win rules, HUD / end screen.
 
 const VehicleScene: PackedScene = preload("res://scenes/vehicle.tscn")
+const GAME_ICON: Texture2D = preload("res://icon.png")
 const AI_MODELS: Array[String] = [
 	"res://scenes/vehicles/WraithModular.tscn",
-	"res://scenes/vehicles/BulldozeModular.tscn",
+	"res://scenes/vehicles/BullDozeModular.tscn",
 	"res://scenes/vehicles/VenomModular.tscn",
 ]
 
@@ -20,6 +21,11 @@ var hud: CanvasLayer = null
 var end_layer: CanvasLayer = null
 var race_path3d: Path3D = null
 var _rank_accum: float = 0.0
+var _race_started: bool = false
+var _countdown_running: bool = false
+var _start_layer: CanvasLayer = null
+var _countdown_label: Label = null
+var _prompt_label: Label = null
 
 
 func _ready() -> void:
@@ -31,6 +37,8 @@ func _ready() -> void:
 	_spawn_field()
 	_bind_camera()
 	_spawn_hud()
+	_set_race_started(false)
+	_create_start_overlay()
 
 
 func _load_track() -> void:
@@ -111,6 +119,8 @@ func _spawn_vehicle(spawn: Transform3D, as_player: bool, model_path: Variant, na
 	# Keep that editor reference at runtime instead of applying the legacy visual drop.
 	var visual_model := veh.get_node_or_null("Container/Model") as Node3D
 	var is_modular_model := visual_model != null and visual_model.is_in_group("modular_vehicle_visual")
+	# Modular roads now sit slightly above the old zero-height surface. Lift
+	# the visual chassis/wheels without changing the physics sphere height.
 	var visual_drop := 0.55 if is_modular_model else 0.65
 	var model_pos := pos - Vector3(0, visual_drop, 0)
 	var container := veh.get_node_or_null("Container") as Node3D
@@ -193,8 +203,116 @@ func _spawn_hud() -> void:
 		hud.call("set_player", player)
 	if hud.has_method("set_race_path"):
 		hud.call("set_race_path", race_path3d)
+	if hud.has_method("set_running"):
+		hud.call("set_running", false)
 	_update_alive_hud()
 	_update_position_hud()
+
+
+func _set_race_started(started: bool) -> void:
+	_race_started = started
+	for veh in vehicles:
+		if is_instance_valid(veh) and veh.has_method("set_race_started"):
+			veh.set_race_started(started)
+	if hud and hud.has_method("set_running"):
+		hud.call("set_running", started)
+
+
+func _create_start_overlay() -> void:
+	_start_layer = CanvasLayer.new()
+	_start_layer.name = "RaceStartOverlay"
+	_start_layer.layer = 40
+	add_child(_start_layer)
+
+	var dim := ColorRect.new()
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.color = Color(0.03, 0.04, 0.025, 0.28)
+	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_start_layer.add_child(dim)
+
+	var center := CenterContainer.new()
+	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_start_layer.add_child(center)
+
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(430, 430)
+	panel.add_theme_stylebox_override("panel", GameStyle.comic_panel(Color(0.09, 0.12, 0.08, 0.96), 18.0))
+	center.add_child(panel)
+
+	var margin := MarginContainer.new()
+	for side in ["margin_left", "margin_right", "margin_top", "margin_bottom"]:
+		margin.add_theme_constant_override(side, 22)
+	panel.add_child(margin)
+
+	var stack := VBoxContainer.new()
+	stack.alignment = BoxContainer.ALIGNMENT_CENTER
+	stack.add_theme_constant_override("separation", 12)
+	margin.add_child(stack)
+
+	var logo := TextureRect.new()
+	logo.texture = GAME_ICON
+	logo.custom_minimum_size = Vector2(190, 190)
+	logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	logo.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	stack.add_child(logo)
+
+	var title := Label.new()
+	title.text = "READY TO RACE?"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	GameStyle.apply_title(title, GameStyle.ACCENT, 30)
+	stack.add_child(title)
+
+	_prompt_label = Label.new()
+	_prompt_label.text = "PRESS ENTER TO START"
+	_prompt_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	GameStyle.apply_title(_prompt_label, GameStyle.TEXT, 19)
+	stack.add_child(_prompt_label)
+
+	_countdown_label = Label.new()
+	_countdown_label.text = ""
+	_countdown_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_countdown_label.custom_minimum_size = Vector2(0, 110)
+	_countdown_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	GameStyle.apply_title(_countdown_label, GameStyle.PINK, 92)
+	stack.add_child(_countdown_label)
+
+
+func _start_countdown() -> void:
+	if _countdown_running or _race_started or _start_layer == null:
+		return
+	_countdown_running = true
+	if _prompt_label:
+		_prompt_label.visible = false
+	var logo_node := _start_layer.get_node_or_null("CenterContainer/PanelContainer/MarginContainer/VBoxContainer/TextureRect")
+	if logo_node:
+		logo_node.visible = false
+	var title_node := _start_layer.get_node_or_null("CenterContainer/PanelContainer/MarginContainer/VBoxContainer/Label")
+	if title_node:
+		title_node.visible = false
+
+	for number in ["3", "2", "1"]:
+		if _countdown_label == null:
+			return
+		_countdown_label.text = number
+		_countdown_label.modulate = Color.WHITE
+		_countdown_label.scale = Vector2(0.72, 0.72)
+		var tween := create_tween()
+		tween.set_parallel(true)
+		tween.tween_property(_countdown_label, "scale", Vector2.ONE, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tween.tween_property(_countdown_label, "modulate", Color(1, 0.78, 0.35, 1), 0.7)
+		await get_tree().create_timer(0.8).timeout
+
+	if _countdown_label:
+		_countdown_label.text = "GO!"
+		GameStyle.apply_title(_countdown_label, GameStyle.SUCCESS, 82)
+	_set_race_started(true)
+	await get_tree().create_timer(0.65).timeout
+	if is_instance_valid(_start_layer):
+		_start_layer.queue_free()
+	_start_layer = null
+	_countdown_running = false
 
 
 func _process(delta: float) -> void:
@@ -375,5 +493,10 @@ func _add_stat_row(parent: Control, label_text: String, value_text: String) -> v
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if not _race_started and not _countdown_running and event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER:
+			_start_countdown()
+			get_viewport().set_input_as_handled()
+			return
 	if event.is_action_pressed("ui_cancel") and not match_over:
 		get_tree().change_scene_to_file("res://scenes/Setup.tscn")

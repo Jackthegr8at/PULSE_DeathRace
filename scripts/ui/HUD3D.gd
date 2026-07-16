@@ -68,6 +68,10 @@ func stop() -> void:
 	_running = false
 
 
+func set_running(running: bool) -> void:
+	_running = running
+
+
 func get_elapsed() -> float:
 	return _elapsed
 

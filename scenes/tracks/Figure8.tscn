@@ -1,7 +1,0 @@
-[gd_scene load_steps=2 format=3]
-
-[ext_resource type="Script" path="res://scripts/tracks/Track.gd" id="1_track"]
-
-[node name="Figure8" type="Node2D"]
-script = ExtResource("1_track")
-build_figure8_on_ready = true

@@ -92,6 +92,7 @@ var health: float = 100.0
 var missile_ammo: int = 0
 var is_alive: bool = true
 var match_over: bool = false
+var race_started: bool = true
 var _cooldown: float = 0.0
 var _ai_aim_target: Vehicle = null
 var _ai_aim_timer: float = 0.0
@@ -281,8 +282,27 @@ func set_match_over(over: bool) -> void:
 		linear_speed = 0.0
 
 
+func set_race_started(started: bool) -> void:
+	## Holds both player and AI in place until the race countdown completes.
+	race_started = started
+	input = Vector3.ZERO
+	linear_speed = 0.0
+	if sphere:
+		sphere.freeze = not started
+		sphere.linear_velocity = Vector3.ZERO
+		sphere.angular_velocity = Vector3.ZERO
+
+
 func _physics_process(delta: float) -> void:
 	if not is_alive:
+		return
+	if not race_started:
+		input = Vector3.ZERO
+		linear_speed = 0.0
+		if sphere:
+			sphere.freeze = true
+			sphere.linear_velocity = Vector3.ZERO
+			sphere.angular_velocity = Vector3.ZERO
 		return
 	if _cooldown > 0.0:
 		_cooldown = maxf(0.0, _cooldown - delta)
@@ -332,7 +352,10 @@ func _physics_process(delta: float) -> void:
 
 	if sphere and vehicle_model:
 		acceleration = lerpf(acceleration, linear_speed + (abs(sphere.angular_velocity.length() * linear_speed) / 100), delta * 1)
-		vehicle_model.position = sphere.position - Vector3(0, 0.65, 0)
+		# Modular chassis/wheels are authored higher than the legacy vehicle
+		# visual. Keep their lift every physics frame instead of overwriting it.
+		var visual_drop: float = 0.55 if _is_modular_model else 0.65
+		vehicle_model.position = sphere.position - Vector3(0, visual_drop, 0)
 		raycast.position = sphere.position
 		linear_velocity = (vehicle_model.position - prev_position) / maxf(delta, 0.0001)
 		prev_position = vehicle_model.position

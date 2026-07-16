@@ -38,7 +38,6 @@ scenes/main.tscn           → original kit demo (kept)
 scripts/vehicle.gd         → Kenney vehicle physics
 scripts/race/Race3D.gd     → race orchestration
 scripts/autoload/MatchConfig.gd
-legacy 2D prototype        → scenes/cars, scenes/Main.tscn, etc. (not main)
 ```
 
 ## Combat (current)

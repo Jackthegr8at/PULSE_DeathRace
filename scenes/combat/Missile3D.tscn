@@ -7,14 +7,21 @@
 radius = 0.4
 
 [node name="Missile3D" type="Area3D" unique_id=204940511]
+transform = Transform3D(-0.99999994, 0, -8.742277e-08, 0, 1, 0, 8.742277e-08, 0, -0.99999994, 0, 0, 0)
 collision_layer = 16
 collision_mask = 9
 script = ExtResource("1_script")
 speed = 23.0
-model_scale = 0.4
+model_scale = 1.0
+model_rotation_degrees = Vector3(0, 0, 0)
 
 [node name="Model" parent="." unique_id=32670216 instance=ExtResource("2_missile")]
-transform = Transform3D(-0.25, 0, 0, 0, 0.25, 0, 0, 0, -0.25, 0, 0, 0)
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1533063137]
 shape = SubResource("SphereShape3D_hit")
+
+[node name="Glow" type="OmniLight3D" parent="." unique_id=669463078]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.006376514, 0.017230317, 0.5489982)
+light_color = Color(1, 0.7, 0.25, 1)
+light_specular = 1.5
+omni_range = 3.0

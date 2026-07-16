@@ -12,27 +12,27 @@ script = ExtResource("1_script")
 transform = Transform3D(-6.338151e-08, 0, -1.45, 0, 1.4499999, 0, 1.4499999, 0, -6.338151e-08, 0, 0.38, 0)
 
 [node name="WheelFrontLeft" type="Node3D" parent="." unique_id=220062103]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.32, 0.15863502, 0.42648816)
+transform = Transform3D(0.32, 0, 0, 0, 0.32, 0, 0, 0, 0.32, -0.32, 0.15863502, 0.4046859)
 
 [node name="Wheel" parent="WheelFrontLeft" unique_id=1653117100 instance=ExtResource("3_wheel")]
-transform = Transform3D(-5.972984e-07, 0, 0.165, 0, 0.165, 0, -0.165, 0, -5.972984e-07, 0, 0, 0)
+transform = Transform3D(-3.6199901e-06, 0, 1, 0, 1, 0, -1, 0, -3.6199901e-06, 0, 0, 0)
 
 [node name="WheelFrontRight" type="Node3D" parent="." unique_id=422829593]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.32, 0.15863502, 0.42648816)
+transform = Transform3D(0.32, 0, 0, 0, 0.32, 0, 0, 0, 0.32, 0.32, 0.15863502, 0.4046859)
 
 [node name="Wheel" parent="WheelFrontRight" unique_id=350164869 instance=ExtResource("3_wheel")]
-transform = Transform3D(-5.791984e-07, 0, 0.16, 0, 0.16, 0, -0.16, 0, -5.791984e-07, 0, 0, 0)
+transform = Transform3D(-3.6199901e-06, 0, 1, 0, 1, 0, -1, 0, -3.6199901e-06, 0, 0, 0)
 
 [node name="WheelBackLeft" type="Node3D" parent="." unique_id=611402472]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.32, 0.15863499, -0.45891675)
+transform = Transform3D(0.33, 0, 0, 0, 0.33, 0, 0, 0, 0.33, -0.32, 0.15863499, -0.4520503)
 
 [node name="Wheel" parent="WheelBackLeft" unique_id=1205999877 instance=ExtResource("3_wheel")]
-transform = Transform3D(-5.972984e-07, 0, 0.165, 0, 0.165, 0, -0.165, 0, -5.972984e-07, 0, 0, 0)
+transform = Transform3D(-3.6199901e-06, 0, 1, 0, 1, 0, -1, 0, -3.6199901e-06, 0, 0, 0)
 
 [node name="WheelBackRight" type="Node3D" parent="." unique_id=1284125615]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.32, 0.15863499, -0.45891675)
+transform = Transform3D(0.33, 0, 0, 0, 0.33, 0, 0, 0, 0.33, 0.32, 0.15863499, -0.4520503)
 
 [node name="Wheel" parent="WheelBackRight" unique_id=719306556 instance=ExtResource("3_wheel")]
-transform = Transform3D(-5.972984e-07, 0, 0.165, 0, 0.165, 0, -0.165, 0, -5.972984e-07, 0, 0, 0)
+transform = Transform3D(-3.6199901e-06, 0, 1, 0, 1, 0, -1, 0, -3.6199901e-06, 0, 0, 0)
 
 [node name="UndersideAttachments" type="Node3D" parent="." unique_id=1423380148]
