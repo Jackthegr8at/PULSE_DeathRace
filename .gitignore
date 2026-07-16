@@ -23,3 +23,6 @@ models/decoration-*.glb
 textures/*.png
 textures/*.webp
 *.before_collision_rebuild
+
+docs/superpowers/specs/
+/plan/

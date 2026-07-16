@@ -34,6 +34,17 @@ const HP_HIGH := Color("64e070")
 const HP_MID := Color("ffc94d")
 const HP_LOW := Color("f04f4f")
 
+## Setup-screen palette: cold blackened metal with painted combat accents.
+const SETUP_METAL := Color("081218")
+const SETUP_METAL_RAISED := Color("101b21")
+const SETUP_METAL_HOVER := Color("182832")
+const SETUP_EDGE := Color("34291f")
+const SETUP_WEAR := Color("9a5b25")
+const SETUP_CYAN := Color("00dbe7")
+const SETUP_PURPLE := Color("a84cff")
+const SETUP_YELLOW := Color("f6b600")
+const SETUP_RED := Color("d62f35")
+
 
 static func panel(bg: Color = SURFACE, border: Color = BORDER, radius: float = 12.0, border_w: float = 3.0) -> StyleBoxFlat:
 	var s := StyleBoxFlat.new()
@@ -121,6 +132,83 @@ static func button_ghost() -> Dictionary:
 
 static func button_selected() -> StyleBoxFlat:
 	return button_normal(Color(0.28, 0.22, 0.1, 0.95), ACCENT)
+
+
+static func setup_panel(bg: Color = SETUP_METAL, accent: Color = SETUP_EDGE, border_w: int = 3) -> StyleBoxFlat:
+	var s := StyleBoxFlat.new()
+	s.bg_color = bg
+	s.border_color = accent
+	s.set_border_width_all(border_w)
+	s.set_corner_radius_all(5)
+	s.corner_detail = 2
+	s.content_margin_left = 16
+	s.content_margin_right = 16
+	s.content_margin_top = 12
+	s.content_margin_bottom = 12
+	s.shadow_color = Color(0, 0, 0, 0.82)
+	s.shadow_size = 8
+	s.shadow_offset = Vector2(5, 6)
+	return s
+
+
+static func setup_rule_row() -> StyleBoxFlat:
+	var s := setup_panel(Color("0b151b"), Color("3f3328"), 2)
+	s.set_corner_radius_all(4)
+	s.content_margin_left = 12
+	s.content_margin_right = 8
+	s.content_margin_top = 6
+	s.content_margin_bottom = 6
+	s.shadow_size = 3
+	s.shadow_offset = Vector2(2, 3)
+	return s
+
+
+static func setup_choice_styles(accent: Color, selected: bool = false) -> Dictionary:
+	var normal_bg := Color("111b21")
+	var normal_border := Color("1c252a")
+	if selected:
+		normal_bg = accent.darkened(0.78)
+		normal_border = accent
+	var normal := button_normal(normal_bg, normal_border)
+	normal.set_corner_radius_all(4)
+	normal.set_border_width_all(3 if selected else 2)
+	var hover := button_normal(accent.darkened(0.7), accent.lightened(0.12))
+	hover.set_corner_radius_all(4)
+	hover.set_border_width_all(3)
+	var pressed := button_normal(accent.darkened(0.82), accent)
+	pressed.set_corner_radius_all(4)
+	pressed.set_border_width_all(3)
+	return {"normal": normal, "hover": hover, "pressed": pressed}
+
+
+static func setup_stepper_button_styles() -> Dictionary:
+	var normal := button_normal(Color("10191e"), Color("2a3032"))
+	normal.set_corner_radius_all(4)
+	normal.content_margin_left = 8
+	normal.content_margin_right = 8
+	var hover := button_normal(Color("29343a"), SETUP_YELLOW)
+	hover.set_corner_radius_all(4)
+	var pressed := button_normal(Color("05090b"), SETUP_YELLOW.darkened(0.12))
+	pressed.set_corner_radius_all(4)
+	return {"normal": normal, "hover": hover, "pressed": pressed}
+
+
+static func setup_start_styles() -> Dictionary:
+	var normal := button_normal(SETUP_YELLOW, Color("23170b"))
+	normal.set_corner_radius_all(5)
+	normal.set_border_width_all(5)
+	normal.shadow_color = Color(0, 0, 0, 0.85)
+	normal.shadow_size = 8
+	normal.shadow_offset = Vector2(7, 8)
+	var hover := button_normal(Color("ffd32d"), Color("2e1b08"))
+	hover.set_corner_radius_all(5)
+	hover.set_border_width_all(6)
+	hover.shadow_color = Color(SETUP_YELLOW.r, SETUP_YELLOW.g, SETUP_YELLOW.b, 0.3)
+	hover.shadow_size = 10
+	var pressed := button_normal(Color("d68f00"), Color("100b05"))
+	pressed.set_corner_radius_all(5)
+	pressed.set_border_width_all(5)
+	return {"normal": normal, "hover": hover, "pressed": pressed}
 
 
 static func progress_bg() -> StyleBoxFlat:
