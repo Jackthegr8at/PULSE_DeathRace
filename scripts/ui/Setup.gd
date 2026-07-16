@@ -163,10 +163,16 @@ func _add_stepper_target(name_text: String, at: Vector2, action: Callable) -> vo
 func _build_dynamic_values() -> void:
 	_lap_value = _value_label("LapValue", Vector2(372, 621), Vector2(49, 48), 29, YELLOW)
 	_crate_value = _value_label("CrateValue", Vector2(372, 703), Vector2(49, 48), 29, YELLOW)
+	_crate_value.pivot_offset = _crate_value.size * 0.5
+	_crate_value.rotation_degrees = 1
 	_ammo_value = _value_label("AmmoValue", Vector2(372, 784), Vector2(49, 48), 29, YELLOW)
 	_ai_badge_value = _value_label("AiBadgeValue", Vector2(1379, 45), Vector2(34, 36), 27, Color.WHITE)
 	_opponents_value = _value_label("OpponentsValue", Vector2(990, 726), Vector2(36, 42), 32, PURPLE)
+	_opponents_value.pivot_offset = _opponents_value.size * 0.5
+	_opponents_value.rotation_degrees = 1
 	_race_type_value = _value_label("RaceTypeValue", Vector2(684, 716), Vector2(124, 38), 27, CYAN, HORIZONTAL_ALIGNMENT_LEFT)
+	_race_type_value.pivot_offset = _race_type_value.size * 0.5
+	_race_type_value.rotation_degrees = 1
 	_crates_state_value = _value_label("CratesStateValue", Vector2(1260, 732), Vector2(94, 38), 27, YELLOW, HORIZONTAL_ALIGNMENT_LEFT)
 
 
