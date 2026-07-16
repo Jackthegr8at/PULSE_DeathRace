@@ -36,7 +36,7 @@ visible = false
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.03576088, 0, -0.015955448)
 
 [node name="collision-shape" type="CollisionShape3D" parent="track-corner/collision" unique_id=691914015]
-transform = Transform3D(0.902, 0, 0, 0, 0.902, 0, 0, 0, 0.902, -0.157835, 0.00020217896, 0.26036823)
+transform = Transform3D(0.85, 0, 0, 0, 0.85, 0, 0, 0, 0.85, -0.31512213, 0.00020217896, 0.21006286)
 shape = SubResource("ConcavePolygonShape3D_ftcqc")
 
 [node name="track-finish" parent="." unique_id=1968956639 instance=ExtResource("6_8vya0")]
@@ -60,5 +60,5 @@ visible = false
 transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 0, 0, 0)
 
 [node name="collision-shape" type="CollisionShape3D" parent="track-straight/collision" unique_id=551118773]
-transform = Transform3D(0.8, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+transform = Transform3D(0.78, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
 shape = SubResource("ConcavePolygonShape3D_oxy43")
