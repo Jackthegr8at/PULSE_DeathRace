@@ -1,10 +1,12 @@
 extends CanvasLayer
 ## Comic-style in-race HUD for 3D DeathRace.
-## Top-left stat card (timer, chips, HP, missile pips, lap), top-right position
-## + alive, bottom-right minimap, bottom-center fading hint.
+## Top-left health/timer/lap, top-right position/alive, bottom-left missiles,
+## bottom-right minimap and track progress.
 
 const DATA_BOX_TEXTURE: Texture2D = preload("res://assets/ui/hud/datas_box.png")
 const SURVIVOR_SKULL_TEXTURE: Texture2D = preload("res://assets/ui/hud/skull-yellow.png")
+const MISSILE_BOX_TEXTURE: Texture2D = preload("res://assets/ui/hud/missiles-box.png")
+const HP_BAR_TEXTURE: Texture2D = preload("res://assets/ui/hud/hp-bar.png")
 const DATA_BOX_SHADER := """
 shader_type canvas_item;
 
@@ -17,35 +19,53 @@ void fragment() {
 	COLOR = pixel * COLOR;
 }
 """
+const HP_BAR_SHADER := """
+shader_type canvas_item;
+
+uniform float health_ratio : hint_range(0.0, 1.0) = 1.0;
+
+void fragment() {
+	vec4 pixel = texture(TEXTURE, UV);
+	float luminance = dot(pixel.rgb, vec3(0.299, 0.587, 0.114));
+	float white_segment = smoothstep(0.62, 0.92, luminance);
+	float bar_x = step(0.135, UV.x) * step(UV.x, 0.965);
+	float bar_y = step(0.25, UV.y) * step(UV.y, 0.76);
+	float segment_mask = white_segment * bar_x * bar_y;
+	float filled = step(UV.x, mix(0.135, 0.965, health_ratio));
+	vec3 active_color = vec3(0.92, 0.08, 0.055) * mix(0.72, 1.18, luminance);
+	vec3 empty_color = vec3(0.10, 0.09, 0.095) * mix(0.65, 1.05, luminance);
+	pixel.rgb = mix(pixel.rgb, mix(empty_color, active_color, filled), segment_mask);
+	COLOR = pixel * COLOR;
+}
+"""
 
 var _player: Vehicle = null
 var _elapsed: float = 0.0
 var _running: bool = true
 var _last_hp: float = -1.0
+var _last_ammo: int = 0
 
 var timer_label: Label
-var hp_bar: ProgressBar
+var hp_bar: TextureRect
 var lap_label: Label
+var lap_panel: Control
 var lap_bar: ProgressBar
 var alive_label: Label
 var alive_count_label: Label
-var mode_label: Label
-var track_label: Label
 var hint_label: Label
 var place_label: Label
 var place_total_label: Label
 var place_panel: Control
-var missile_pips: MissilePips
+var missile_display: Control
+var missile_count_label: Label
 var minimap: Minimap3D
 
 
 func _ready() -> void:
 	layer = 20
 	_build()
-	mode_label.text = MatchConfig.mode_display_name().to_upper()
-	track_label.text = MatchConfig.track_display_name()
 	var laps := MatchConfig.uses_laps()
-	lap_label.visible = laps
+	lap_panel.visible = laps
 	lap_bar.visible = laps
 	if place_panel:
 		place_panel.visible = laps
@@ -106,113 +126,89 @@ func _build() -> void:
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(root)
 
-	# ---- Top-left stat card ----
-	var panel := PanelContainer.new()
-	panel.position = Vector2(16, 14)
-	panel.add_theme_stylebox_override("panel", GameStyle.comic_panel(Color(0.10, 0.13, 0.09, 0.95), 14.0))
-	root.add_child(panel)
-	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 6)
-	var margin := MarginContainer.new()
-	for s in ["margin_left", "margin_right", "margin_top", "margin_bottom"]:
-		margin.add_theme_constant_override(s, 12)
-	margin.add_child(v)
-	panel.add_child(margin)
+	# ---- Top-left: health, timer, lap ----
+	hp_bar = TextureRect.new()
+	hp_bar.position = Vector2(16, 14)
+	hp_bar.size = Vector2(350, 53)
+	hp_bar.texture = HP_BAR_TEXTURE
+	hp_bar.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	hp_bar.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	hp_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var hp_shader := Shader.new()
+	hp_shader.code = HP_BAR_SHADER
+	var hp_material := ShaderMaterial.new()
+	hp_material.shader = hp_shader
+	hp_bar.material = hp_material
+	root.add_child(hp_bar)
 
+	var timer_panel := _make_data_panel(Vector2(205, 56))
+	timer_panel.position = Vector2(16, 72)
+	root.add_child(timer_panel)
+	var timer_row := HBoxContainer.new()
+	timer_row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	timer_row.offset_left = 18
+	timer_row.offset_top = 4
+	timer_row.offset_right = -18
+	timer_row.offset_bottom = -4
+	timer_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	timer_row.add_theme_constant_override("separation", 10)
+	timer_panel.add_child(timer_row)
+	var stopwatch := StopwatchIcon.new()
+	stopwatch.custom_minimum_size = Vector2(27, 31)
+	stopwatch.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	timer_row.add_child(stopwatch)
 	timer_label = Label.new()
 	timer_label.text = "00:00.00"
-	GameStyle.apply_title(timer_label, GameStyle.TEXT, 26)
-	v.add_child(timer_label)
+	GameStyle.apply_title(timer_label, GameStyle.TEXT, 24)
+	timer_row.add_child(timer_label)
 
-	var chips := HBoxContainer.new()
-	chips.add_theme_constant_override("separation", 6)
-	v.add_child(chips)
-
-	var mode_chip := PanelContainer.new()
-	mode_chip.add_theme_stylebox_override("panel", GameStyle.comic_panel(GameStyle.ACCENT_DIM.darkened(0.25), 8.0))
-	chips.add_child(mode_chip)
-	mode_label = Label.new()
-	GameStyle.apply_label(mode_label, GameStyle.ACCENT, 12)
-	mode_chip.add_child(mode_label)
-
-	var track_chip := PanelContainer.new()
-	track_chip.add_theme_stylebox_override("panel", GameStyle.comic_panel(Color(0.14, 0.18, 0.13, 0.95), 8.0))
-	chips.add_child(track_chip)
-	track_label = Label.new()
-	GameStyle.apply_label(track_label, GameStyle.TEXT_MUTED, 12)
-	track_chip.add_child(track_label)
-
-	var hp_row := HBoxContainer.new()
-	hp_row.add_theme_constant_override("separation", 8)
-	v.add_child(hp_row)
-	var hp_tag := Label.new()
-	hp_tag.text = "HP"
-	GameStyle.apply_title(hp_tag, GameStyle.SUCCESS, 15)
-	hp_row.add_child(hp_tag)
-	hp_bar = ProgressBar.new()
-	hp_bar.custom_minimum_size = Vector2(190, 20)
-	hp_bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	hp_bar.max_value = 100
-	hp_bar.value = 100
-	hp_bar.show_percentage = false
-	var hp_bg := GameStyle.progress_bg()
-	hp_bg.border_color = GameStyle.INK
-	hp_bg.set_border_width_all(3)
-	hp_bar.add_theme_stylebox_override("background", hp_bg)
-	hp_bar.add_theme_stylebox_override("fill", GameStyle.progress_fill(GameStyle.SUCCESS))
-	hp_row.add_child(hp_bar)
-
-	missile_pips = MissilePips.new()
-	missile_pips.custom_minimum_size = Vector2(190, 26)
-	v.add_child(missile_pips)
-
+	lap_panel = _make_data_panel(Vector2(150, 46))
+	lap_panel.position = Vector2(16, 132)
+	root.add_child(lap_panel)
+	var lap_row := HBoxContainer.new()
+	lap_row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	lap_row.offset_left = 18
+	lap_row.offset_top = 4
+	lap_row.offset_right = -18
+	lap_row.offset_bottom = -4
+	lap_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	lap_row.add_theme_constant_override("separation", 5)
+	lap_panel.add_child(lap_row)
+	var lap_title := Label.new()
+	lap_title.text = "LAP"
+	GameStyle.apply_title(lap_title, GameStyle.TEXT, 16)
+	lap_row.add_child(lap_title)
 	lap_label = Label.new()
-	lap_label.text = "LAP 0 / %d" % MatchConfig.lap_count
-	GameStyle.apply_title(lap_label, GameStyle.SKY, 14)
-	v.add_child(lap_label)
-
-	lap_bar = ProgressBar.new()
-	lap_bar.custom_minimum_size = Vector2(190, 10)
-	lap_bar.max_value = 1.0
-	lap_bar.show_percentage = false
-	var lap_bg := GameStyle.progress_bg()
-	lap_bg.border_color = GameStyle.INK
-	lap_bg.set_border_width_all(2)
-	lap_bar.add_theme_stylebox_override("background", lap_bg)
-	lap_bar.add_theme_stylebox_override("fill", GameStyle.progress_fill(GameStyle.SKY))
-	v.add_child(lap_bar)
+	lap_label.text = "0"
+	GameStyle.apply_title(lap_label, GameStyle.SKY, 24)
+	lap_row.add_child(lap_label)
+	var lap_total := Label.new()
+	lap_total.text = "/%d" % MatchConfig.lap_count
+	GameStyle.apply_title(lap_total, GameStyle.TEXT, 17)
+	lap_row.add_child(lap_total)
 
 	# ---- Top-right: position + alive ----
-	var right := VBoxContainer.new()
+	var right := Control.new()
 	right.anchor_left = 1.0
 	right.anchor_right = 1.0
-	right.offset_left = -241
+	right.offset_left = -221
 	right.offset_right = -16
 	right.offset_top = 14
-	right.add_theme_constant_override("separation", 4)
+	right.offset_bottom = 120
 	root.add_child(right)
 
-	place_panel = _make_data_panel()
+	place_panel = _make_data_panel(Vector2(205, 56))
+	place_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	place_panel.position = Vector2.ZERO
+	place_panel.size = Vector2(205, 56)
 	right.add_child(place_panel)
-	var position_title := Label.new()
-	position_title.text = "POSITION"
-	position_title.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	position_title.offset_left = 23
-	position_title.offset_top = 3
-	position_title.offset_right = -86
-	position_title.offset_bottom = -49
-	position_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	GameStyle.apply_title(position_title, GameStyle.SKY, 14)
-	place_panel.add_child(position_title)
-	_add_data_divider(place_panel, Color(GameStyle.SKY, 0.42))
-	_add_finish_mark(place_panel)
 
 	var place_row := HBoxContainer.new()
 	place_row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	place_row.offset_left = 25
-	place_row.offset_top = 28
-	place_row.offset_right = -25
-	place_row.offset_bottom = -5
+	place_row.offset_left = 22
+	place_row.offset_top = 4
+	place_row.offset_right = -22
+	place_row.offset_bottom = -4
 	place_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	place_row.add_theme_constant_override("separation", 14)
 	place_panel.add_child(place_row)
@@ -229,26 +225,18 @@ func _build() -> void:
 	GameStyle.apply_title(place_total_label, GameStyle.TEXT_MUTED, 14)
 	place_row.add_child(place_total_label)
 
-	var alive_panel := _make_data_panel()
+	var alive_panel := _make_data_panel(Vector2(175, 46))
+	alive_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	alive_panel.position = Vector2(30, 60)
+	alive_panel.size = Vector2(175, 46)
 	right.add_child(alive_panel)
-	var survivors_title := Label.new()
-	survivors_title.text = "SURVIVORS"
-	survivors_title.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	survivors_title.offset_left = 23
-	survivors_title.offset_top = 3
-	survivors_title.offset_right = -70
-	survivors_title.offset_bottom = -49
-	survivors_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	GameStyle.apply_title(survivors_title, GameStyle.WARNING, 14)
-	alive_panel.add_child(survivors_title)
-	_add_data_divider(alive_panel, Color(GameStyle.WARNING, 0.42))
 
 	var skull := TextureRect.new()
 	skull.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	skull.offset_left = 173
-	skull.offset_top = 11
-	skull.offset_right = -17
-	skull.offset_bottom = -39
+	skull.offset_left = 138
+	skull.offset_top = 9
+	skull.offset_right = -12
+	skull.offset_bottom = -9
 	skull.texture = SURVIVOR_SKULL_TEXTURE
 	skull.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	skull.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -257,10 +245,10 @@ func _build() -> void:
 
 	var alive_row := HBoxContainer.new()
 	alive_row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	alive_row.offset_left = 25
-	alive_row.offset_top = 32
-	alive_row.offset_right = -25
-	alive_row.offset_bottom = -5
+	alive_row.offset_left = 18
+	alive_row.offset_top = 4
+	alive_row.offset_right = -42
+	alive_row.offset_bottom = -4
 	alive_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	alive_row.add_theme_constant_override("separation", 8)
 	alive_panel.add_child(alive_row)
@@ -276,6 +264,54 @@ func _build() -> void:
 	alive_count_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	GameStyle.apply_title(alive_count_label, GameStyle.WARNING, 18)
 	alive_row.add_child(alive_count_label)
+
+	# ---- Bottom-left: missile ammo ----
+	missile_display = Control.new()
+	missile_display.anchor_top = 1.0
+	missile_display.anchor_bottom = 1.0
+	missile_display.offset_left = 16
+	missile_display.offset_top = -222
+	missile_display.offset_right = 196
+	missile_display.offset_bottom = -16
+	missile_display.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(missile_display)
+
+	var missile_art := TextureRect.new()
+	missile_art.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	missile_art.texture = MISSILE_BOX_TEXTURE
+	missile_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	missile_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	missile_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	missile_display.add_child(missile_art)
+
+	missile_count_label = Label.new()
+	missile_count_label.position = Vector2(119, 109)
+	missile_count_label.size = Vector2(50, 50)
+	missile_count_label.text = "0"
+	missile_count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	missile_count_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	missile_count_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	GameStyle.apply_title(missile_count_label, GameStyle.TEXT, 26)
+	missile_display.add_child(missile_count_label)
+
+	# Keep track progress near the minimap until its final visual pass.
+	lap_bar = ProgressBar.new()
+	lap_bar.anchor_left = 1.0
+	lap_bar.anchor_right = 1.0
+	lap_bar.anchor_top = 1.0
+	lap_bar.anchor_bottom = 1.0
+	lap_bar.offset_left = -196
+	lap_bar.offset_right = -16
+	lap_bar.offset_top = -216
+	lap_bar.offset_bottom = -206
+	lap_bar.max_value = 1.0
+	lap_bar.show_percentage = false
+	var lap_bg := GameStyle.progress_bg()
+	lap_bg.border_color = GameStyle.INK
+	lap_bg.set_border_width_all(2)
+	lap_bar.add_theme_stylebox_override("background", lap_bg)
+	lap_bar.add_theme_stylebox_override("fill", GameStyle.progress_fill(GameStyle.SKY))
+	root.add_child(lap_bar)
 
 	# ---- Bottom-right minimap ----
 	var map_panel := PanelContainer.new()
@@ -312,12 +348,13 @@ func _build() -> void:
 	tw.tween_property(hint_label, "modulate:a", 0.0, 1.0)
 
 
-func _make_data_panel() -> TextureRect:
+func _make_data_panel(panel_size: Vector2) -> TextureRect:
 	var panel := TextureRect.new()
 	panel.texture = DATA_BOX_TEXTURE
-	panel.custom_minimum_size = Vector2(225, 78)
 	panel.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	panel.stretch_mode = TextureRect.STRETCH_SCALE
+	panel.custom_minimum_size = Vector2.ZERO
+	panel.size = panel_size
 	var shader := Shader.new()
 	shader.code = DATA_BOX_SHADER
 	var shader_material := ShaderMaterial.new()
@@ -325,32 +362,6 @@ func _make_data_panel() -> TextureRect:
 	panel.material = shader_material
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return panel
-
-
-func _add_data_divider(panel: Control, color: Color) -> void:
-	var divider := ColorRect.new()
-	divider.position = Vector2(23, 28)
-	divider.size = Vector2(92, 2)
-	divider.color = color
-	divider.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	panel.add_child(divider)
-
-
-func _add_finish_mark(panel: Control) -> void:
-	var mark := Control.new()
-	mark.position = Vector2(171, 10)
-	mark.rotation = -0.16
-	mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	panel.add_child(mark)
-	for square_position in [Vector2(0, 0), Vector2(20, 0), Vector2(10, 10), Vector2(30, 10)]:
-		var square := ColorRect.new()
-		square.position = square_position
-		square.size = Vector2(10, 10)
-		square.color = GameStyle.SKY
-		square.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		mark.add_child(square)
-
-
 func _process(delta: float) -> void:
 	if not _running:
 		return
@@ -360,17 +371,17 @@ func _process(delta: float) -> void:
 	var ms := int(fmod(_elapsed, 1.0) * 100.0)
 	timer_label.text = "%02d:%02d.%02d" % [m, s, ms]
 	if _player and is_instance_valid(_player) and _player.is_alive and MatchConfig.uses_laps():
-		lap_label.text = "LAP %d / %d" % [_player.laps_completed, MatchConfig.lap_count]
+		lap_label.text = str(mini(_player.laps_completed + 1, MatchConfig.lap_count))
 		lap_bar.value = _player.get_lap_progress_ratio()
 
 
 func _on_hp(current: float, maximum: float) -> void:
 	if hp_bar == null:
 		return
-	hp_bar.max_value = maximum
-	hp_bar.value = current
 	var ratio := current / maxf(maximum, 1.0)
-	hp_bar.add_theme_stylebox_override("fill", GameStyle.progress_fill(GameStyle.hp_color(ratio)))
+	var hp_material := hp_bar.material as ShaderMaterial
+	if hp_material:
+		hp_material.set_shader_parameter("health_ratio", ratio)
 	# Damage flash
 	if _last_hp >= 0.0 and current < _last_hp:
 		hp_bar.modulate = Color(1.6, 0.7, 0.7)
@@ -379,74 +390,29 @@ func _on_hp(current: float, maximum: float) -> void:
 	_last_hp = current
 
 
-func _on_ammo(current: int, maximum: int) -> void:
-	if missile_pips == null:
+func _on_ammo(current: int, _maximum: int) -> void:
+	if missile_display == null or missile_count_label == null:
 		return
-	var gained := current > missile_pips.filled
-	missile_pips.set_ammo(current, maximum)
+	var gained := current > _last_ammo
+	_last_ammo = current
+	missile_count_label.text = str(current)
 	if gained:
-		missile_pips.pivot_offset = missile_pips.size * 0.5
-		missile_pips.scale = Vector2(1.18, 1.18)
+		missile_display.pivot_offset = missile_display.size * 0.5
+		missile_display.scale = Vector2(1.12, 1.12)
 		var tw := create_tween()
-		tw.tween_property(missile_pips, "scale", Vector2.ONE, 0.25) \
+		tw.tween_property(missile_display, "scale", Vector2.ONE, 0.25) \
 			.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
 
 
-class MissilePips extends Control:
-	## Icon-based ammo: filled/empty missile silhouettes with ink outlines.
-	var filled: int = 0
-	var total: int = 3
-
-	func set_ammo(current: int, maximum: int) -> void:
-		filled = current
-		total = maxi(maximum, 1)
-		queue_redraw()
-
+class StopwatchIcon extends Control:
 	func _draw() -> void:
-		var pip_w := 26.0
-		var pip_h := minf(size.y, 24.0)
-		var gap := 8.0
-		var y := (size.y - pip_h) * 0.5
-		for i in total:
-			var x := float(i) * (pip_w + gap)
-			var is_full := i < filled
-			_draw_missile(Rect2(x, y, pip_w, pip_h), is_full)
-
-	func _draw_missile(r: Rect2, full: bool) -> void:
-		var body_color := GameStyle.ACCENT if full else Color(0.25, 0.24, 0.20, 0.9)
-		var cy := r.position.y + r.size.y * 0.5
-		var body_h := r.size.y * 0.46
-		var nose_w := r.size.x * 0.3
-		var body := Rect2(r.position.x + r.size.x * 0.12, cy - body_h * 0.5, r.size.x * 0.55, body_h)
-		var nose := PackedVector2Array([
-			Vector2(body.end.x, cy - body_h * 0.5),
-			Vector2(body.end.x + nose_w, cy),
-			Vector2(body.end.x, cy + body_h * 0.5),
-		])
-		var fin_top := PackedVector2Array([
-			Vector2(body.position.x, cy - body_h * 0.5),
-			Vector2(body.position.x - r.size.x * 0.1, cy - body_h * 1.0),
-			Vector2(body.position.x + r.size.x * 0.14, cy - body_h * 0.5),
-		])
-		var fin_bot := PackedVector2Array([
-			Vector2(body.position.x, cy + body_h * 0.5),
-			Vector2(body.position.x - r.size.x * 0.1, cy + body_h * 1.0),
-			Vector2(body.position.x + r.size.x * 0.14, cy + body_h * 0.5),
-		])
-		# Ink outline pass (slightly inflated)
 		var ink := GameStyle.INK
-		draw_rect(body.grow(2.0), ink, true)
-		draw_colored_polygon(_inflate(nose, Vector2(body.end.x + nose_w * 0.5, cy)), ink)
-		draw_colored_polygon(_inflate(fin_top, Vector2(body.position.x, cy - body_h * 0.75)), ink)
-		draw_colored_polygon(_inflate(fin_bot, Vector2(body.position.x, cy + body_h * 0.75)), ink)
-		# Color fill
-		draw_rect(body, body_color, true)
-		draw_colored_polygon(nose, body_color)
-		draw_colored_polygon(fin_top, body_color)
-		draw_colored_polygon(fin_bot, body_color)
-
-	func _inflate(points: PackedVector2Array, center: Vector2) -> PackedVector2Array:
-		var out := PackedVector2Array()
-		for p in points:
-			out.append(center + (p - center) * 1.25 + (p - center).normalized() * 1.2)
-		return out
+		var face := GameStyle.TEXT
+		var center := Vector2(13.5, 17.0)
+		draw_arc(center, 10.0, 0.0, TAU, 28, ink, 5.0, true)
+		draw_arc(center, 10.0, 0.0, TAU, 28, face, 2.2, true)
+		draw_line(Vector2(10.0, 4.0), Vector2(17.0, 4.0), ink, 5.0, true)
+		draw_line(Vector2(10.0, 4.0), Vector2(17.0, 4.0), face, 2.2, true)
+		draw_line(Vector2(13.5, 4.0), Vector2(13.5, 7.0), face, 2.2, true)
+		draw_line(center, Vector2(13.5, 10.0), face, 2.0, true)
+		draw_line(center, Vector2(18.5, 17.0), face, 2.0, true)
