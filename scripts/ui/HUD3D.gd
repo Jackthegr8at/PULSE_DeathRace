@@ -7,6 +7,10 @@ const DATA_BOX_TEXTURE: Texture2D = preload("res://assets/ui/hud/datas_box.png")
 const SURVIVOR_SKULL_TEXTURE: Texture2D = preload("res://assets/ui/hud/skull-yellow.png")
 const MISSILE_BOX_TEXTURE: Texture2D = preload("res://assets/ui/hud/missiles-box.png")
 const HP_BAR_TEXTURE: Texture2D = preload("res://assets/ui/hud/hp-bar.png")
+const MINIMAP_TEXTURE: Texture2D = preload("res://assets/ui/hud/minimap.png")
+const AMMO_EMPTY_COLOR := Color("8f8a80")
+const AMMO_READY_COLOR := Color("ff2b9d")
+const AMMO_FULL_COLOR := Color("76f04b")
 const DATA_BOX_SHADER := """
 shader_type canvas_item;
 
@@ -19,25 +23,6 @@ void fragment() {
 	COLOR = pixel * COLOR;
 }
 """
-const HP_BAR_SHADER := """
-shader_type canvas_item;
-
-uniform float health_ratio : hint_range(0.0, 1.0) = 1.0;
-
-void fragment() {
-	vec4 pixel = texture(TEXTURE, UV);
-	float luminance = dot(pixel.rgb, vec3(0.299, 0.587, 0.114));
-	float white_segment = smoothstep(0.62, 0.92, luminance);
-	float bar_x = step(0.135, UV.x) * step(UV.x, 0.965);
-	float bar_y = step(0.25, UV.y) * step(UV.y, 0.76);
-	float segment_mask = white_segment * bar_x * bar_y;
-	float filled = step(UV.x, mix(0.135, 0.965, health_ratio));
-	vec3 active_color = vec3(0.92, 0.08, 0.055) * mix(0.72, 1.18, luminance);
-	vec3 empty_color = vec3(0.10, 0.09, 0.095) * mix(0.65, 1.05, luminance);
-	pixel.rgb = mix(pixel.rgb, mix(empty_color, active_color, filled), segment_mask);
-	COLOR = pixel * COLOR;
-}
-"""
 
 var _player: Vehicle = null
 var _elapsed: float = 0.0
@@ -47,6 +32,8 @@ var _last_ammo: int = 0
 
 var timer_label: Label
 var hp_bar: TextureRect
+var hp_display: Control
+var hp_segments: HPFillSegments
 var lap_label: Label
 var lap_panel: Control
 var lap_bar: ProgressBar
@@ -127,19 +114,24 @@ func _build() -> void:
 	add_child(root)
 
 	# ---- Top-left: health, timer, lap ----
+	hp_display = Control.new()
+	hp_display.position = Vector2(16, 14)
+	hp_display.size = Vector2(350, 53)
+	hp_display.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.add_child(hp_display)
+
+	hp_segments = HPFillSegments.new()
+	hp_segments.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	hp_segments.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hp_display.add_child(hp_segments)
+
 	hp_bar = TextureRect.new()
-	hp_bar.position = Vector2(16, 14)
-	hp_bar.size = Vector2(350, 53)
+	hp_bar.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	hp_bar.texture = HP_BAR_TEXTURE
 	hp_bar.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	hp_bar.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	hp_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var hp_shader := Shader.new()
-	hp_shader.code = HP_BAR_SHADER
-	var hp_material := ShaderMaterial.new()
-	hp_material.shader = hp_shader
-	hp_bar.material = hp_material
-	root.add_child(hp_bar)
+	hp_display.add_child(hp_bar)
 
 	var timer_panel := _make_data_panel(Vector2(205, 56))
 	timer_panel.position = Vector2(16, 72)
@@ -291,19 +283,20 @@ func _build() -> void:
 	missile_count_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	missile_count_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	missile_count_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	GameStyle.apply_title(missile_count_label, GameStyle.TEXT, 26)
+	GameStyle.apply_title(missile_count_label, AMMO_EMPTY_COLOR, 29)
+	missile_count_label.add_theme_constant_override("outline_size", 7)
 	missile_display.add_child(missile_count_label)
 
-	# Keep track progress near the minimap until its final visual pass.
+	# Keep track progress directly above the minimap until its final visual pass.
 	lap_bar = ProgressBar.new()
 	lap_bar.anchor_left = 1.0
 	lap_bar.anchor_right = 1.0
 	lap_bar.anchor_top = 1.0
 	lap_bar.anchor_bottom = 1.0
-	lap_bar.offset_left = -196
+	lap_bar.offset_left = -232
 	lap_bar.offset_right = -16
-	lap_bar.offset_top = -216
-	lap_bar.offset_bottom = -206
+	lap_bar.offset_top = -266
+	lap_bar.offset_bottom = -256
 	lap_bar.max_value = 1.0
 	lap_bar.show_percentage = false
 	var lap_bg := GameStyle.progress_bg()
@@ -314,19 +307,27 @@ func _build() -> void:
 	root.add_child(lap_bar)
 
 	# ---- Bottom-right minimap ----
-	var map_panel := PanelContainer.new()
+	var map_panel := Control.new()
 	map_panel.anchor_left = 1.0
 	map_panel.anchor_right = 1.0
 	map_panel.anchor_top = 1.0
 	map_panel.anchor_bottom = 1.0
-	map_panel.offset_left = -196
+	map_panel.offset_left = -232
 	map_panel.offset_right = -16
-	map_panel.offset_top = -196
+	map_panel.offset_top = -254
 	map_panel.offset_bottom = -16
-	map_panel.add_theme_stylebox_override("panel", GameStyle.comic_panel(Color(0.10, 0.13, 0.09, 0.95), 14.0))
+	map_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(map_panel)
+	var map_art := TextureRect.new()
+	map_art.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	map_art.texture = MINIMAP_TEXTURE
+	map_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	map_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	map_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	map_panel.add_child(map_art)
 	minimap = Minimap3D.new()
-	minimap.custom_minimum_size = Vector2(160, 160)
+	minimap.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	minimap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	map_panel.add_child(minimap)
 
 	# ---- Bottom-center hint ----
@@ -376,26 +377,28 @@ func _process(delta: float) -> void:
 
 
 func _on_hp(current: float, maximum: float) -> void:
-	if hp_bar == null:
+	if hp_display == null or hp_segments == null:
 		return
 	var ratio := current / maxf(maximum, 1.0)
-	var hp_material := hp_bar.material as ShaderMaterial
-	if hp_material:
-		hp_material.set_shader_parameter("health_ratio", ratio)
+	hp_segments.set_ratio(ratio)
 	# Damage flash
 	if _last_hp >= 0.0 and current < _last_hp:
-		hp_bar.modulate = Color(1.6, 0.7, 0.7)
+		hp_display.modulate = Color(1.6, 0.7, 0.7)
 		var tw := create_tween()
-		tw.tween_property(hp_bar, "modulate", Color.WHITE, 0.3)
+		tw.tween_property(hp_display, "modulate", Color.WHITE, 0.3)
 	_last_hp = current
 
 
-func _on_ammo(current: int, _maximum: int) -> void:
+func _on_ammo(current: int, maximum: int) -> void:
 	if missile_display == null or missile_count_label == null:
 		return
 	var gained := current > _last_ammo
 	_last_ammo = current
 	missile_count_label.text = str(current)
+	var counter_color := AMMO_EMPTY_COLOR
+	if current > 0:
+		counter_color = AMMO_FULL_COLOR if maximum > 0 and current >= maximum else AMMO_READY_COLOR
+	missile_count_label.add_theme_color_override("font_color", counter_color)
 	if gained:
 		missile_display.pivot_offset = missile_display.size * 0.5
 		missile_display.scale = Vector2(1.12, 1.12)
@@ -416,3 +419,26 @@ class StopwatchIcon extends Control:
 		draw_line(Vector2(13.5, 4.0), Vector2(13.5, 7.0), face, 2.2, true)
 		draw_line(center, Vector2(13.5, 10.0), face, 2.0, true)
 		draw_line(center, Vector2(18.5, 17.0), face, 2.0, true)
+
+
+class HPFillSegments extends Control:
+	const SEGMENT_COUNT := 14
+	var ratio: float = 1.0
+
+	func set_ratio(value: float) -> void:
+		ratio = clampf(value, 0.0, 1.0)
+		queue_redraw()
+
+	func _draw() -> void:
+		var filled_count := ceili(ratio * float(SEGMENT_COUNT))
+		var start_x := size.x * 0.145
+		var end_x := size.x * 0.955
+		var segment_width := (end_x - start_x) / float(SEGMENT_COUNT)
+		var top := size.y * 0.27
+		var bottom := size.y * 0.80
+		for index in SEGMENT_COUNT:
+			var x := start_x + float(index) * segment_width
+			var color := Color("#d9251d") if index < filled_count else Color("#252326")
+			# The source frame contains the exact angled transparent openings and
+			# opaque separators. Rectangles behind it are clipped into those shapes.
+			draw_rect(Rect2(x - 1.0, top, segment_width + 2.0, bottom - top), color, true)

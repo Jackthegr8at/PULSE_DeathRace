@@ -3,11 +3,23 @@ extends Node3D
 
 const VehicleScene: PackedScene = preload("res://scenes/vehicle.tscn")
 const STARTUP_PANEL_TEXTURE: Texture2D = preload("res://assets/ui/hud/startup_box.png")
+const COUNTDOWN_TEXTURES: Dictionary = {
+	"3": preload("res://assets/ui/hud/countdown/3.png"),
+	"2": preload("res://assets/ui/hud/countdown/2.png"),
+	"1": preload("res://assets/ui/hud/countdown/1.png"),
+	"GO": preload("res://assets/ui/hud/countdown/go.png"),
+}
 const AI_MODELS: Array[String] = [
 	"res://scenes/vehicles/WraithModular.tscn",
 	"res://scenes/vehicles/BullDozeModular.tscn",
 	"res://scenes/vehicles/VenomModular.tscn",
 ]
+const PLAYER_MINIMAP_COLOR := Color("21e6e6")
+const AI_MINIMAP_COLORS: Dictionary = {
+	"res://scenes/vehicles/WraithModular.tscn": Color("ff4b4b"),
+	"res://scenes/vehicles/BullDozeModular.tscn": Color("ffc928"),
+	"res://scenes/vehicles/VenomModular.tscn": Color("b52cff"),
+}
 
 @onready var track_root: Node3D = $TrackRoot
 @onready var vehicles_root: Node3D = $Vehicles
@@ -24,7 +36,7 @@ var _rank_accum: float = 0.0
 var _race_started: bool = false
 var _countdown_running: bool = false
 var _start_layer: CanvasLayer = null
-var _countdown_label: Label = null
+var _countdown_art: TextureRect = null
 var _startup_panel: TextureRect = null
 
 
@@ -101,6 +113,7 @@ func _spawn_vehicle(spawn: Transform3D, as_player: bool, model_path: Variant, na
 	var veh := VehicleScene.instantiate() as Vehicle
 	veh.is_player = as_player
 	veh.display_name = name_label
+	veh.minimap_color = PLAYER_MINIMAP_COLOR if as_player else AI_MINIMAP_COLORS.get(str(model_path), GameStyle.DANGER)
 	vehicles_root.add_child(veh)
 
 	# Optional model swap for AI color variety
@@ -242,22 +255,24 @@ func _create_start_overlay() -> void:
 	_startup_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_start_layer.add_child(_startup_panel)
 
-	_countdown_label = Label.new()
-	_countdown_label.name = "Countdown"
-	_countdown_label.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_countdown_label.text = ""
-	_countdown_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_countdown_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_countdown_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	GameStyle.apply_title(_countdown_label, GameStyle.PINK, 92)
-	_start_layer.add_child(_countdown_label)
-	_countdown_label.resized.connect(_center_countdown_pivot)
+	_countdown_art = TextureRect.new()
+	_countdown_art.name = "CountdownArt"
+	_countdown_art.anchor_left = 0.30
+	_countdown_art.anchor_top = 0.24
+	_countdown_art.anchor_right = 0.70
+	_countdown_art.anchor_bottom = 0.76
+	_countdown_art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_countdown_art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_countdown_art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_countdown_art.visible = false
+	_start_layer.add_child(_countdown_art)
+	_countdown_art.resized.connect(_center_countdown_pivot)
 	_center_countdown_pivot()
 
 
 func _center_countdown_pivot() -> void:
-	if _countdown_label:
-		_countdown_label.pivot_offset = _countdown_label.size * 0.5
+	if _countdown_art:
+		_countdown_art.pivot_offset = _countdown_art.size * 0.5
 
 
 func _start_countdown() -> void:
@@ -268,27 +283,33 @@ func _start_countdown() -> void:
 		_startup_panel.visible = false
 
 	for number in ["3", "2", "1"]:
-		if _countdown_label == null:
+		if _countdown_art == null:
 			return
-		_countdown_label.text = number
-		_countdown_label.modulate = Color.WHITE
-		_countdown_label.scale = Vector2(0.72, 0.72)
+		_countdown_art.texture = COUNTDOWN_TEXTURES[number]
+		_countdown_art.visible = true
+		_countdown_art.modulate = Color.WHITE
+		_countdown_art.scale = Vector2(0.72, 0.72)
 		var tween := create_tween()
 		tween.set_parallel(true)
-		tween.tween_property(_countdown_label, "scale", Vector2.ONE, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-		tween.tween_property(_countdown_label, "modulate", Color(1, 0.78, 0.35, 1), 0.7)
+		tween.tween_property(_countdown_art, "scale", Vector2.ONE, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		tween.tween_property(_countdown_art, "modulate", Color(1, 1, 1, 0.82), 0.7)
 		await get_tree().create_timer(0.8).timeout
 
-	if _countdown_label:
-		_countdown_label.text = "GO!"
-		GameStyle.apply_title(_countdown_label, GameStyle.SUCCESS, 82)
+	if _countdown_art:
+		_countdown_art.texture = COUNTDOWN_TEXTURES["GO"]
+		_countdown_art.modulate = Color.WHITE
+		_countdown_art.scale = Vector2(0.72, 0.72)
+		var go_tween := create_tween()
+		go_tween.set_parallel(true)
+		go_tween.tween_property(_countdown_art, "scale", Vector2.ONE, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		go_tween.tween_property(_countdown_art, "modulate", Color(1, 1, 1, 0.82), 0.55)
 	_set_race_started(true)
 	await get_tree().create_timer(0.65).timeout
 	if is_instance_valid(_start_layer):
 		_start_layer.queue_free()
 	_start_layer = null
 	_startup_panel = null
-	_countdown_label = null
+	_countdown_art = null
 	_countdown_running = false
 
 

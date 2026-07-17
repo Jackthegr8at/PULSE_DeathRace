@@ -39,6 +39,7 @@ var _wheel_rest_positions: Dictionary = {}
 @export_group("Identity")
 @export var is_player: bool = true
 @export var display_name: String = "Vehicle"
+@export var minimap_color: Color = Color("21e6e6")
 
 @export_group("Model")
 ## Extra pitch/lean strength for body (works on monomesh or chassis node).
