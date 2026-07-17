@@ -2,7 +2,7 @@ extends Node3D
 ## 3D race host: track, player + AI, combat win rules, HUD / end screen.
 
 const VehicleScene: PackedScene = preload("res://scenes/vehicle.tscn")
-const GAME_ICON: Texture2D = preload("res://icon.png")
+const STARTUP_PANEL_TEXTURE: Texture2D = preload("res://assets/ui/hud/startup_box.png")
 const AI_MODELS: Array[String] = [
 	"res://scenes/vehicles/WraithModular.tscn",
 	"res://scenes/vehicles/BullDozeModular.tscn",
@@ -25,7 +25,7 @@ var _race_started: bool = false
 var _countdown_running: bool = false
 var _start_layer: CanvasLayer = null
 var _countdown_label: Label = null
-var _prompt_label: Label = null
+var _startup_panel: TextureRect = null
 
 
 func _ready() -> void:
@@ -230,67 +230,42 @@ func _create_start_overlay() -> void:
 	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_start_layer.add_child(dim)
 
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_start_layer.add_child(center)
-
-	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(430, 430)
-	panel.add_theme_stylebox_override("panel", GameStyle.comic_panel(Color(0.09, 0.12, 0.08, 0.96), 18.0))
-	center.add_child(panel)
-
-	var margin := MarginContainer.new()
-	for side in ["margin_left", "margin_right", "margin_top", "margin_bottom"]:
-		margin.add_theme_constant_override(side, 22)
-	panel.add_child(margin)
-
-	var stack := VBoxContainer.new()
-	stack.alignment = BoxContainer.ALIGNMENT_CENTER
-	stack.add_theme_constant_override("separation", 12)
-	margin.add_child(stack)
-
-	var logo := TextureRect.new()
-	logo.texture = GAME_ICON
-	logo.custom_minimum_size = Vector2(190, 190)
-	logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	logo.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	stack.add_child(logo)
-
-	var title := Label.new()
-	title.text = "READY TO RACE?"
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	GameStyle.apply_title(title, GameStyle.ACCENT, 30)
-	stack.add_child(title)
-
-	_prompt_label = Label.new()
-	_prompt_label.text = "PRESS ENTER TO START"
-	_prompt_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	GameStyle.apply_title(_prompt_label, GameStyle.TEXT, 19)
-	stack.add_child(_prompt_label)
+	_startup_panel = TextureRect.new()
+	_startup_panel.name = "StartupPanel"
+	_startup_panel.anchor_left = 0.25
+	_startup_panel.anchor_top = 0.25
+	_startup_panel.anchor_right = 0.75
+	_startup_panel.anchor_bottom = 0.75
+	_startup_panel.texture = STARTUP_PANEL_TEXTURE
+	_startup_panel.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_startup_panel.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_startup_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_start_layer.add_child(_startup_panel)
 
 	_countdown_label = Label.new()
+	_countdown_label.name = "Countdown"
+	_countdown_label.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_countdown_label.text = ""
 	_countdown_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_countdown_label.custom_minimum_size = Vector2(0, 110)
 	_countdown_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_countdown_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	GameStyle.apply_title(_countdown_label, GameStyle.PINK, 92)
-	stack.add_child(_countdown_label)
+	_start_layer.add_child(_countdown_label)
+	_countdown_label.resized.connect(_center_countdown_pivot)
+	_center_countdown_pivot()
+
+
+func _center_countdown_pivot() -> void:
+	if _countdown_label:
+		_countdown_label.pivot_offset = _countdown_label.size * 0.5
 
 
 func _start_countdown() -> void:
 	if _countdown_running or _race_started or _start_layer == null:
 		return
 	_countdown_running = true
-	if _prompt_label:
-		_prompt_label.visible = false
-	var logo_node := _start_layer.get_node_or_null("CenterContainer/PanelContainer/MarginContainer/VBoxContainer/TextureRect")
-	if logo_node:
-		logo_node.visible = false
-	var title_node := _start_layer.get_node_or_null("CenterContainer/PanelContainer/MarginContainer/VBoxContainer/Label")
-	if title_node:
-		title_node.visible = false
+	if _startup_panel:
+		_startup_panel.visible = false
 
 	for number in ["3", "2", "1"]:
 		if _countdown_label == null:
@@ -312,6 +287,8 @@ func _start_countdown() -> void:
 	if is_instance_valid(_start_layer):
 		_start_layer.queue_free()
 	_start_layer = null
+	_startup_panel = null
+	_countdown_label = null
 	_countdown_running = false
 
 

@@ -3,6 +3,21 @@ extends CanvasLayer
 ## Top-left stat card (timer, chips, HP, missile pips, lap), top-right position
 ## + alive, bottom-right minimap, bottom-center fading hint.
 
+const DATA_BOX_TEXTURE: Texture2D = preload("res://assets/ui/hud/datas_box.png")
+const SURVIVOR_SKULL_TEXTURE: Texture2D = preload("res://assets/ui/hud/skull-yellow.png")
+const DATA_BOX_SHADER := """
+shader_type canvas_item;
+
+void fragment() {
+	vec4 pixel = texture(TEXTURE, UV);
+	float inside_x = smoothstep(0.07, 0.12, UV.x) * (1.0 - smoothstep(0.88, 0.93, UV.x));
+	float inside_y = smoothstep(0.10, 0.18, UV.y) * (1.0 - smoothstep(0.82, 0.90, UV.y));
+	float darkness = 1.0 - smoothstep(0.04, 0.20, max(pixel.r, max(pixel.g, pixel.b)));
+	pixel.a *= mix(1.0, 0.70, inside_x * inside_y * darkness);
+	COLOR = pixel * COLOR;
+}
+"""
+
 var _player: Vehicle = null
 var _elapsed: float = 0.0
 var _running: bool = true
@@ -13,12 +28,13 @@ var hp_bar: ProgressBar
 var lap_label: Label
 var lap_bar: ProgressBar
 var alive_label: Label
+var alive_count_label: Label
 var mode_label: Label
 var track_label: Label
 var hint_label: Label
 var place_label: Label
 var place_total_label: Label
-var place_panel: PanelContainer
+var place_panel: Control
 var missile_pips: MissilePips
 var minimap: Minimap3D
 
@@ -53,15 +69,15 @@ func set_race_path(path: Path3D) -> void:
 
 
 func update_alive(n: int) -> void:
-	if alive_label:
-		alive_label.text = "ALIVE  %d" % n
+	if alive_count_label:
+		alive_count_label.text = str(n)
 
 
 func update_position(place: int, total: int) -> void:
 	if place_label == null:
 		return
 	place_label.text = _ordinal(place)
-	place_total_label.text = "of %d" % total
+	place_total_label.text = "OF %d" % total
 
 
 func stop() -> void:
@@ -170,37 +186,96 @@ func _build() -> void:
 	var right := VBoxContainer.new()
 	right.anchor_left = 1.0
 	right.anchor_right = 1.0
-	right.offset_left = -190
+	right.offset_left = -241
 	right.offset_right = -16
 	right.offset_top = 14
-	right.add_theme_constant_override("separation", 8)
+	right.add_theme_constant_override("separation", 4)
 	root.add_child(right)
 
-	place_panel = PanelContainer.new()
-	place_panel.add_theme_stylebox_override("panel", GameStyle.comic_panel(Color(0.10, 0.13, 0.09, 0.95), 14.0))
+	place_panel = _make_data_panel()
 	right.add_child(place_panel)
+	var position_title := Label.new()
+	position_title.text = "POSITION"
+	position_title.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	position_title.offset_left = 23
+	position_title.offset_top = 3
+	position_title.offset_right = -86
+	position_title.offset_bottom = -49
+	position_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	GameStyle.apply_title(position_title, GameStyle.SKY, 14)
+	place_panel.add_child(position_title)
+	_add_data_divider(place_panel, Color(GameStyle.SKY, 0.42))
+	_add_finish_mark(place_panel)
+
 	var place_row := HBoxContainer.new()
+	place_row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	place_row.offset_left = 25
+	place_row.offset_top = 28
+	place_row.offset_right = -25
+	place_row.offset_bottom = -5
 	place_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	place_row.add_theme_constant_override("separation", 8)
+	place_row.add_theme_constant_override("separation", 14)
 	place_panel.add_child(place_row)
+
 	place_label = Label.new()
 	place_label.text = "--"
-	GameStyle.apply_title(place_label, GameStyle.ACCENT, 38)
+	place_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	GameStyle.apply_title(place_label, GameStyle.ACCENT, 30)
 	place_row.add_child(place_label)
+
 	place_total_label = Label.new()
-	place_total_label.text = ""
-	place_total_label.size_flags_vertical = Control.SIZE_SHRINK_END
-	GameStyle.apply_label(place_total_label, GameStyle.TEXT_MUTED, 15)
+	place_total_label.text = "OF 4"
+	place_total_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	GameStyle.apply_title(place_total_label, GameStyle.TEXT_MUTED, 14)
 	place_row.add_child(place_total_label)
 
-	var alive_panel := PanelContainer.new()
-	alive_panel.add_theme_stylebox_override("panel", GameStyle.comic_panel(Color(0.16, 0.10, 0.07, 0.95), 10.0))
+	var alive_panel := _make_data_panel()
 	right.add_child(alive_panel)
+	var survivors_title := Label.new()
+	survivors_title.text = "SURVIVORS"
+	survivors_title.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	survivors_title.offset_left = 23
+	survivors_title.offset_top = 3
+	survivors_title.offset_right = -70
+	survivors_title.offset_bottom = -49
+	survivors_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	GameStyle.apply_title(survivors_title, GameStyle.WARNING, 14)
+	alive_panel.add_child(survivors_title)
+	_add_data_divider(alive_panel, Color(GameStyle.WARNING, 0.42))
+
+	var skull := TextureRect.new()
+	skull.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	skull.offset_left = 173
+	skull.offset_top = 11
+	skull.offset_right = -17
+	skull.offset_bottom = -39
+	skull.texture = SURVIVOR_SKULL_TEXTURE
+	skull.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	skull.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	skull.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	alive_panel.add_child(skull)
+
+	var alive_row := HBoxContainer.new()
+	alive_row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	alive_row.offset_left = 25
+	alive_row.offset_top = 32
+	alive_row.offset_right = -25
+	alive_row.offset_bottom = -5
+	alive_row.alignment = BoxContainer.ALIGNMENT_CENTER
+	alive_row.add_theme_constant_override("separation", 8)
+	alive_panel.add_child(alive_row)
+
 	alive_label = Label.new()
-	alive_label.text = "ALIVE  1"
-	alive_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	GameStyle.apply_title(alive_label, GameStyle.WARNING, 16)
-	alive_panel.add_child(alive_label)
+	alive_label.text = "ALIVE"
+	alive_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	GameStyle.apply_title(alive_label, GameStyle.TEXT, 16)
+	alive_row.add_child(alive_label)
+
+	alive_count_label = Label.new()
+	alive_count_label.text = "1"
+	alive_count_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	GameStyle.apply_title(alive_count_label, GameStyle.WARNING, 18)
+	alive_row.add_child(alive_count_label)
 
 	# ---- Bottom-right minimap ----
 	var map_panel := PanelContainer.new()
@@ -235,6 +310,45 @@ func _build() -> void:
 	var tw := create_tween()
 	tw.tween_interval(5.0)
 	tw.tween_property(hint_label, "modulate:a", 0.0, 1.0)
+
+
+func _make_data_panel() -> TextureRect:
+	var panel := TextureRect.new()
+	panel.texture = DATA_BOX_TEXTURE
+	panel.custom_minimum_size = Vector2(225, 78)
+	panel.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	panel.stretch_mode = TextureRect.STRETCH_SCALE
+	var shader := Shader.new()
+	shader.code = DATA_BOX_SHADER
+	var shader_material := ShaderMaterial.new()
+	shader_material.shader = shader
+	panel.material = shader_material
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return panel
+
+
+func _add_data_divider(panel: Control, color: Color) -> void:
+	var divider := ColorRect.new()
+	divider.position = Vector2(23, 28)
+	divider.size = Vector2(92, 2)
+	divider.color = color
+	divider.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(divider)
+
+
+func _add_finish_mark(panel: Control) -> void:
+	var mark := Control.new()
+	mark.position = Vector2(171, 10)
+	mark.rotation = -0.16
+	mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(mark)
+	for square_position in [Vector2(0, 0), Vector2(20, 0), Vector2(10, 10), Vector2(30, 10)]:
+		var square := ColorRect.new()
+		square.position = square_position
+		square.size = Vector2(10, 10)
+		square.color = GameStyle.SKY
+		square.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		mark.add_child(square)
 
 
 func _process(delta: float) -> void:
