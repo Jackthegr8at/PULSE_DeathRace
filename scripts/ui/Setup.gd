@@ -252,7 +252,12 @@ func _refresh_all() -> void:
 
 func _paint_choice(button: Button, selected: bool) -> void:
 	var accent: Color = button.get_meta("accent") as Color
-	button.add_theme_stylebox_override("normal", _highlight_style(accent, 0.20, 3) if selected else StyleBoxEmpty.new())
+	var normal_style: StyleBox
+	if selected:
+		normal_style = _highlight_style(accent, 0.20, 3)
+	else:
+		normal_style = StyleBoxEmpty.new()
+	button.add_theme_stylebox_override("normal", normal_style)
 	button.add_theme_stylebox_override("hover", _highlight_style(accent, 0.14, 2))
 	button.add_theme_stylebox_override("focus", _highlight_style(accent, 0.14, 2))
 	button.add_theme_stylebox_override("pressed", _highlight_style(accent, 0.28, 3))
@@ -331,4 +336,5 @@ func _on_start_pressed() -> void:
 		MatchConfig.lap_count = _lap_count
 	MatchConfig.crate_count = _crate_count
 	MatchConfig.missiles_per_crate = _missiles_per_crate
-	get_tree().change_scene_to_file("res://scenes/race/Race3D.tscn")
+	MatchConfig.begin_race_loading()
+	get_tree().change_scene_to_file("res://scenes/LoadingScreen.tscn")

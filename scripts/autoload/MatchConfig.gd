@@ -32,6 +32,12 @@ var track_id: TrackId = TrackId.KENNEY_DEFAULT
 var crate_count: int = 5 ## How many crates spawn on the track
 var missiles_per_crate: int = 2 ## Ammo granted when collecting one crate
 
+## Strong references retained while moving through the loading screen. Keeping
+## these resources alive means Race3D's existing load() calls reuse Godot's
+## cache instead of loading the track and vehicle scenes a second time.
+var loading_resources: Dictionary = {}
+var loading_started_msec: int = 0
+
 
 func uses_laps() -> bool:
 	return mode != Mode.LAST_STANDING
@@ -55,6 +61,25 @@ func track_display_name() -> String:
 
 func track_scene_path() -> String:
 	return TRACK_PATHS.get(track_id, TRACK_PATHS[TrackId.KENNEY_DEFAULT])
+
+
+func begin_race_loading() -> void:
+	loading_resources.clear()
+	loading_started_msec = Time.get_ticks_msec()
+
+
+func retain_loading_resource(path: String, resource: Resource) -> void:
+	if resource != null:
+		loading_resources[path] = resource
+
+
+func get_loading_resource(path: String) -> Resource:
+	return loading_resources.get(path) as Resource
+
+
+func clear_loading_resources() -> void:
+	loading_resources.clear()
+	loading_started_msec = 0
 
 
 func reset_to_defaults() -> void:

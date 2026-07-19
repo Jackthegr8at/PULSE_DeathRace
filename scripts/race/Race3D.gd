@@ -41,16 +41,32 @@ var _startup_panel: TextureRect = null
 
 
 func _ready() -> void:
+	var ready_started_msec := Time.get_ticks_msec()
 	RenderingServer.set_default_clear_color(Color(0.68, 0.76, 0.97))
 	MatchConfig.ai_count = maxi(MatchConfig.ai_count, 3)
+	var phase_started_msec := Time.get_ticks_msec()
 	_load_track()
+	_print_load_phase("track load and instantiation", phase_started_msec)
 	await get_tree().process_frame
 	await get_tree().process_frame
+	phase_started_msec = Time.get_ticks_msec()
 	_spawn_field()
+	_print_load_phase("vehicle field creation", phase_started_msec)
 	_bind_camera()
+	phase_started_msec = Time.get_ticks_msec()
 	_spawn_hud()
 	_set_race_started(false)
 	_create_start_overlay()
+	_print_load_phase("HUD and start overlay", phase_started_msec)
+	_print_load_phase("Race3D ready total", ready_started_msec)
+	if MatchConfig.loading_started_msec > 0:
+		_print_load_phase("setup-to-race total", MatchConfig.loading_started_msec)
+	MatchConfig.clear_loading_resources()
+
+
+func _print_load_phase(label: String, started_msec: int) -> void:
+	var elapsed_seconds := float(Time.get_ticks_msec() - started_msec) / 1000.0
+	print("[RaceLoad] %s: %.2f s" % [label, elapsed_seconds])
 
 
 func _load_track() -> void:
