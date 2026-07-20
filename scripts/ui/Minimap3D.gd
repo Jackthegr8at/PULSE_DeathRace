@@ -7,6 +7,9 @@ const ROAD_SHADOW := Color("25170f")
 const ROAD_EDGE := Color("6f4528")
 const ROAD_DIRT := Color("bd8249")
 const ROAD_DUST := Color("d5a366")
+const REDRAW_INTERVAL := 0.1
+const MAX_PATH_SAMPLES := 96
+const SMOOTHING_PASSES := 2
 
 @export var map_region: Rect2 = Rect2(0.115, 0.235, 0.77, 0.625)
 
@@ -16,6 +19,8 @@ var _path_points: PackedVector2Array = PackedVector2Array()
 var _display_points: PackedVector2Array = PackedVector2Array()
 var _bounds: Rect2 = Rect2()
 var _display_cache_size: Vector2 = Vector2.ZERO
+var _vehicles: Array[Vehicle] = []
+var _redraw_accumulator: float = 0.0
 
 
 func setup(path: Path3D, p_player: Vehicle) -> void:
@@ -23,6 +28,7 @@ func setup(path: Path3D, p_player: Vehicle) -> void:
 	_rebuild_path_cache(path)
 	_display_points = PackedVector2Array()
 	_display_cache_size = Vector2.ZERO
+	_cache_vehicles()
 	queue_redraw()
 
 
@@ -30,9 +36,19 @@ func _rebuild_path_cache(path: Path3D) -> void:
 	_path_points = PackedVector2Array()
 	if path == null or path.curve == null:
 		return
-	for p in path.curve.get_baked_points():
+	# Curve3D is baked densely for AI steering. The HUD does not need thousands
+	# of points: downsample before smoothing to keep CanvasItem drawing cheap.
+	var baked := path.curve.get_baked_points()
+	var stride := maxi(ceili(float(baked.size()) / float(MAX_PATH_SAMPLES)), 1)
+	for index in range(0, baked.size(), stride):
+		var p := baked[index]
 		var world := path.to_global(p)
 		_path_points.append(Vector2(world.x, world.z))
+	if baked.size() > 1:
+		var last_world := path.to_global(baked[baked.size() - 1])
+		var last_point := Vector2(last_world.x, last_world.z)
+		if _path_points.is_empty() or not _path_points[_path_points.size() - 1].is_equal_approx(last_point):
+			_path_points.append(last_point)
 	if _path_points.is_empty():
 		return
 	var min_v := _path_points[0]
@@ -43,7 +59,11 @@ func _rebuild_path_cache(path: Path3D) -> void:
 	_bounds = Rect2(min_v, max_v - min_v).grow(6.0)
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	_redraw_accumulator += delta
+	if _redraw_accumulator < REDRAW_INTERVAL:
+		return
+	_redraw_accumulator = fmod(_redraw_accumulator, REDRAW_INTERVAL)
 	queue_redraw()
 
 
@@ -68,12 +88,9 @@ func _draw() -> void:
 		draw_polyline(pts, ROAD_DUST, 5.5, true)
 		_draw_road_wear(pts)
 
-	if get_tree() == null:
-		return
-	for node in get_tree().get_nodes_in_group("vehicles"):
-		if not (node is Vehicle):
+	for veh in _vehicles:
+		if not is_instance_valid(veh):
 			continue
-		var veh := node as Vehicle
 		if not veh.is_alive:
 			continue
 		var world := veh.get_vehicle_position()
@@ -87,6 +104,15 @@ func _draw() -> void:
 		else:
 			draw_circle(mp, 6.0, GameStyle.INK)
 			draw_circle(mp, 4.2, dot_color)
+
+
+func _cache_vehicles() -> void:
+	_vehicles.clear()
+	if get_tree() == null:
+		return
+	for node in get_tree().get_nodes_in_group("vehicles"):
+		if node is Vehicle:
+			_vehicles.append(node as Vehicle)
 
 
 func _draw_road_wear(points: PackedVector2Array) -> void:
@@ -116,7 +142,7 @@ func _rebuild_display_path(inner: Rect2) -> void:
 	var mapped := PackedVector2Array()
 	for point in _path_points:
 		mapped.append(_world_to_map(point, inner))
-	_display_points = _smooth_closed_path(mapped, 4)
+	_display_points = _smooth_closed_path(mapped, SMOOTHING_PASSES)
 	_display_cache_size = size
 
 

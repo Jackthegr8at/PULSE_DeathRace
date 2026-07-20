@@ -26,3 +26,5 @@ textures/*.webp
 
 docs/superpowers/specs/
 /plan/
+
+models/Library/mesh-library-runtime.res

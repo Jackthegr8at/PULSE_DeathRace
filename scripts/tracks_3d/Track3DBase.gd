@@ -9,7 +9,9 @@ extends Node3D
 @export var build_runtime_wall_colliders: bool = true
 
 const MissilePickupScene: PackedScene = preload("res://scenes/combat/MissilePickup.tscn")
-const MeshLibrarySourceScene: PackedScene = preload("res://models/Library/mesh-library.tscn")
+const MESH_LIBRARY_SOURCE_SCENE_PATH := "res://models/Library/mesh-library.tscn"
+
+static var _wall_collision_sources: Dictionary = {}
 
 var race_path: Path3D = null
 
@@ -86,6 +88,16 @@ func _ensure_runtime_wall_colliders() -> void:
 
 	if road_cells.is_empty():
 		return
+	var needs_runtime_shapes := false
+	for cell in road_cells:
+		var item := grid.get_cell_item(cell)
+		if grid.mesh_library.get_item_shapes(item).is_empty():
+			needs_runtime_shapes = true
+			break
+	if not needs_runtime_shapes:
+		# The generated binary MeshLibrary embeds these collisions directly,
+		# allowing GridMap to create its optimized physics bodies itself.
+		return
 
 	var wall_root := StaticBody3D.new()
 	wall_root.name = "RuntimeTrackWalls"
@@ -93,16 +105,10 @@ func _ensure_runtime_wall_colliders() -> void:
 	wall_root.collision_mask = 0
 	add_child(wall_root)
 
-	var source_root: Node3D = MeshLibrarySourceScene.instantiate() as Node3D
-	if source_root == null:
+	var collision_sources := _get_wall_collision_sources()
+	if collision_sources.is_empty():
 		wall_root.queue_free()
 		return
-	# This scene is only a source of Shape3D resources. Keep its imported
-	# MeshInstance3D nodes out of rendering while we extract the collisions.
-	source_root.visible = false
-	for source_child in source_root.get_children():
-		if source_child.name != "track-corner" and source_child.name != "track-straight":
-			source_child.free()
 
 	for cell in road_cells:
 		var item: int = grid.get_cell_item(cell)
@@ -111,30 +117,23 @@ func _ensure_runtime_wall_colliders() -> void:
 		if source_name.is_empty():
 			continue
 
-		var source_item: Node3D = source_root.get_node_or_null(source_name) as Node3D
-		if source_item == null:
+		var source: Array = collision_sources.get(source_name, [])
+		if source.size() != 2:
 			continue
-		var source_collision: StaticBody3D = source_item.get_node_or_null("collision") as StaticBody3D
-		if source_collision == null:
+		var collision_shape: Shape3D = source[0] as Shape3D
+		var local_shape_transform: Transform3D = source[1]
+		if collision_shape == null:
 			continue
 
 		var orientation: int = grid.get_cell_item_orientation(cell)
 		var item_basis: Basis = grid.get_basis_with_orthogonal_index(orientation)
 		var cell_transform: Transform3D = grid.global_transform * Transform3D(item_basis, grid.map_to_local(cell))
 
-		for child in source_collision.get_children():
-			var source_shape: CollisionShape3D = child as CollisionShape3D
-			if source_shape == null or source_shape.shape == null:
-				continue
+		var target_shape := CollisionShape3D.new()
+		target_shape.shape = collision_shape
+		wall_root.add_child(target_shape)
+		target_shape.global_transform = cell_transform * local_shape_transform
 
-			var collision_shape: Shape3D = source_shape.shape
-			var target_shape: CollisionShape3D = CollisionShape3D.new()
-			target_shape.shape = collision_shape
-			wall_root.add_child(target_shape)
-			var local_shape_transform: Transform3D = source_item.transform * source_collision.transform * source_shape.transform
-			target_shape.global_transform = cell_transform * local_shape_transform
-
-	source_root.free()
 	if wall_root.get_child_count() == 0:
 		wall_root.queue_free()
 
@@ -151,6 +150,107 @@ func _collision_source_item_name(item_name: String) -> String:
 			return "track-straight"
 		_:
 			return ""
+
+
+func _get_wall_collision_sources() -> Dictionary:
+	if not _wall_collision_sources.is_empty():
+		return _wall_collision_sources
+	var started_msec := Time.get_ticks_msec()
+	var source_text := FileAccess.get_file_as_string(MESH_LIBRARY_SOURCE_SCENE_PATH)
+	if source_text.is_empty():
+		push_warning("Could not read wall collision source: %s" % MESH_LIBRARY_SOURCE_SCENE_PATH)
+		return {}
+	var corner_shape := _read_node_concave_shape(
+		source_text,
+		"[node name=\"collision-shape\" type=\"CollisionShape3D\" parent=\"track-corner/collision\""
+	)
+	var straight_shape := _read_node_concave_shape(
+		source_text,
+		"[node name=\"collision-shape\" type=\"CollisionShape3D\" parent=\"track-straight/collision\""
+	)
+	if corner_shape == null or straight_shape == null:
+		push_warning("Could not extract track wall collision shapes")
+		return {}
+	_wall_collision_sources = {
+		"track-corner": [
+			corner_shape,
+			_read_node_transform(source_text, "[node name=\"track-corner\"")
+			* _read_node_transform(source_text, "[node name=\"collision\" type=\"StaticBody3D\" parent=\"track-corner\"")
+			* _read_node_transform(source_text, "[node name=\"collision-shape\" type=\"CollisionShape3D\" parent=\"track-corner/collision\"")
+		],
+		"track-straight": [
+			straight_shape,
+			_read_node_transform(source_text, "[node name=\"track-straight\"")
+			* _read_node_transform(source_text, "[node name=\"collision\" type=\"StaticBody3D\" parent=\"track-straight\"")
+			* _read_node_transform(source_text, "[node name=\"collision-shape\" type=\"CollisionShape3D\" parent=\"track-straight/collision\"")
+		],
+	}
+	print("[RaceLoad] wall collision source parse: %.3f s" % [float(Time.get_ticks_msec() - started_msec) / 1000.0])
+	return _wall_collision_sources
+
+
+func _read_node_concave_shape(source_text: String, node_prefix: String) -> ConcavePolygonShape3D:
+	var node_block := _read_node_block(source_text, node_prefix)
+	var reference_start := node_block.find("shape = SubResource(\"")
+	if reference_start < 0:
+		return null
+	reference_start += "shape = SubResource(\"".length()
+	var reference_end := node_block.find("\"", reference_start)
+	if reference_end < 0:
+		return null
+	var resource_id := node_block.substr(reference_start, reference_end - reference_start)
+	var block_start := source_text.find("[sub_resource type=\"ConcavePolygonShape3D\" id=\"%s\"]" % resource_id)
+	if block_start < 0:
+		return null
+	var values_start := source_text.find("data = PackedVector3Array(", block_start)
+	if values_start < 0:
+		return null
+	values_start += "data = PackedVector3Array(".length()
+	var values_end := source_text.find(")", values_start)
+	if values_end < 0:
+		return null
+	var numbers := source_text.substr(values_start, values_end - values_start).split(",", false)
+	if numbers.size() < 3 or numbers.size() % 3 != 0:
+		return null
+	var faces := PackedVector3Array()
+	for index in range(0, numbers.size(), 3):
+		faces.append(Vector3(float(numbers[index]), float(numbers[index + 1]), float(numbers[index + 2])))
+	var shape := ConcavePolygonShape3D.new()
+	shape.set_faces(faces)
+	return shape
+
+
+func _read_node_transform(source_text: String, node_prefix: String) -> Transform3D:
+	var block := _read_node_block(source_text, node_prefix)
+	var values_start := block.find("transform = Transform3D(")
+	if values_start < 0:
+		return Transform3D.IDENTITY
+	values_start += "transform = Transform3D(".length()
+	var values_end := block.find(")", values_start)
+	if values_end < 0:
+		return Transform3D.IDENTITY
+	var numbers := block.substr(values_start, values_end - values_start).split(",", false)
+	if numbers.size() != 12:
+		return Transform3D.IDENTITY
+	var values: Array[float] = []
+	for number in numbers:
+		values.append(float(number))
+	var parsed_basis := Basis(
+		Vector3(values[0], values[1], values[2]),
+		Vector3(values[3], values[4], values[5]),
+		Vector3(values[6], values[7], values[8])
+	)
+	return Transform3D(parsed_basis, Vector3(values[9], values[10], values[11]))
+
+
+func _read_node_block(source_text: String, node_prefix: String) -> String:
+	var node_start := source_text.find(node_prefix)
+	if node_start < 0:
+		return ""
+	var node_end := source_text.find("\n[node ", node_start + node_prefix.length())
+	if node_end < 0:
+		node_end = source_text.length()
+	return source_text.substr(node_start, node_end - node_start)
 
 
 func _ensure_race_path() -> void:
