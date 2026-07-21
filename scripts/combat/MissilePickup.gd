@@ -49,12 +49,12 @@ func _on_body_entered(body: Node) -> void:
 
 func _collect() -> void:
 	_active = false
-	monitoring = false
+	set_deferred("monitoring", false)
 	if visual:
 		visual.visible = false
 	await get_tree().create_timer(respawn_time).timeout
 	if is_instance_valid(self):
 		_active = true
-		monitoring = true
+		set_deferred("monitoring", true)
 		if visual:
 			visual.visible = true
