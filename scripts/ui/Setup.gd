@@ -15,6 +15,7 @@ const YELLOW := Color("ffc20b")
 
 var _selected_mode: MatchConfig.Mode = MatchConfig.Mode.HYBRID
 var _selected_track: MatchConfig.TrackId = MatchConfig.TrackId.KENNEY_DEFAULT
+var _selected_ai_difficulty: MatchConfig.AIDifficulty = MatchConfig.AIDifficulty.NOVICE
 var _lap_count: int = 5
 var _crate_count: int = 5
 var _missiles_per_crate: int = 2
@@ -23,6 +24,7 @@ var _canvas: Control
 var _display_font: SystemFont
 var _mode_buttons: Dictionary = {}
 var _track_buttons: Dictionary = {}
+var _difficulty_buttons: Dictionary = {}
 var _focus_buttons: Array[Button] = []
 var _lap_value: Label
 var _crate_value: Label
@@ -37,6 +39,7 @@ var _preview_image: TextureRect
 func _ready() -> void:
 	_selected_mode = MatchConfig.mode
 	_selected_track = MatchConfig.track_id
+	_selected_ai_difficulty = MatchConfig.ai_difficulty
 	_lap_count = MatchConfig.lap_count
 	_crate_count = MatchConfig.crate_count
 	_missiles_per_crate = MatchConfig.missiles_per_crate
@@ -59,6 +62,7 @@ func _build_screen() -> void:
 		child.free()
 	_mode_buttons.clear()
 	_track_buttons.clear()
+	_difficulty_buttons.clear()
 	_focus_buttons.clear()
 
 	var backdrop := TextureRect.new()
@@ -107,6 +111,7 @@ func _build_screen() -> void:
 	_build_choice_targets()
 	_build_stepper_targets()
 	_build_dynamic_values()
+	_build_ai_difficulty_selector()
 	_build_start_target()
 	_wire_focus_order()
 
@@ -176,6 +181,32 @@ func _build_dynamic_values() -> void:
 	_crates_state_value = _value_label("CratesStateValue", Vector2(1260, 732), Vector2(94, 38), 27, YELLOW, HORIZONTAL_ALIGNMENT_LEFT)
 
 
+func _build_ai_difficulty_selector() -> void:
+	var heading := _value_label("AiDifficultyHeading", Vector2(575, 820), Vector2(365, 30), 20, CYAN)
+	heading.text = "AI DIFFICULTY"
+	_add_difficulty_target("DifficultyNovice", "NOVICE", Vector2(575, 852), MatchConfig.AIDifficulty.NOVICE)
+	_add_difficulty_target("DifficultyMedium", "MEDIUM", Vector2(700, 852), MatchConfig.AIDifficulty.MEDIUM)
+	_add_difficulty_target("DifficultyHard", "HARD", Vector2(825, 852), MatchConfig.AIDifficulty.HARD)
+
+
+func _add_difficulty_target(name_text: String, label_text: String, at: Vector2, difficulty: MatchConfig.AIDifficulty) -> void:
+	var button := _transparent_button(name_text, at, Vector2(115, 56))
+	button.text = label_text
+	button.add_theme_font_override("font", _display_font)
+	button.add_theme_font_size_override("font_size", 22)
+	button.add_theme_color_override("font_color", Color.WHITE)
+	button.add_theme_color_override("font_hover_color", CYAN)
+	button.add_theme_color_override("font_focus_color", CYAN)
+	button.add_theme_color_override("font_pressed_color", CYAN)
+	button.add_theme_color_override("font_outline_color", Color("020405"))
+	button.add_theme_constant_override("outline_size", 4)
+	button.set_meta("accent", CYAN)
+	button.pressed.connect(_select_ai_difficulty.bind(difficulty))
+	_canvas.add_child(button)
+	_difficulty_buttons[difficulty] = button
+	_focus_buttons.append(button)
+
+
 func _value_label(name_text: String, at: Vector2, dimensions: Vector2, font_size: int, color: Color, alignment: HorizontalAlignment = HORIZONTAL_ALIGNMENT_CENTER) -> Label:
 	var label := Label.new()
 	label.name = name_text
@@ -227,6 +258,11 @@ func _refresh_all() -> void:
 		_paint_choice(_mode_buttons[mode] as Button, mode == _selected_mode)
 	for track in _track_buttons:
 		_paint_choice(_track_buttons[track] as Button, track == _selected_track)
+	for difficulty in _difficulty_buttons:
+		var difficulty_button := _difficulty_buttons[difficulty] as Button
+		var selected: bool = int(difficulty) == int(_selected_ai_difficulty)
+		_paint_choice(difficulty_button, selected)
+		difficulty_button.add_theme_color_override("font_color", CYAN if selected else Color.WHITE)
 
 	var laps_enabled := _selected_mode != MatchConfig.Mode.LAST_STANDING
 	_lap_value.text = str(_lap_count) if laps_enabled else "—"
@@ -270,6 +306,11 @@ func _select_mode(mode: MatchConfig.Mode) -> void:
 
 func _select_track(track: MatchConfig.TrackId) -> void:
 	_selected_track = track
+	_refresh_all()
+
+
+func _select_ai_difficulty(difficulty: MatchConfig.AIDifficulty) -> void:
+	_selected_ai_difficulty = difficulty
 	_refresh_all()
 
 
@@ -332,6 +373,7 @@ func _place(control: Control, at: Vector2, dimensions: Vector2) -> void:
 func _on_start_pressed() -> void:
 	MatchConfig.mode = _selected_mode
 	MatchConfig.track_id = _selected_track
+	MatchConfig.ai_difficulty = _selected_ai_difficulty
 	if _selected_mode != MatchConfig.Mode.LAST_STANDING:
 		MatchConfig.lap_count = _lap_count
 	MatchConfig.crate_count = _crate_count

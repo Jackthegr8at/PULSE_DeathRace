@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pulse Deathrace — Font Direction</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;0,900;1,800&family=Oswald:wght@500;600;700&family=Teko:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root { --ink:#070d11; --panel:#0a151a; --line:#334047; --cyan:#19d6e3; --yellow:#ffc21c; --orange:#ff861c; --purple:#b839ed; --paper:#f2efe7; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--paper); background:radial-gradient(circle at 55% -10%, #24414a 0, #0c171b 35%, #05090b 72%); min-height:100vh; font-family:Arial,sans-serif; }
+    body:before { content:""; position:fixed; inset:0; opacity:.13; pointer-events:none; background-image:linear-gradient(115deg,transparent 0 48%,#fff 49% 50%,transparent 51%),linear-gradient(#fff1 1px,transparent 1px); background-size:27px 27px,100% 5px; mix-blend-mode:overlay; }
+    main { width:min(1480px,96vw); margin:0 auto; padding:34px 0 46px; }
+    header { display:flex; align-items:end; justify-content:space-between; gap:22px; margin-bottom:24px; }
+    h1 { margin:0; font:900 clamp(34px,4vw,64px)/.9 "Barlow Condensed",sans-serif; font-style:italic; letter-spacing:.02em; text-transform:uppercase; }
+    h1 span { color:var(--cyan); }
+    header p { max-width:570px; margin:0; color:#adbbc1; font:600 18px/1.35 "Barlow Condensed",sans-serif; text-align:right; }
+    .grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; }
+    .choice { position:relative; min-width:0; cursor:pointer; border:2px solid #38464b; clip-path:polygon(16px 0,calc(100% - 16px) 0,100% 16px,100% calc(100% - 16px),calc(100% - 16px) 100%,16px 100%,0 calc(100% - 16px),0 16px); background:linear-gradient(145deg,#101d22,#060d10 70%); transition:.16s ease; box-shadow:0 15px 40px #0008; }
+    .choice:hover,.choice.selected { transform:translateY(-4px); border-color:var(--cyan); box-shadow:0 0 0 2px #07cbd633,0 19px 50px #000b; }
+    .choice.selected:after { content:"SELECTED"; position:absolute; right:15px; top:13px; padding:5px 10px; color:#001417; background:var(--cyan); font:900 14px/1 "Barlow Condensed",sans-serif; letter-spacing:.08em; transform:skew(-8deg); }
+    .recommended { position:absolute; left:0; top:0; z-index:2; padding:7px 15px 7px 12px; color:#151000; background:var(--yellow); font:900 13px/1 "Barlow Condensed",sans-serif; letter-spacing:.08em; clip-path:polygon(0 0,100% 0,calc(100% - 9px) 100%,0 100%); }
+    .name { padding:46px 18px 13px; border-bottom:1px solid #2e3b40; }
+    .name strong { display:block; font-size:30px; text-transform:uppercase; }
+    .name small { display:block; margin-top:4px; color:#92a3aa; font-size:14px; }
+    .hud { position:relative; margin:16px; padding:17px; min-height:470px; overflow:hidden; border:1px solid #49565a; background:linear-gradient(#111a1de8,#05090bed),url("/assets/ui/setup/setup_background.png") center/cover; }
+    .hud:before,.hud:after { content:""; position:absolute; width:100px; height:4px; background:var(--cyan); transform:rotate(-10deg); opacity:.6; }
+    .hud:before { right:-23px; top:33px; } .hud:after { left:-35px; bottom:68px; background:var(--purple); }
+    .results { border:2px solid #3c4548; background:#071014e8; padding:14px 16px; }
+    .kicker { color:var(--cyan); font-size:18px; letter-spacing:.09em; text-transform:uppercase; }
+    .place { color:var(--yellow); font-size:74px; line-height:.9; letter-spacing:.015em; text-shadow:3px 3px 0 #000; text-transform:uppercase; }
+    .sub { margin-top:7px; color:#d4d2ca; font-size:18px; }
+    .stats { display:grid; grid-template-columns:1fr auto; gap:7px 14px; margin-top:16px; padding-top:12px; border-top:1px solid #344147; font-size:17px; }
+    .stats b { color:#ffb728; }
+    .hudrow { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:13px; }
+    .box { padding:12px 13px; border:2px solid #3c474b; background:#050b0ddf; }
+    .box label { display:block; color:#9babb0; font-size:14px; letter-spacing:.08em; text-transform:uppercase; }
+    .box strong { display:block; margin-top:2px; font-size:29px; line-height:1; color:#f0eee5; }
+    .box strong.cyan { color:var(--cyan); } .box strong.purple { color:var(--purple); }
+    .leaderboard { margin-top:12px; }
+    .leaderboard div { display:grid; grid-template-columns:35px 1fr auto; align-items:center; gap:9px; padding:8px 10px; margin-top:5px; background:#05090bdd; border-left:4px solid #38444a; font-size:17px; }
+    .leaderboard div:first-child { border-color:var(--cyan); background:#073039d9; }
+    .leaderboard b { color:var(--yellow); }
+    .rationale { padding:0 18px 19px; color:#c5cdd0; font-size:15px; line-height:1.35; }
+    .barlow,.barlow * { font-family:"Barlow Condensed",sans-serif; }
+    .teko,.teko * { font-family:"Teko",sans-serif; }
+    .teko .sub,.teko .rationale,.teko .name small { font-family:"Barlow Condensed",sans-serif; }
+    .oswald,.oswald * { font-family:"Oswald",sans-serif; }
+    .oswald .place { letter-spacing:-.02em; }
+    footer { margin-top:20px; padding:13px 16px; color:#94a2a7; border-left:4px solid var(--cyan); background:#071014c9; font:600 16px/1.4 "Barlow Condensed",sans-serif; }
+    @media(max-width:1050px){ .grid{grid-template-columns:1fr;} .hud{min-height:auto;} header{align-items:start;flex-direction:column;} header p{text-align:left;} }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Choose the game’s <span>font direction</span></h1>
+    <p>Click one option. Each card uses real race HUD and result-screen language so you can judge hierarchy, readability, and personality—not just an alphabet sample.</p>
+  </header>
+  <section class="grid">
+    <article class="choice barlow" data-choice="barlow-condensed" onclick="toggleSelect(this)">
+      <span class="recommended">RECOMMENDED</span>
+      <div class="name"><strong>01 — Barlow Condensed</strong><small>One flexible family · industrial comic-sport</small></div>
+      <div class="hud">
+        <div class="results"><div class="kicker">Race complete</div><div class="place">2ND PLACE</div><div class="sub">You crossed the line in second.</div><div class="stats"><span>RACE TIME</span><b>03:20.06</b><span>LAPS DONE</span><b>5 / 5</b><span>FINISH STATUS</span><b>CONFIRMED</b></div></div>
+        <div class="hudrow"><div class="box"><label>Position</label><strong>2ND <small>OF 4</small></strong></div><div class="box"><label>Missiles</label><strong class="purple">12</strong></div></div>
+        <div class="leaderboard"><div><b>1</b><strong>AI-3</strong><span>03:16.92</span></div><div><b>2</b><strong>PLAYER</strong><span>03:20.06</span></div><div><b>3</b><strong>AI-1</strong><span>EST.</span></div></div>
+      </div>
+      <div class="rationale">Best balance: aggressive enough for the brand, compact enough for HUD data, and highly readable at small sizes. Black for headlines; SemiBold/Bold for labels.</div>
+    </article>
+    <article class="choice teko" data-choice="teko-barlow" onclick="toggleSelect(this)">
+      <div class="name"><strong>02 — Teko + Barlow</strong><small>Maximum arcade energy · two-family system</small></div>
+      <div class="hud">
+        <div class="results"><div class="kicker">Race complete</div><div class="place">2ND PLACE</div><div class="sub">You crossed the line in second.</div><div class="stats"><span>RACE TIME</span><b>03:20.06</b><span>LAPS DONE</span><b>5 / 5</b><span>FINISH STATUS</span><b>CONFIRMED</b></div></div>
+        <div class="hudrow"><div class="box"><label>Position</label><strong>2ND <small>OF 4</small></strong></div><div class="box"><label>Missiles</label><strong class="purple">12</strong></div></div>
+        <div class="leaderboard"><div><b>1</b><strong>AI-3</strong><span>03:16.92</span></div><div><b>2</b><strong>PLAYER</strong><span>03:20.06</span></div><div><b>3</b><strong>AI-1</strong><span>EST.</span></div></div>
+      </div>
+      <div class="rationale">The loudest and most arcade-like. Excellent for placement numbers and countdowns; requires Barlow for descriptions and compact secondary text.</div>
+    </article>
+    <article class="choice oswald" data-choice="oswald" onclick="toggleSelect(this)">
+      <div class="name"><strong>03 — Oswald</strong><small>Clean competitive readability · restrained character</small></div>
+      <div class="hud">
+        <div class="results"><div class="kicker">Race complete</div><div class="place">2ND PLACE</div><div class="sub">You crossed the line in second.</div><div class="stats"><span>RACE TIME</span><b>03:20.06</b><span>LAPS DONE</span><b>5 / 5</b><span>FINISH STATUS</span><b>CONFIRMED</b></div></div>
+        <div class="hudrow"><div class="box"><label>Position</label><strong>2ND <small>OF 4</small></strong></div><div class="box"><label>Missiles</label><strong class="purple">12</strong></div></div>
+        <div class="leaderboard"><div><b>1</b><strong>AI-3</strong><span>03:16.92</span></div><div><b>2</b><strong>PLAYER</strong><span>03:20.06</span></div><div><b>3</b><strong>AI-1</strong><span>EST.</span></div></div>
+      </div>
+      <div class="rationale">The safest competitive HUD choice. Crisp and mature, though it has less of the rough comic-book personality carried by the logo and painted UI frames.</div>
+    </article>
+  </section>
+  <footer>The chosen system will replace programmable Godot text consistently across Setup, Loading, HUD, countdown, and Results. Text baked into PNG artwork stays untouched.</footer>
+</main>
+<script>
+function toggleSelect(el){ document.querySelectorAll('.choice').forEach(x=>x.classList.remove('selected')); el.classList.add('selected'); }
+</script>
+</body>
+</html>

@@ -2,6 +2,7 @@ extends Node3D
 ## 3D race host: track, player + AI, combat win rules, HUD / end screen.
 
 const VehicleScene: PackedScene = preload("res://scenes/vehicle.tscn")
+const EndScreenScene: PackedScene = preload("res://scenes/ui/EndScreen.tscn")
 const STARTUP_PANEL_TEXTURE: Texture2D = preload("res://assets/ui/hud/startup_box.png")
 const COUNTDOWN_TEXTURES: Dictionary = {
 	"3": preload("res://assets/ui/hud/countdown/3.png"),
@@ -14,6 +15,12 @@ const AI_MODELS: Array[String] = [
 	"res://scenes/vehicles/BullDozeModular.tscn",
 	"res://scenes/vehicles/VenomModular.tscn",
 ]
+const VEHICLE_TYPES_BY_MODEL: Dictionary = {
+	"res://scenes/vehicles/RavageModular.tscn": Vehicle.VehicleType.RAVAGE,
+	"res://scenes/vehicles/BullDozeModular.tscn": Vehicle.VehicleType.BULLDOZE,
+	"res://scenes/vehicles/VenomModular.tscn": Vehicle.VehicleType.VENOM,
+	"res://scenes/vehicles/WraithModular.tscn": Vehicle.VehicleType.WRAITH,
+}
 const PLAYER_MINIMAP_COLOR := Color("21e6e6")
 const FINISH_WINDOW_SECONDS := 30.0
 const AI_MINIMAP_COLORS: Dictionary = {
@@ -122,15 +129,25 @@ func _spawn_field() -> void:
 			ai.display_name = "AI-%d" % (i + 1)
 		ai.died.connect(_on_vehicle_died)
 		ai.race_finished.connect(_on_race_finished)
-		# Slightly easier than the player; small variety so packs don't clone
-		ai.max_health = 100.0
-		ai.health = 100.0
-		ai.ai_throttle = 0.72 + float(i % 3) * 0.04
-		ai.ai_corner_throttle = 0.46
+		_apply_ai_difficulty(ai, i)
 		ai.path_look_ahead = 5.2 + float(i % 3) * 0.4
 		vehicles.append(ai)
 
 	_update_alive_hud()
+
+
+func _apply_ai_difficulty(ai: Vehicle, ai_index: int) -> void:
+	var profile := MatchConfig.ai_profile()
+	ai.ai_throttle = (
+		float(profile.get("throttle_base", 0.72))
+		+ float(ai_index % 3) * float(profile.get("throttle_step", 0.04))
+	)
+	ai.ai_corner_throttle = float(profile.get("corner_throttle", 0.46))
+	ai.ai_steer_gain = float(profile.get("steer_gain", 2.10))
+	ai.detect_range = float(profile.get("detect_range", 22.0))
+	ai.ai_aim_steer_weight = float(profile.get("aim_steer_weight", 0.72))
+	ai.ai_aim_time_max = float(profile.get("aim_time_max", 0.40))
+	ai.fire_dot_min = float(profile.get("fire_dot_min", 0.93))
 
 
 func _spawn_vehicle(spawn: Transform3D, as_player: bool, model_path: Variant, name_label: String) -> Vehicle:
@@ -138,6 +155,10 @@ func _spawn_vehicle(spawn: Transform3D, as_player: bool, model_path: Variant, na
 	veh.is_player = as_player
 	veh.display_name = name_label
 	veh.minimap_color = PLAYER_MINIMAP_COLOR if as_player else AI_MINIMAP_COLORS.get(str(model_path), GameStyle.DANGER)
+	if as_player:
+		veh.vehicle_type = Vehicle.VehicleType.RAVAGE
+	else:
+		veh.vehicle_type = int(VEHICLE_TYPES_BY_MODEL.get(str(model_path), Vehicle.VehicleType.RAVAGE))
 	vehicles_root.add_child(veh)
 
 	# Optional model swap for AI color variety
@@ -434,6 +455,7 @@ func _record_finished(veh: Vehicle) -> void:
 		"status": "FINISHED",
 		"place": finish_order.size() + 1,
 		"progress": _race_progress(veh),
+		"finish_time": _race_elapsed(),
 	})
 
 
@@ -572,129 +594,62 @@ func _end_match(player_won: bool, detail: String) -> void:
 
 
 func _show_end(player_won: bool, detail: String) -> void:
-	end_layer = CanvasLayer.new()
-	end_layer.layer = 30
-	add_child(end_layer)
-
-	var dim := ColorRect.new()
-	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
-	dim.color = Color(0, 0, 0, 0.55)
-	end_layer.add_child(dim)
-
-	var center := CenterContainer.new()
-	center.set_anchors_preset(Control.PRESET_FULL_RECT)
-	end_layer.add_child(center)
-
-	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(480, 360 if not finish_order.is_empty() else 260)
-	panel.add_theme_stylebox_override("panel", GameStyle.comic_panel(Color(0.10, 0.13, 0.09, 0.97), 16.0))
-	center.add_child(panel)
-
-	var margin := MarginContainer.new()
-	for s in ["margin_left", "margin_right", "margin_top", "margin_bottom"]:
-		margin.add_theme_constant_override(s, 26)
-	panel.add_child(margin)
-
-	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 12)
-	margin.add_child(vbox)
-
-	var title := Label.new()
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var player_place := _get_player_finish_place()
+	var result_title := "WRECKED"
 	if player_place > 0:
-		title.text = "%s PLACE" % _ordinal(player_place)
-		GameStyle.apply_title(title, GameStyle.SUCCESS if player_won else GameStyle.ACCENT, 44)
+		result_title = "%s PLACE" % _ordinal(player_place)
 	elif player_won:
-		title.text = "YOU WIN!"
-		GameStyle.apply_title(title, GameStyle.SUCCESS, 44)
-	else:
-		title.text = "WRECKED!"
-		GameStyle.apply_title(title, GameStyle.DANGER, 44)
-	vbox.add_child(title)
+		result_title = "YOU WIN"
 
-	var detail_l := Label.new()
-	detail_l.text = detail
-	detail_l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	detail_l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	GameStyle.apply_label(detail_l, GameStyle.TEXT_MUTED, 14)
-	vbox.add_child(detail_l)
-
-	var stats := VBoxContainer.new()
-	stats.add_theme_constant_override("separation", 4)
-	vbox.add_child(stats)
-	var elapsed := 0.0
-	if hud and hud.has_method("get_elapsed"):
-		elapsed = hud.call("get_elapsed")
-	var m := int(elapsed) / 60
-	var s2 := int(elapsed) % 60
-	_add_stat_row(stats, "RACE TIME", "%02d:%02d" % [m, s2])
-	if MatchConfig.uses_laps() and player and is_instance_valid(player):
-		_add_stat_row(stats, "LAPS DONE", "%d / %d" % [player.laps_completed, MatchConfig.lap_count])
-	_add_stat_row(stats, "CARS LEFT", str(_living().size()))
-	if not finish_order.is_empty():
-		_add_finish_results(vbox)
-
-	var row := HBoxContainer.new()
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	row.add_theme_constant_override("separation", 12)
-	vbox.add_child(row)
-
-	var rematch := Button.new()
-	rematch.text = "REMATCH"
-	rematch.custom_minimum_size = Vector2(140, 46)
-	GameStyle.apply_button(rematch, GameStyle.button_primary(), GameStyle.BG_DEEP)
-	rematch.pressed.connect(func() -> void:
-		get_tree().change_scene_to_file("res://scenes/race/Race3D.tscn")
-	)
-	row.add_child(rematch)
-
-	var setup := Button.new()
-	setup.text = "SETUP"
-	setup.custom_minimum_size = Vector2(140, 46)
-	GameStyle.apply_button(setup, GameStyle.button_ghost())
-	setup.pressed.connect(func() -> void:
-		get_tree().change_scene_to_file("res://scenes/Setup.tscn")
-	)
-	row.add_child(setup)
-
-
-func _add_stat_row(parent: Control, label_text: String, value_text: String) -> void:
-	var row := HBoxContainer.new()
-	parent.add_child(row)
-	var tag := Label.new()
-	tag.text = label_text
-	tag.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	GameStyle.apply_label(tag, GameStyle.TEXT_DIM, 13)
-	row.add_child(tag)
-	var val := Label.new()
-	val.text = value_text
-	val.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	GameStyle.apply_label(val, GameStyle.ACCENT, 15)
-	row.add_child(val)
-
-
-func _add_finish_results(parent: Control) -> void:
-	var heading := Label.new()
-	heading.text = "FINISH ORDER"
-	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	GameStyle.apply_label(heading, GameStyle.TEXT, 16)
-	parent.add_child(heading)
-
-	var results := VBoxContainer.new()
-	results.add_theme_constant_override("separation", 2)
-	parent.add_child(results)
+	var display_results: Array[Dictionary] = []
 	for result in finish_order:
-		var result_name := str(result.get("name", "CAR"))
-		if str(result.get("status", "FINISHED")) == "ESTIMATED":
-			result_name += "  (EST.)"
-		_add_stat_row(
-			results,
-			_ordinal(int(result.get("place", 0))),
-			result_name,
-		)
+		display_results.append(result.duplicate(true))
 	for result in dnf_order:
-		_add_stat_row(results, "DNF", str(result.get("name", "CAR")))
+		display_results.append(result.duplicate(true))
+
+	var laps_done := 0
+	if player and is_instance_valid(player):
+		laps_done = player.laps_completed
+	var race_time := _race_elapsed()
+	for result in finish_order:
+		if bool(result.get("is_player", false)) and result.has("finish_time"):
+			race_time = float(result.get("finish_time", race_time))
+			break
+
+	end_layer = EndScreenScene.instantiate() as CanvasLayer
+	if end_layer == null:
+		push_error("Race3D: failed to instantiate EndScreen")
+		return
+	add_child(end_layer)
+	end_layer.connect("rematch_requested", _on_end_rematch_requested)
+	end_layer.connect("setup_requested", _on_end_setup_requested)
+	end_layer.call("show_results", {
+		"title": result_title,
+		"player_won": player_won,
+		"player_place": player_place,
+		"detail": detail,
+		"race_time": race_time,
+		"uses_laps": MatchConfig.uses_laps(),
+		"laps_done": laps_done,
+		"lap_total": MatchConfig.lap_count,
+		"difficulty": MatchConfig.ai_difficulty_display_name().to_upper(),
+		"survivors": _living().size(),
+		"results": display_results,
+	})
+
+
+func _race_elapsed() -> float:
+	if hud and hud.has_method("get_elapsed"):
+		return float(hud.call("get_elapsed"))
+	return 0.0
+
+
+func _on_end_rematch_requested() -> void:
+	get_tree().change_scene_to_file("res://scenes/race/Race3D.tscn")
+
+
+func _on_end_setup_requested() -> void:
+	get_tree().change_scene_to_file("res://scenes/Setup.tscn")
 
 
 func _unhandled_input(event: InputEvent) -> void:

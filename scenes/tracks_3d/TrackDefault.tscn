@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://b4qknrwhx8qoq"]
 
 [ext_resource type="Script" uid="uid://m0of4twyawa6" path="res://scripts/tracks_3d/Track3DBase.gd" id="1_script"]
-[ext_resource type="MeshLibrary" path="res://models/Library/mesh-library-runtime.res" id="2_mesh"]
+[ext_resource type="MeshLibrary" uid="uid://s7rub1clyyep" path="res://models/Library/mesh-library-runtime.res" id="2_mesh"]
 
 [sub_resource type="PhysicsMaterial" id="PhysicsMaterial_track"]
 friction = 0.0
@@ -24,4 +24,4 @@ data = {
 metadata/_editor_floor_ = Vector3(0, 42, 0)
 
 [node name="SpawnPoint" type="Marker3D" parent="." unique_id=369145384]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.1542044, 0.2, 5)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.1542044, 0.2, 4.009016)

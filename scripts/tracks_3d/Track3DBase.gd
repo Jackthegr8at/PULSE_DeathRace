@@ -4,7 +4,8 @@ extends Node3D
 ## No per-map car/crate files — path, crates, and finish come from this GridMap.
 
 @export var track_display_name: String = "Track"
-@export var spawn_row_spacing: float = 1.35
+@export var spawn_row_spacing: float = 2.2
+@export var spawn_column_spacing: float = 1.1
 @export var first_pickup_path_fraction: float = 0.12
 @export var build_runtime_wall_colliders: bool = true
 
@@ -45,14 +46,42 @@ func get_grid_map() -> GridMap:
 
 
 func get_spawn_transforms(count: int) -> Array[Transform3D]:
-	var base := get_spawn_transform()
 	var result: Array[Transform3D] = []
+	if count <= 0:
+		return result
+	var base := get_spawn_transform()
 	var basis := base.basis.orthonormalized()
 	var forward := basis.z.normalized()
-	for i in count:
-		var origin := base.origin - forward * (float(i) * spawn_row_spacing)
+	var lateral := basis.x.normalized()
+	var half_column := spawn_column_spacing * 0.5
+	var front_left := base.origin - lateral * half_column
+	var front_right := base.origin + lateral * half_column
+	var rear_left := front_left - forward * spawn_row_spacing
+	var rear_right := front_right - forward * spawn_row_spacing
+	var first_origins: Array[Vector3] = [
+		rear_left,
+		front_left,
+		front_right,
+		rear_right,
+	]
+	for i in mini(count, first_origins.size()):
+		var origin := first_origins[i]
 		origin.y = base.origin.y
 		result.append(Transform3D(basis, origin))
+	var row_index := 2
+	var column_signs: Array[float] = [-1.0, 1.0]
+	while result.size() < count:
+		for column_sign in column_signs:
+			if result.size() >= count:
+				break
+			var origin := (
+				base.origin
+				+ lateral * half_column * column_sign
+				- forward * (float(row_index) * spawn_row_spacing)
+			)
+			origin.y = base.origin.y
+			result.append(Transform3D(basis, origin))
+		row_index += 1
 	return result
 
 

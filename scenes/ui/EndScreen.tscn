@@ -1,9 +1,11 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/EndScreen.gd" id="1_end"]
+[ext_resource type="Texture2D" path="res://assets/ui/hud/datas_box.png" id="2_box"]
 
 [node name="EndScreen" type="CanvasLayer"]
-layer = 20
+layer = 30
+visible = false
 script = ExtResource("1_end")
 
 [node name="Dim" type="ColorRect" parent="."]
@@ -13,68 +15,199 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0, 0, 0, 0.62)
+mouse_filter = 1
+color = Color(0, 0, 0, 0.68)
 
-[node name="Center" type="CenterContainer" parent="."]
+[node name="DesignRoot" type="Control" parent="."]
+unique_name_in_owner = true
+layout_mode = 0
+offset_right = 820.0
+offset_bottom = 650.0
+mouse_filter = 1
+
+[node name="Card" type="Control" parent="DesignRoot"]
+unique_name_in_owner = true
+layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+pivot_offset = Vector2(410, 325)
 
-[node name="Panel" type="PanelContainer" parent="Center"]
+[node name="Frame" type="NinePatchRect" parent="DesignRoot/Card"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(420, 260)
-layout_mode = 2
-pivot_offset = Vector2(210, 130)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+texture = ExtResource("2_box")
+patch_margin_left = 96
+patch_margin_top = 72
+patch_margin_right = 96
+patch_margin_bottom = 72
 
-[node name="Margin" type="MarginContainer" parent="Center/Panel"]
-layout_mode = 2
-theme_override_constants/margin_left = 32
-theme_override_constants/margin_top = 28
-theme_override_constants/margin_right = 32
-theme_override_constants/margin_bottom = 28
+[node name="Content" type="MarginContainer" parent="DesignRoot/Card"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 68.0
+offset_top = 48.0
+offset_right = -68.0
+offset_bottom = -50.0
+grow_horizontal = 2
+grow_vertical = 2
 
-[node name="VBox" type="VBoxContainer" parent="Center/Panel/Margin"]
+[node name="VBox" type="VBoxContainer" parent="DesignRoot/Card/Content"]
 layout_mode = 2
-theme_override_constants/separation = 16
+theme_override_constants/separation = 7
 
-[node name="Accent" type="ColorRect" parent="Center/Panel/Margin/VBox"]
+[node name="KickerLabel" type="Label" parent="DesignRoot/Card/Content/VBox"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(72, 4)
 layout_mode = 2
-size_flags_horizontal = 4
-color = Color(0.24, 0.84, 0.55, 1)
-
-[node name="TitleLabel" type="Label" parent="Center/Panel/Margin/VBox"]
-unique_name_in_owner = true
-layout_mode = 2
-theme_override_font_sizes/font_size = 42
-text = "YOU WIN!"
+text = "RACE COMPLETE"
 horizontal_alignment = 1
 
-[node name="DetailLabel" type="Label" parent="Center/Panel/Margin/VBox"]
+[node name="TitleLabel" type="Label" parent="DesignRoot/Card/Content/VBox"]
 unique_name_in_owner = true
 layout_mode = 2
-theme_override_colors/font_color = Color(0.55, 0.58, 0.66, 1)
-theme_override_font_sizes/font_size = 15
-text = ""
+text = "1ST PLACE"
+horizontal_alignment = 1
+
+[node name="DetailLabel" type="Label" parent="DesignRoot/Card/Content/VBox"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "You finished first."
 horizontal_alignment = 1
 autowrap_mode = 2
 
-[node name="Buttons" type="HBoxContainer" parent="Center/Panel/Margin/VBox"]
+[node name="TopRule" type="ColorRect" parent="DesignRoot/Card/Content/VBox"]
+custom_minimum_size = Vector2(0, 2)
 layout_mode = 2
+color = Color(0, 0.858824, 0.905882, 0.72)
+
+[node name="Summary" type="HBoxContainer" parent="DesignRoot/Card/Content/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
 alignment = 1
-theme_override_constants/separation = 14
 
-[node name="RematchButton" type="Button" parent="Center/Panel/Margin/VBox/Buttons"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(150, 46)
+[node name="TimeStat" type="VBoxContainer" parent="DesignRoot/Card/Content/VBox/Summary"]
+custom_minimum_size = Vector2(160, 58)
 layout_mode = 2
-text = "Rematch"
+size_flags_horizontal = 3
+theme_override_constants/separation = 0
 
-[node name="SetupButton" type="Button" parent="Center/Panel/Margin/VBox/Buttons"]
-unique_name_in_owner = true
-custom_minimum_size = Vector2(150, 46)
+[node name="Tag" type="Label" parent="DesignRoot/Card/Content/VBox/Summary/TimeStat"]
 layout_mode = 2
-text = "Setup"
+text = "RACE TIME"
+horizontal_alignment = 1
+
+[node name="TimeValue" type="Label" parent="DesignRoot/Card/Content/VBox/Summary/TimeStat"]
+layout_mode = 2
+text = "03:20.06"
+horizontal_alignment = 1
+
+[node name="LapsStat" type="VBoxContainer" parent="DesignRoot/Card/Content/VBox/Summary"]
+custom_minimum_size = Vector2(140, 58)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 0
+
+[node name="Tag" type="Label" parent="DesignRoot/Card/Content/VBox/Summary/LapsStat"]
+layout_mode = 2
+text = "LAPS"
+horizontal_alignment = 1
+
+[node name="LapsValue" type="Label" parent="DesignRoot/Card/Content/VBox/Summary/LapsStat"]
+layout_mode = 2
+text = "5 / 5"
+horizontal_alignment = 1
+
+[node name="DifficultyStat" type="VBoxContainer" parent="DesignRoot/Card/Content/VBox/Summary"]
+custom_minimum_size = Vector2(150, 58)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 0
+
+[node name="Tag" type="Label" parent="DesignRoot/Card/Content/VBox/Summary/DifficultyStat"]
+layout_mode = 2
+text = "DIFFICULTY"
+horizontal_alignment = 1
+
+[node name="DifficultyValue" type="Label" parent="DesignRoot/Card/Content/VBox/Summary/DifficultyStat"]
+layout_mode = 2
+text = "NOVICE"
+horizontal_alignment = 1
+
+[node name="SurvivorsStat" type="VBoxContainer" parent="DesignRoot/Card/Content/VBox/Summary"]
+custom_minimum_size = Vector2(140, 58)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 0
+
+[node name="Tag" type="Label" parent="DesignRoot/Card/Content/VBox/Summary/SurvivorsStat"]
+layout_mode = 2
+text = "SURVIVORS"
+horizontal_alignment = 1
+
+[node name="SurvivorsValue" type="Label" parent="DesignRoot/Card/Content/VBox/Summary/SurvivorsStat"]
+layout_mode = 2
+text = "4"
+horizontal_alignment = 1
+
+[node name="OrderTitle" type="Label" parent="DesignRoot/Card/Content/VBox"]
+layout_mode = 2
+text = "FINISH ORDER"
+horizontal_alignment = 1
+
+[node name="ColumnHeader" type="HBoxContainer" parent="DesignRoot/Card/Content/VBox"]
+layout_mode = 2
+
+[node name="Place" type="Label" parent="DesignRoot/Card/Content/VBox/ColumnHeader"]
+custom_minimum_size = Vector2(100, 0)
+layout_mode = 2
+text = "POSITION"
+
+[node name="Racer" type="Label" parent="DesignRoot/Card/Content/VBox/ColumnHeader"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "RACER"
+
+[node name="Result" type="Label" parent="DesignRoot/Card/Content/VBox/ColumnHeader"]
+custom_minimum_size = Vector2(130, 0)
+layout_mode = 2
+text = "RESULT"
+horizontal_alignment = 2
+
+[node name="OrderScroll" type="ScrollContainer" parent="DesignRoot/Card/Content/VBox"]
+custom_minimum_size = Vector2(0, 190)
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="ResultsList" type="VBoxContainer" parent="DesignRoot/Card/Content/VBox/OrderScroll"]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 5
+
+[node name="Buttons" type="HBoxContainer" parent="DesignRoot/Card/Content/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 16
+alignment = 1
+
+[node name="RematchButton" type="Button" parent="DesignRoot/Card/Content/VBox/Buttons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(190, 48)
+layout_mode = 2
+text = "REMATCH"
+
+[node name="SetupButton" type="Button" parent="DesignRoot/Card/Content/VBox/Buttons"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(190, 48)
+layout_mode = 2
+text = "SETUP"

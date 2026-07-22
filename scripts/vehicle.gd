@@ -8,8 +8,21 @@ signal died(vehicle: Vehicle)
 signal lap_completed(vehicle: Vehicle, laps: int)
 signal race_finished(vehicle: Vehicle)
 
+enum VehicleType {
+	RAVAGE,
+	BULLDOZE,
+	VENOM,
+	WRAITH,
+}
+
 const MissileScene: PackedScene = preload("res://scenes/combat/Missile3D.tscn")
 const CustomWheelScene: PackedScene = preload("res://models/wheel.glb")
+const RAVAGE_HEALTH_MULTIPLIER := 1.15
+const BULLDOZE_RAM_DAMAGE := 7.5
+const BULLDOZE_MIN_IMPACT_SPEED := 1.5
+const BULLDOZE_RAM_COOLDOWN_SECONDS := 1.0
+const VENOM_FORWARD_SPEED_MULTIPLIER := 1.12
+const WRAITH_MISSILE_DAMAGE_MULTIPLIER := 1.5
 
 # Nodes
 @onready var sphere: RigidBody3D = $Sphere
@@ -40,6 +53,7 @@ var _wheel_rest_positions: Dictionary = {}
 @export var is_player: bool = true
 @export var display_name: String = "Vehicle"
 @export var minimap_color: Color = Color("21e6e6")
+@export var vehicle_type: VehicleType = VehicleType.RAVAGE
 
 @export_group("Model")
 ## Extra pitch/lean strength for body (works on monomesh or chassis node).
@@ -95,9 +109,12 @@ var is_alive: bool = true
 var match_over: bool = false
 var race_started: bool = true
 var has_finished_race: bool = false
+var forward_speed_multiplier: float = 1.0
 var _cooldown: float = 0.0
 var _ai_aim_target: Vehicle = null
 var _ai_aim_timer: float = 0.0
+var _traits_applied: bool = false
+var _ram_cooldowns: Dictionary = {}
 
 var race_path: Path3D = null
 var _path_length: float = 0.0
@@ -135,6 +152,7 @@ func get_forward() -> Vector3:
 
 
 func _ready() -> void:
+	_apply_vehicle_traits()
 	health = max_health
 	missile_ammo = starting_missile_ammo
 	add_to_group("vehicles")
@@ -146,6 +164,22 @@ func _ready() -> void:
 		# Vehicle spheres on layer 8 (matches kit)
 		sphere.collision_layer = 8
 		sphere.collision_mask = 1 | 8
+
+
+func _apply_vehicle_traits() -> void:
+	if _traits_applied:
+		return
+	_traits_applied = true
+	forward_speed_multiplier = 1.0
+	match vehicle_type:
+		VehicleType.RAVAGE:
+			max_health *= RAVAGE_HEALTH_MULTIPLIER
+		VehicleType.VENOM:
+			forward_speed_multiplier = VENOM_FORWARD_SPEED_MULTIPLIER
+		VehicleType.WRAITH:
+			missile_damage *= WRAITH_MISSILE_DAMAGE_MULTIPLIER
+		VehicleType.BULLDOZE:
+			pass
 
 
 ## Call after swapping Container/Model (e.g. AI color trucks or custom GLB).
@@ -303,6 +337,7 @@ func set_race_started(started: bool) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	_update_ram_cooldowns(delta)
 	if not is_alive:
 		return
 	if not race_started:
@@ -350,7 +385,9 @@ func _physics_process(delta: float) -> void:
 
 	colliding = raycast.is_colliding() if raycast else false
 
-	var target_speed = input.z
+	var target_speed := input.z
+	if target_speed > 0.0:
+		target_speed *= forward_speed_multiplier
 	if target_speed < 0 and linear_speed > 0.01:
 		linear_speed = lerp(linear_speed, 0.0, delta * 8)
 	else:
@@ -615,6 +652,7 @@ func _ensure_hp_bar() -> void:
 	_hp_root.position = Vector3(0, 2.1, 0)
 
 	var bg := MeshInstance3D.new()
+	bg.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	var bg_mesh := BoxMesh.new()
 	bg_mesh.size = Vector3(HP_BAR_WIDTH, 0.12, 0.04)
 	bg.mesh = bg_mesh
@@ -626,6 +664,7 @@ func _ensure_hp_bar() -> void:
 	_hp_root.add_child(bg)
 
 	_hp_fill = MeshInstance3D.new()
+	_hp_fill.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	var fill_mesh := BoxMesh.new()
 	fill_mesh.size = Vector3(HP_BAR_WIDTH, 0.1, 0.05)
 	_hp_fill.mesh = fill_mesh
@@ -853,7 +892,49 @@ func align_with_y(xform, new_y):
 	return xform
 
 
-func _on_sphere_body_entered(_body: Node) -> void:
+func _update_ram_cooldowns(delta: float) -> void:
+	if _ram_cooldowns.is_empty():
+		return
+	for target_id in _ram_cooldowns.keys():
+		var remaining := float(_ram_cooldowns.get(target_id, 0.0)) - delta
+		if remaining <= 0.0:
+			_ram_cooldowns.erase(target_id)
+		else:
+			_ram_cooldowns[target_id] = remaining
+
+
+func _vehicle_from_collision_body(body: Node) -> Vehicle:
+	var current := body
+	while current != null:
+		if current is Vehicle:
+			return current as Vehicle
+		current = current.get_parent()
+	return null
+
+
+func _try_apply_ram_damage(body: Node) -> void:
+	if vehicle_type != VehicleType.BULLDOZE:
+		return
+	if not is_alive or not race_started or has_finished_race or match_over:
+		return
+	var other := _vehicle_from_collision_body(body)
+	if other == null or other == self:
+		return
+	if not other.is_alive or not other.race_started or other.has_finished_race or other.match_over:
+		return
+	var relative_velocity := linear_velocity - other.linear_velocity
+	relative_velocity.y = 0.0
+	if relative_velocity.length() < BULLDOZE_MIN_IMPACT_SPEED:
+		return
+	var target_id := other.get_instance_id()
+	if float(_ram_cooldowns.get(target_id, 0.0)) > 0.0:
+		return
+	_ram_cooldowns[target_id] = BULLDOZE_RAM_COOLDOWN_SECONDS
+	other.take_damage(BULLDOZE_RAM_DAMAGE, self)
+
+
+func _on_sphere_body_entered(body: Node) -> void:
+	_try_apply_ram_damage(body)
 	if impact_sound == null:
 		return
 	_suspension_y = -suspension_max
