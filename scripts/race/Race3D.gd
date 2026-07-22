@@ -15,6 +15,7 @@ const AI_MODELS: Array[String] = [
 	"res://scenes/vehicles/VenomModular.tscn",
 ]
 const PLAYER_MINIMAP_COLOR := Color("21e6e6")
+const FINISH_WINDOW_SECONDS := 30.0
 const AI_MINIMAP_COLORS: Dictionary = {
 	"res://scenes/vehicles/WraithModular.tscn": Color("ff4b4b"),
 	"res://scenes/vehicles/BullDozeModular.tscn": Color("ffc928"),
@@ -38,6 +39,12 @@ var _countdown_running: bool = false
 var _start_layer: CanvasLayer = null
 var _countdown_art: TextureRect = null
 var _startup_panel: TextureRect = null
+var finish_order: Array[Dictionary] = []
+var dnf_order: Array[Dictionary] = []
+var _resolved_vehicle_ids: Dictionary = {}
+var _entrant_count: int = 0
+var _finish_window_started: bool = false
+var _finish_timer: Timer = null
 
 
 func _ready() -> void:
@@ -86,6 +93,7 @@ func _spawn_field() -> void:
 	race_path3d = path3d
 
 	var count := 1 + MatchConfig.ai_count
+	_entrant_count = count
 	var spawns: Array[Transform3D] = []
 	if track and track.has_method("get_spawn_transforms"):
 		spawns = track.call("get_spawn_transforms", count) as Array[Transform3D]
@@ -347,15 +355,18 @@ func _update_position_hud() -> void:
 		return
 	if not MatchConfig.uses_laps() or player == null or not is_instance_valid(player):
 		return
-	var total := vehicles.size()
-	var place := 1
+	var player_finish_place := _get_player_finish_place()
+	if player_finish_place > 0:
+		hud.call("update_position", player_finish_place, _entrant_count)
+		return
+	var place := finish_order.size() + 1
 	var mine := _race_progress(player)
 	for v in vehicles:
-		if v == player or not is_instance_valid(v) or not v.is_alive:
+		if v == player or not is_instance_valid(v) or not v.is_alive or _is_vehicle_resolved(v):
 			continue
 		if _race_progress(v) > mine:
 			place += 1
-	hud.call("update_position", place, total)
+	hud.call("update_position", place, _entrant_count)
 
 
 func _living() -> Array[Vehicle]:
@@ -374,33 +385,184 @@ func _update_alive_hud() -> void:
 func _on_vehicle_died(veh: Vehicle) -> void:
 	if match_over:
 		return
+	var had_finished := _is_vehicle_resolved(veh) and veh.has_finished_race
+	if not _is_vehicle_resolved(veh):
+		_record_dnf(veh)
 	vehicles.erase(veh)
 	_update_alive_hud()
 
-	if veh == player:
+	if veh == player and not had_finished:
 		_end_match(false, "You were destroyed.")
+		return
+	if _finish_window_started and _all_entrants_resolved():
+		_finish_race_from_order()
 		return
 
 	var living := _living()
 	if living.size() == 1 and living[0] == player:
-		if MatchConfig.mode == MatchConfig.Mode.LAST_STANDING \
-				or MatchConfig.mode == MatchConfig.Mode.HYBRID:
+		if not _finish_window_started and (
+			MatchConfig.mode == MatchConfig.Mode.LAST_STANDING
+			or MatchConfig.mode == MatchConfig.Mode.HYBRID
+		):
 			_end_match(true, "Last car standing!")
 
 
 func _on_race_finished(veh: Vehicle) -> void:
 	if match_over or not MatchConfig.uses_laps():
 		return
+	if _is_vehicle_resolved(veh):
+		return
+	_record_finished(veh)
+	veh.mark_race_finished()
 	if veh == player:
-		_end_match(true, "You finished %d laps first!" % MatchConfig.lap_count)
-	else:
-		_end_match(false, "%s finished the race first." % veh.display_name)
+		_record_remaining_estimates()
+		_finish_race_from_order()
+		return
+	if not _finish_window_started:
+		_start_finish_window()
+	if _all_entrants_resolved():
+		_finish_race_from_order()
+
+
+func _record_finished(veh: Vehicle) -> void:
+	var vehicle_id := veh.get_instance_id()
+	_resolved_vehicle_ids[vehicle_id] = true
+	finish_order.append({
+		"id": vehicle_id,
+		"name": veh.display_name,
+		"is_player": veh == player,
+		"status": "FINISHED",
+		"place": finish_order.size() + 1,
+		"progress": _race_progress(veh),
+	})
+
+
+func _record_dnf(veh: Vehicle) -> void:
+	var vehicle_id := veh.get_instance_id()
+	if _resolved_vehicle_ids.has(vehicle_id):
+		return
+	_resolved_vehicle_ids[vehicle_id] = true
+	dnf_order.append({
+		"id": vehicle_id,
+		"name": veh.display_name,
+		"is_player": veh == player,
+		"status": "DNF",
+		"place": 0,
+		"progress": _race_progress(veh),
+	})
+
+
+func _is_vehicle_resolved(veh: Vehicle) -> bool:
+	return _resolved_vehicle_ids.has(veh.get_instance_id())
+
+
+func _all_entrants_resolved() -> bool:
+	return _entrant_count > 0 and _resolved_vehicle_ids.size() >= _entrant_count
+
+
+func _start_finish_window() -> void:
+	_finish_window_started = true
+	_finish_timer = Timer.new()
+	_finish_timer.name = "FinishWindowTimer"
+	_finish_timer.one_shot = true
+	_finish_timer.wait_time = FINISH_WINDOW_SECONDS
+	_finish_timer.timeout.connect(_on_finish_timeout)
+	add_child(_finish_timer)
+	_finish_timer.start()
+
+
+func _on_finish_timeout() -> void:
+	if match_over:
+		return
+	_record_remaining_dnfs()
+	_finish_race_from_order()
+
+
+func _record_remaining_dnfs() -> void:
+	for veh in vehicles:
+		if is_instance_valid(veh) and not _is_vehicle_resolved(veh):
+			_record_dnf(veh)
+	_sort_dnf_order()
+
+
+func _record_remaining_estimates() -> void:
+	var estimated: Array[Dictionary] = []
+	for veh in vehicles:
+		if not is_instance_valid(veh) or _is_vehicle_resolved(veh):
+			continue
+		estimated.append({
+			"vehicle": veh,
+			"progress": _race_progress(veh),
+		})
+	estimated.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return float(a.get("progress", 0.0)) > float(b.get("progress", 0.0))
+	)
+	for entry in estimated:
+		var estimated_vehicle: Vehicle = entry.get("vehicle") as Vehicle
+		if estimated_vehicle == null:
+			continue
+		var vehicle_id := estimated_vehicle.get_instance_id()
+		_resolved_vehicle_ids[vehicle_id] = true
+		finish_order.append({
+			"id": vehicle_id,
+			"name": estimated_vehicle.display_name,
+			"is_player": false,
+			"status": "ESTIMATED",
+			"place": finish_order.size() + 1,
+			"progress": float(entry.get("progress", 0.0)),
+		})
+
+
+func _sort_dnf_order() -> void:
+	dnf_order.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return float(a.get("progress", 0.0)) > float(b.get("progress", 0.0))
+	)
+
+
+func _finish_race_from_order() -> void:
+	if match_over:
+		return
+	if _finish_timer != null:
+		_finish_timer.stop()
+	_sort_dnf_order()
+	var player_place := _get_player_finish_place()
+	var player_won := player_place == 1
+	var detail := "You were marked DNF."
+	if player_place > 0:
+		detail = "You finished %s." % _ordinal(player_place).to_lower()
+	_end_match(player_won, detail)
+
+
+func _get_player_finish_place() -> int:
+	for result in finish_order:
+		if bool(result.get("is_player", false)):
+			return int(result.get("place", 0))
+	return 0
+
+
+func _ordinal(value: int) -> String:
+	var remainder_100 := value % 100
+	if remainder_100 >= 11 and remainder_100 <= 13:
+		return "%dTH" % value
+	match value % 10:
+		1:
+			return "%dST" % value
+		2:
+			return "%dND" % value
+		3:
+			return "%dRD" % value
+		_:
+			return "%dTH" % value
 
 
 func _end_match(player_won: bool, detail: String) -> void:
 	if match_over:
 		return
+	if _finish_window_started:
+		_record_remaining_dnfs()
 	match_over = true
+	if _finish_timer != null:
+		_finish_timer.stop()
 	if hud and hud.has_method("stop"):
 		hud.call("stop")
 	for v in vehicles:
@@ -424,7 +586,7 @@ func _show_end(player_won: bool, detail: String) -> void:
 	end_layer.add_child(center)
 
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(420, 260)
+	panel.custom_minimum_size = Vector2(480, 360 if not finish_order.is_empty() else 260)
 	panel.add_theme_stylebox_override("panel", GameStyle.comic_panel(Color(0.10, 0.13, 0.09, 0.97), 16.0))
 	center.add_child(panel)
 
@@ -439,7 +601,11 @@ func _show_end(player_won: bool, detail: String) -> void:
 
 	var title := Label.new()
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	if player_won:
+	var player_place := _get_player_finish_place()
+	if player_place > 0:
+		title.text = "%s PLACE" % _ordinal(player_place)
+		GameStyle.apply_title(title, GameStyle.SUCCESS if player_won else GameStyle.ACCENT, 44)
+	elif player_won:
 		title.text = "YOU WIN!"
 		GameStyle.apply_title(title, GameStyle.SUCCESS, 44)
 	else:
@@ -466,6 +632,8 @@ func _show_end(player_won: bool, detail: String) -> void:
 	if MatchConfig.uses_laps() and player and is_instance_valid(player):
 		_add_stat_row(stats, "LAPS DONE", "%d / %d" % [player.laps_completed, MatchConfig.lap_count])
 	_add_stat_row(stats, "CARS LEFT", str(_living().size()))
+	if not finish_order.is_empty():
+		_add_finish_results(vbox)
 
 	var row := HBoxContainer.new()
 	row.alignment = BoxContainer.ALIGNMENT_CENTER
@@ -504,6 +672,29 @@ func _add_stat_row(parent: Control, label_text: String, value_text: String) -> v
 	val.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	GameStyle.apply_label(val, GameStyle.ACCENT, 15)
 	row.add_child(val)
+
+
+func _add_finish_results(parent: Control) -> void:
+	var heading := Label.new()
+	heading.text = "FINISH ORDER"
+	heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	GameStyle.apply_label(heading, GameStyle.TEXT, 16)
+	parent.add_child(heading)
+
+	var results := VBoxContainer.new()
+	results.add_theme_constant_override("separation", 2)
+	parent.add_child(results)
+	for result in finish_order:
+		var result_name := str(result.get("name", "CAR"))
+		if str(result.get("status", "FINISHED")) == "ESTIMATED":
+			result_name += "  (EST.)"
+		_add_stat_row(
+			results,
+			_ordinal(int(result.get("place", 0))),
+			result_name,
+		)
+	for result in dnf_order:
+		_add_stat_row(results, "DNF", str(result.get("name", "CAR")))
 
 
 func _unhandled_input(event: InputEvent) -> void:

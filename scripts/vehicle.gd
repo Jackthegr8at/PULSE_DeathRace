@@ -94,6 +94,7 @@ var missile_ammo: int = 0
 var is_alive: bool = true
 var match_over: bool = false
 var race_started: bool = true
+var has_finished_race: bool = false
 var _cooldown: float = 0.0
 var _ai_aim_target: Vehicle = null
 var _ai_aim_timer: float = 0.0
@@ -281,6 +282,13 @@ func set_match_over(over: bool) -> void:
 	if over:
 		input = Vector3.ZERO
 		linear_speed = 0.0
+
+
+func mark_race_finished() -> void:
+	## Finished cars keep driving, but can no longer affect the remaining race
+	## with weapons or missile pickups.
+	has_finished_race = true
+	_ai_clear_aim()
 
 
 func set_race_started(started: bool) -> void:
@@ -477,7 +485,7 @@ func _ai_pick_fire_target(acquire_dot: float) -> Vehicle:
 		if node == self or not (node is Vehicle):
 			continue
 		var other := node as Vehicle
-		if not other.is_alive:
+		if not other.is_alive or other.has_finished_race:
 			continue
 		var offset: Vector3 = other.get_vehicle_position() - origin
 		var dist := offset.length()
@@ -492,7 +500,7 @@ func _ai_pick_fire_target(acquire_dot: float) -> Vehicle:
 
 
 func _ai_combat(delta: float) -> void:
-	if match_over or not is_alive or missile_ammo <= 0 or _cooldown > 0.0:
+	if has_finished_race or match_over or not is_alive or missile_ammo <= 0 or _cooldown > 0.0:
 		_ai_clear_aim()
 		return
 
@@ -532,7 +540,7 @@ func _ai_combat(delta: float) -> void:
 
 func add_missiles(amount: int) -> bool:
 	## Returns true if any ammo was actually added (pickup may respawn).
-	if amount <= 0 or not is_alive or match_over:
+	if amount <= 0 or not is_alive or match_over or has_finished_race:
 		return false
 	if missile_ammo >= max_missile_ammo:
 		return false
@@ -542,7 +550,7 @@ func add_missiles(amount: int) -> bool:
 
 
 func try_fire() -> bool:
-	if not is_alive or match_over or _cooldown > 0.0:
+	if not is_alive or match_over or has_finished_race or _cooldown > 0.0:
 		return false
 	if missile_ammo <= 0:
 		return false
@@ -682,7 +690,7 @@ func _update_lap_progress() -> void:
 
 
 func _try_complete_lap() -> void:
-	if not is_alive or not MatchConfig.uses_laps() or match_over:
+	if not is_alive or not MatchConfig.uses_laps() or match_over or has_finished_race:
 		return
 	if _lap_cooldown > 0.0 or _path_length <= 1.0:
 		return
