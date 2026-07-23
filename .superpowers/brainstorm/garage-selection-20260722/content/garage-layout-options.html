@@ -1,0 +1,77 @@
+<style>
+  .garage-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin-top:22px}
+  .garage-card{background:#081217;border:2px solid #34434a;border-radius:10px;overflow:hidden;cursor:pointer;transition:.18s;box-shadow:0 10px 24px #0008}
+  .garage-card:hover,.garage-card.selected{border-color:#00dbe7;transform:translateY(-3px);box-shadow:0 0 0 2px #00dbe733,0 14px 30px #000b}
+  .scene{height:270px;position:relative;overflow:hidden;background:
+    linear-gradient(#061018aa,#061018dd),
+    repeating-linear-gradient(90deg,transparent 0 49px,#26343b55 50px),
+    linear-gradient(165deg,#22333a,#090d10 55%,#020405)}
+  .floor{position:absolute;left:-10%;right:-10%;bottom:-35px;height:145px;transform:perspective(260px) rotateX(60deg);background:repeating-linear-gradient(90deg,#151c20 0 42px,#273239 43px 45px),repeating-linear-gradient(#151c20 0 42px,#273239 43px 45px)}
+  .lamp{position:absolute;top:-20px;width:90px;height:170px;background:linear-gradient(#00dbe744,transparent);clip-path:polygon(42% 0,58% 0,100% 100%,0 100%)}
+  .car{position:absolute;width:112px;height:48px;border:5px solid #07090b;border-radius:32px 17px 18px 28px;box-shadow:0 12px 12px #000c,inset 0 0 0 4px #ffffff1d}
+  .car:before,.car:after{content:"";position:absolute;bottom:-14px;width:27px;height:18px;background:#090b0c;border:4px solid #323b40;border-radius:50%}
+  .car:before{left:12px}.car:after{right:12px}
+  .cyan{background:#22aeb5}.yellow{background:#d79c1f}.red{background:#b82e38}.purple{background:#7a2dac}
+  .locked{filter:brightness(.28) saturate(.25)}
+  .lock{position:absolute;color:#ffbf19;font-weight:900;font-size:14px;background:#120d08dd;border:1px solid #ffbf19;padding:4px 7px;transform:rotate(-5deg)}
+  .bay{position:absolute;bottom:54px;left:50%;transform:translateX(-50%);width:78%;height:7px;background:#00dbe7;box-shadow:0 0 18px #00dbe7}
+  .stats{position:absolute;left:18px;right:18px;bottom:12px;display:flex;justify-content:space-between;color:#dce8e9;font-size:12px}
+  .card-copy{padding:16px 17px 18px}.card-copy h3{margin:0 0 7px;color:#f7bd18}.card-copy p{margin:0;color:#aebcc1;line-height:1.45}
+  .badge{display:inline-block;margin-top:12px;padding:4px 8px;border:1px solid #00dbe7;color:#00dbe7;font-size:11px;font-weight:800}
+  @media(max-width:1000px){.garage-grid{grid-template-columns:1fr}.scene{height:235px}}
+</style>
+
+<h2>How should the garage present the four cars?</h2>
+<p class="subtitle">All versions support persistent selection, locked-car progress, full stats, and returning to race setup.</p>
+
+<div class="garage-grid">
+  <div class="garage-card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="scene">
+      <div class="floor"></div>
+      <div class="lamp" style="left:7%"></div><div class="lamp" style="left:31%"></div><div class="lamp" style="left:55%"></div><div class="lamp" style="left:79%"></div>
+      <div class="car cyan" style="left:5%;bottom:75px;transform:scale(.66)"></div>
+      <div class="car yellow locked" style="left:29%;bottom:75px;transform:scale(.66)"></div>
+      <div class="car red locked" style="left:53%;bottom:75px;transform:scale(.66)"></div>
+      <div class="car purple locked" style="left:77%;bottom:75px;transform:scale(.66)"></div>
+      <span class="lock" style="left:33%;top:104px">LOCKED</span>
+      <span class="lock" style="left:57%;top:104px">LOCKED</span>
+      <span class="lock" style="left:81%;top:104px">LOCKED</span>
+    </div>
+    <div class="card-copy">
+      <h3>A — Four-Car Showroom</h3>
+      <p>All cars remain parked side by side. Selecting one moves the camera toward its bay and opens its information panel.</p>
+    </div>
+  </div>
+
+  <div class="garage-card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="scene">
+      <div class="floor"></div>
+      <div class="lamp" style="left:37%;width:150px;background:linear-gradient(#a84cff66,transparent)"></div>
+      <div class="bay"></div>
+      <div class="car cyan" style="left:50%;bottom:82px;transform:translateX(-50%) scale(1.35)"></div>
+      <div class="stats"><span>◀ RAVAGE</span><span>VENOM ▶</span></div>
+    </div>
+    <div class="card-copy">
+      <h3>B — Single Inspection Bay</h3>
+      <p>One large rotating vehicle dominates the screen. Arrows cycle through the four cars; locked vehicles remain inspectable.</p>
+    </div>
+  </div>
+
+  <div class="garage-card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="scene">
+      <div class="floor"></div>
+      <div class="lamp" style="left:33%;width:170px"></div>
+      <div class="car yellow locked" style="left:1%;bottom:67px;transform:scale(.54);opacity:.55"></div>
+      <div class="car red locked" style="right:1%;bottom:67px;transform:scale(.54);opacity:.55"></div>
+      <div class="bay" style="left:50%;width:55%"></div>
+      <div class="car cyan" style="left:50%;bottom:82px;transform:translateX(-50%) scale(1.25)"></div>
+      <span class="lock" style="left:8%;top:116px">7 / 20</span>
+      <span class="lock" style="right:8%;top:116px">18 / 50</span>
+    </div>
+    <div class="card-copy">
+      <h3>C — Hybrid Combat Garage</h3>
+      <p>The selected car occupies a central inspection bay, while the other cars remain visible in surrounding stalls with unlock progress.</p>
+      <span class="badge">RECOMMENDED</span>
+    </div>
+  </div>
+</div>

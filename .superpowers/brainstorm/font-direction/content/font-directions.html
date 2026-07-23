@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Pulse Deathrace — Font Direction</title>
+  <title>Pulse Deathrace — Brush Font Direction</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;0,900;1,800&family=Oswald:wght@500;600;700&family=Teko:wght@500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;0,900;1,800&family=Knewave&family=Permanent+Marker&family=Road+Rage&display=swap" rel="stylesheet">
   <style>
     :root { --ink:#070d11; --panel:#0a151a; --line:#334047; --cyan:#19d6e3; --yellow:#ffc21c; --orange:#ff861c; --purple:#b839ed; --paper:#f2efe7; }
     * { box-sizing:border-box; }
@@ -44,11 +44,14 @@
     .leaderboard div:first-child { border-color:var(--cyan); background:#073039d9; }
     .leaderboard b { color:var(--yellow); }
     .rationale { padding:0 18px 19px; color:#c5cdd0; font-size:15px; line-height:1.35; }
-    .barlow,.barlow * { font-family:"Barlow Condensed",sans-serif; }
-    .teko,.teko * { font-family:"Teko",sans-serif; }
-    .teko .sub,.teko .rationale,.teko .name small { font-family:"Barlow Condensed",sans-serif; }
-    .oswald,.oswald * { font-family:"Oswald",sans-serif; }
-    .oswald .place { letter-spacing:-.02em; }
+    .road-rage,.road-rage * { font-family:"Road Rage",cursive; }
+    .knewave,.knewave * { font-family:"Knewave",cursive; }
+    .marker,.marker * { font-family:"Permanent Marker",cursive; }
+    .road-rage .sub,.road-rage .rationale,.road-rage .name small,
+    .knewave .sub,.knewave .rationale,.knewave .name small,
+    .marker .sub,.marker .rationale,.marker .name small { font-family:"Barlow Condensed",sans-serif; }
+    .road-rage .place { font-size:88px; transform:skew(-4deg); transform-origin:left; }
+    .road-rage .kicker,.road-rage .box label { font-size:22px; }
     footer { margin-top:20px; padding:13px 16px; color:#94a2a7; border-left:4px solid var(--cyan); background:#071014c9; font:600 16px/1.4 "Barlow Condensed",sans-serif; }
     @media(max-width:1050px){ .grid{grid-template-columns:1fr;} .hud{min-height:auto;} header{align-items:start;flex-direction:column;} header p{text-align:left;} }
   </style>
@@ -56,40 +59,40 @@
 <body>
 <main>
   <header>
-    <h1>Choose the game’s <span>font direction</span></h1>
-    <p>Click one option. Each card uses real race HUD and result-screen language so you can judge hierarchy, readability, and personality—not just an alphabet sample.</p>
+    <h1>Choose the game’s <span>brush font</span></h1>
+    <p>These are open-source candidates shown in real race HUD and result-screen language. Small descriptions would remain in Barlow Condensed for readability.</p>
   </header>
   <section class="grid">
-    <article class="choice barlow" data-choice="barlow-condensed" onclick="toggleSelect(this)">
+    <article class="choice road-rage" data-choice="road-rage" onclick="toggleSelect(this)">
       <span class="recommended">RECOMMENDED</span>
-      <div class="name"><strong>01 — Barlow Condensed</strong><small>One flexible family · industrial comic-sport</small></div>
+      <div class="name"><strong>01 — Road Rage</strong><small>OFL · aggressive dry-brush display face</small></div>
       <div class="hud">
         <div class="results"><div class="kicker">Race complete</div><div class="place">2ND PLACE</div><div class="sub">You crossed the line in second.</div><div class="stats"><span>RACE TIME</span><b>03:20.06</b><span>LAPS DONE</span><b>5 / 5</b><span>FINISH STATUS</span><b>CONFIRMED</b></div></div>
         <div class="hudrow"><div class="box"><label>Position</label><strong>2ND <small>OF 4</small></strong></div><div class="box"><label>Missiles</label><strong class="purple">12</strong></div></div>
         <div class="leaderboard"><div><b>1</b><strong>AI-3</strong><span>03:16.92</span></div><div><b>2</b><strong>PLAYER</strong><span>03:20.06</span></div><div><b>3</b><strong>AI-1</strong><span>EST.</span></div></div>
       </div>
-      <div class="rationale">Best balance: aggressive enough for the brand, compact enough for HUD data, and highly readable at small sizes. Black for headlines; SemiBold/Bold for labels.</div>
+      <div class="rationale">Closest existing match: sharp, fast, irregular, and complete enough for buttons, placement, countdowns, values, and section titles.</div>
     </article>
-    <article class="choice teko" data-choice="teko-barlow" onclick="toggleSelect(this)">
-      <div class="name"><strong>02 — Teko + Barlow</strong><small>Maximum arcade energy · two-family system</small></div>
+    <article class="choice knewave" data-choice="knewave" onclick="toggleSelect(this)">
+      <div class="name"><strong>02 — Knewave</strong><small>OFL · thick hand-painted lettering</small></div>
       <div class="hud">
         <div class="results"><div class="kicker">Race complete</div><div class="place">2ND PLACE</div><div class="sub">You crossed the line in second.</div><div class="stats"><span>RACE TIME</span><b>03:20.06</b><span>LAPS DONE</span><b>5 / 5</b><span>FINISH STATUS</span><b>CONFIRMED</b></div></div>
         <div class="hudrow"><div class="box"><label>Position</label><strong>2ND <small>OF 4</small></strong></div><div class="box"><label>Missiles</label><strong class="purple">12</strong></div></div>
         <div class="leaderboard"><div><b>1</b><strong>AI-3</strong><span>03:16.92</span></div><div><b>2</b><strong>PLAYER</strong><span>03:20.06</span></div><div><b>3</b><strong>AI-1</strong><span>EST.</span></div></div>
       </div>
-      <div class="rationale">The loudest and most arcade-like. Excellent for placement numbers and countdowns; requires Barlow for descriptions and compact secondary text.</div>
+      <div class="rationale">Chunkier and more playful. It feels painted and energetic, but less dangerous and less slanted than your reference.</div>
     </article>
-    <article class="choice oswald" data-choice="oswald" onclick="toggleSelect(this)">
-      <div class="name"><strong>03 — Oswald</strong><small>Clean competitive readability · restrained character</small></div>
+    <article class="choice marker" data-choice="permanent-marker" onclick="toggleSelect(this)">
+      <div class="name"><strong>03 — Permanent Marker</strong><small>Apache 2.0 · readable hand-drawn fallback</small></div>
       <div class="hud">
         <div class="results"><div class="kicker">Race complete</div><div class="place">2ND PLACE</div><div class="sub">You crossed the line in second.</div><div class="stats"><span>RACE TIME</span><b>03:20.06</b><span>LAPS DONE</span><b>5 / 5</b><span>FINISH STATUS</span><b>CONFIRMED</b></div></div>
         <div class="hudrow"><div class="box"><label>Position</label><strong>2ND <small>OF 4</small></strong></div><div class="box"><label>Missiles</label><strong class="purple">12</strong></div></div>
         <div class="leaderboard"><div><b>1</b><strong>AI-3</strong><span>03:16.92</span></div><div><b>2</b><strong>PLAYER</strong><span>03:20.06</span></div><div><b>3</b><strong>AI-1</strong><span>EST.</span></div></div>
       </div>
-      <div class="rationale">The safest competitive HUD choice. Crisp and mature, though it has less of the rough comic-book personality carried by the logo and painted UI frames.</div>
+      <div class="rationale">Readable and expressive, but too friendly and handwritten for the final identity. Included as a contrast test.</div>
     </article>
   </section>
-  <footer>The chosen system will replace programmable Godot text consistently across Setup, Loading, HUD, countdown, and Results. Text baked into PNG artwork stays untouched.</footer>
+  <footer>If Road Rage still feels too soft or too familiar, the next step should be a custom Pulse Deathrace display font based on your alphabet reference.</footer>
 </main>
 <script>
 function toggleSelect(el){ document.querySelectorAll('.choice').forEach(x=>x.classList.remove('selected')); el.classList.add('selected'); }

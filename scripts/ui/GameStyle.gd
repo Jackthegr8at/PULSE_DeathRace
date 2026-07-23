@@ -45,6 +45,9 @@ const SETUP_PURPLE := Color("a84cff")
 const SETUP_YELLOW := Color("f6b600")
 const SETUP_RED := Color("d62f35")
 
+## Branded display face. Keep body copy on Godot's readable default font.
+const DISPLAY_FONT: FontFile = preload("res://assets/fonts/Road_Rage.otf")
+
 
 static func panel(bg: Color = SURFACE, border: Color = BORDER, radius: float = 12.0, border_w: float = 3.0) -> StyleBoxFlat:
 	var s := StyleBoxFlat.new()
@@ -233,6 +236,7 @@ static func apply_button(btn: Button, styles: Dictionary, font_color: Color = TE
 	btn.add_theme_stylebox_override("pressed", styles["pressed"])
 	btn.add_theme_stylebox_override("focus", styles["hover"])
 	btn.add_theme_stylebox_override("disabled", button_normal(SURFACE.darkened(0.2), BORDER.darkened(0.2)))
+	btn.add_theme_font_override("font", DISPLAY_FONT)
 	btn.add_theme_color_override("font_color", font_color)
 	btn.add_theme_color_override("font_hover_color", font_color.lightened(0.08))
 	btn.add_theme_color_override("font_pressed_color", font_color.darkened(0.1))
@@ -244,9 +248,14 @@ static func apply_label(label: Label, color: Color = TEXT, size: int = 14) -> vo
 	label.add_theme_font_size_override("font_size", size)
 
 
+static func apply_display_label(label: Label, color: Color = TEXT, size: int = 18) -> void:
+	apply_label(label, color, size)
+	label.add_theme_font_override("font", DISPLAY_FONT)
+
+
 static func apply_title(label: Label, color: Color = ACCENT, size: int = 32) -> void:
 	## Comic title: vibrant fill + thick black ink outline.
-	apply_label(label, color, size)
+	apply_display_label(label, color, size)
 	label.add_theme_color_override("font_outline_color", INK)
 	label.add_theme_constant_override("outline_size", maxi(int(size * 0.22), 4))
 

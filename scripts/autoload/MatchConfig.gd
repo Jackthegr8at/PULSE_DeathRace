@@ -103,6 +103,31 @@ func track_scene_path() -> String:
 	return TRACK_PATHS.get(track_id, TRACK_PATHS[TrackId.KENNEY_DEFAULT])
 
 
+func selected_vehicle_id() -> String:
+	return GarageProfile.selected_vehicle_id()
+
+
+func selected_vehicle_entry() -> Dictionary:
+	return VehicleCatalog.get_vehicle(selected_vehicle_id())
+
+
+func selected_vehicle_scene_path() -> String:
+	return VehicleCatalog.get_scene_path(selected_vehicle_id())
+
+
+func ai_vehicle_ids() -> Array[String]:
+	return VehicleCatalog.get_ai_roster(selected_vehicle_id(), ai_count)
+
+
+func race_vehicle_scene_paths() -> Array[String]:
+	var paths: Array[String] = [selected_vehicle_scene_path()]
+	for vehicle_id in ai_vehicle_ids():
+		var path := VehicleCatalog.get_scene_path(vehicle_id)
+		if not path.is_empty() and path not in paths:
+			paths.append(path)
+	return paths
+
+
 func ai_profile() -> Dictionary:
 	return AI_PROFILES.get(ai_difficulty, AI_PROFILES[AIDifficulty.NOVICE]) as Dictionary
 

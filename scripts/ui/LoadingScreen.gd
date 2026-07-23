@@ -12,7 +12,6 @@ const YELLOW := Color("ffc20b")
 var _requests: Array[Dictionary] = []
 var _request_index: int = 0
 var _request_started_msec: int = 0
-var _display_font: SystemFont
 var _progress_bar: ProgressBar
 var _percent_label: Label
 var _stage_label: Label
@@ -67,11 +66,24 @@ func _process(delta: float) -> void:
 func _build_request_list() -> void:
 	_requests = [
 		{"path": MatchConfig.track_scene_path(), "label": "TRACK AND ENVIRONMENT"},
-		{"path": RACE_SCENE_PATH, "label": "PLAYER VEHICLE"},
-		{"path": "res://scenes/vehicles/WraithModular.tscn", "label": "WRAITH"},
-		{"path": "res://scenes/vehicles/BullDozeModular.tscn", "label": "BULLDOZE"},
-		{"path": "res://scenes/vehicles/VenomModular.tscn", "label": "VENOM"},
+		{"path": RACE_SCENE_PATH, "label": "RACE SYSTEMS"},
 	]
+	var queued_paths: Dictionary = {
+		MatchConfig.track_scene_path(): true,
+		RACE_SCENE_PATH: true,
+	}
+	var vehicle_ids: Array[String] = [MatchConfig.selected_vehicle_id()]
+	vehicle_ids.append_array(MatchConfig.ai_vehicle_ids())
+	for vehicle_id in vehicle_ids:
+		var entry := VehicleCatalog.get_vehicle(vehicle_id)
+		var path := str(entry.get("scene_path", ""))
+		if path.is_empty() or queued_paths.has(path):
+			continue
+		queued_paths[path] = true
+		_requests.append({
+			"path": path,
+			"label": str(entry.get("display_name", "VEHICLE")),
+		})
 
 
 func _start_current_request() -> void:
@@ -154,10 +166,6 @@ func _print_request_time(label_text: String) -> void:
 
 
 func _build_screen() -> void:
-	_display_font = SystemFont.new()
-	_display_font.font_names = PackedStringArray(["Impact", "Bahnschrift Condensed", "Arial Narrow", "Arial"])
-	_display_font.font_weight = 700
-
 	var background := TextureRect.new()
 	background.texture = SETUP_BACKGROUND
 	background.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -193,11 +201,11 @@ func _build_screen() -> void:
 	content.add_theme_constant_override("separation", 11)
 	panel.add_child(content)
 
-	var title := _label("ASSEMBLING DEATHRACE", 38, Color.WHITE)
+	var title := _display_label("ASSEMBLING DEATHRACE", 38, Color.WHITE)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	content.add_child(title)
 
-	_stage_label = _label("LOADING", 25, CYAN)
+	_stage_label = _display_label("LOADING", 25, CYAN)
 	_stage_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	content.add_child(_stage_label)
 
@@ -212,29 +220,39 @@ func _build_screen() -> void:
 	_progress_bar.add_theme_stylebox_override("fill", _bar_style(MAGENTA, YELLOW))
 	progress_row.add_child(_progress_bar)
 
-	_percent_label = _label("0%", 23, YELLOW)
+	_percent_label = _display_label("0%", 23, YELLOW)
 	_percent_label.custom_minimum_size = Vector2(65, 30)
 	_percent_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	progress_row.add_child(_percent_label)
 
-	_detail_label = _label("PREPARING", 16, Color("a8b7b9"))
+	_detail_label = _body_label("PREPARING", 16, Color("a8b7b9"))
 	_detail_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	content.add_child(_detail_label)
 
-	_error_label = _label("", 15, MAGENTA)
+	_error_label = _body_label("", 15, MAGENTA)
 	_error_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_error_label.visible = false
 	content.add_child(_error_label)
 
 
-func _label(text_value: String, font_size: int, color: Color) -> Label:
+func _display_label(text_value: String, font_size: int, color: Color) -> Label:
 	var label := Label.new()
 	label.text = text_value
-	label.add_theme_font_override("font", _display_font)
+	label.add_theme_font_override("font", GameStyle.DISPLAY_FONT)
 	label.add_theme_font_size_override("font_size", font_size)
 	label.add_theme_color_override("font_color", color)
 	label.add_theme_color_override("font_outline_color", Color("020405"))
 	label.add_theme_constant_override("outline_size", 5)
+	return label
+
+
+func _body_label(text_value: String, font_size: int, color: Color) -> Label:
+	var label := Label.new()
+	label.text = text_value
+	label.add_theme_font_size_override("font_size", font_size)
+	label.add_theme_color_override("font_color", color)
+	label.add_theme_color_override("font_outline_color", Color("020405"))
+	label.add_theme_constant_override("outline_size", 3)
 	return label
 
 

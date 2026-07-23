@@ -10,24 +10,7 @@ const COUNTDOWN_TEXTURES: Dictionary = {
 	"1": preload("res://assets/ui/hud/countdown/1.png"),
 	"GO": preload("res://assets/ui/hud/countdown/go.png"),
 }
-const AI_MODELS: Array[String] = [
-	"res://scenes/vehicles/WraithModular.tscn",
-	"res://scenes/vehicles/BullDozeModular.tscn",
-	"res://scenes/vehicles/VenomModular.tscn",
-]
-const VEHICLE_TYPES_BY_MODEL: Dictionary = {
-	"res://scenes/vehicles/RavageModular.tscn": Vehicle.VehicleType.RAVAGE,
-	"res://scenes/vehicles/BullDozeModular.tscn": Vehicle.VehicleType.BULLDOZE,
-	"res://scenes/vehicles/VenomModular.tscn": Vehicle.VehicleType.VENOM,
-	"res://scenes/vehicles/WraithModular.tscn": Vehicle.VehicleType.WRAITH,
-}
-const PLAYER_MINIMAP_COLOR := Color("21e6e6")
 const FINISH_WINDOW_SECONDS := 30.0
-const AI_MINIMAP_COLORS: Dictionary = {
-	"res://scenes/vehicles/WraithModular.tscn": Color("ff4b4b"),
-	"res://scenes/vehicles/BullDozeModular.tscn": Color("ffc928"),
-	"res://scenes/vehicles/VenomModular.tscn": Color("b52cff"),
-}
 
 @onready var track_root: Node3D = $TrackRoot
 @onready var vehicles_root: Node3D = $Vehicles
@@ -52,10 +35,15 @@ var _resolved_vehicle_ids: Dictionary = {}
 var _entrant_count: int = 0
 var _finish_window_started: bool = false
 var _finish_timer: Timer = null
+var _player_kills_by_vehicle_id: Dictionary = {}
+var _race_summary_committed: bool = false
+var _newly_unlocked_vehicle_ids: Array[String] = []
+var _race_session_id: String = ""
 
 
 func _ready() -> void:
 	var ready_started_msec := Time.get_ticks_msec()
+	_race_session_id = "%d-%d" % [Time.get_unix_time_from_system(), Time.get_ticks_usec()]
 	RenderingServer.set_default_clear_color(Color(0.68, 0.76, 0.97))
 	MatchConfig.ai_count = maxi(MatchConfig.ai_count, 3)
 	var phase_started_msec := Time.get_ticks_msec()
@@ -109,8 +97,12 @@ func _spawn_field() -> void:
 		for i in count:
 			spawns.append(Transform3D(base.basis, base.origin + base.basis.z * (i * 2.5)))
 
+	var player_id := MatchConfig.selected_vehicle_id()
+	var player_entry := VehicleCatalog.get_vehicle(player_id)
+	var ai_ids := MatchConfig.ai_vehicle_ids()
+
 	# Player
-	player = _spawn_vehicle(spawns[0], true, null, "Player")
+	player = _spawn_vehicle(spawns[0], true, player_entry, "Player")
 	if path3d:
 		player.setup_player_laps(path3d)
 	player.died.connect(_on_vehicle_died)
@@ -120,8 +112,9 @@ func _spawn_field() -> void:
 	# AI
 	for i in MatchConfig.ai_count:
 		var spawn_i := mini(i + 1, spawns.size() - 1)
-		var model := AI_MODELS[i % AI_MODELS.size()]
-		var ai := _spawn_vehicle(spawns[spawn_i], false, model, "AI-%d" % (i + 1))
+		var ai_id := ai_ids[i % ai_ids.size()]
+		var ai_entry := VehicleCatalog.get_vehicle(ai_id)
+		var ai := _spawn_vehicle(spawns[spawn_i], false, ai_entry, "AI-%d" % (i + 1))
 		if path3d:
 			ai.setup_ai(path3d, "AI-%d" % (i + 1))
 		else:
@@ -150,20 +143,18 @@ func _apply_ai_difficulty(ai: Vehicle, ai_index: int) -> void:
 	ai.fire_dot_min = float(profile.get("fire_dot_min", 0.93))
 
 
-func _spawn_vehicle(spawn: Transform3D, as_player: bool, model_path: Variant, name_label: String) -> Vehicle:
+func _spawn_vehicle(spawn: Transform3D, as_player: bool, vehicle_entry: Dictionary, name_label: String) -> Vehicle:
 	var veh := VehicleScene.instantiate() as Vehicle
 	veh.is_player = as_player
 	veh.display_name = name_label
-	veh.minimap_color = PLAYER_MINIMAP_COLOR if as_player else AI_MINIMAP_COLORS.get(str(model_path), GameStyle.DANGER)
-	if as_player:
-		veh.vehicle_type = Vehicle.VehicleType.RAVAGE
-	else:
-		veh.vehicle_type = int(VEHICLE_TYPES_BY_MODEL.get(str(model_path), Vehicle.VehicleType.RAVAGE))
+	veh.minimap_color = vehicle_entry.get("minimap_color", GameStyle.DANGER) as Color
+	veh.vehicle_type = int(vehicle_entry.get("vehicle_type", Vehicle.VehicleType.RAVAGE))
+	veh.set_meta("vehicle_id", str(vehicle_entry.get("id", VehicleCatalog.DEFAULT_VEHICLE_ID)))
 	vehicles_root.add_child(veh)
 
-	# Optional model swap for AI color variety
-	if model_path != null and str(model_path) != "":
-		_swap_model(veh, str(model_path))
+	var model_path := str(vehicle_entry.get("scene_path", ""))
+	if not model_path.is_empty():
+		_swap_model(veh, model_path)
 
 	# Snap to ground under spawn so cars sit on GridMap asphalt, not float/clip
 	var pos := _snap_spawn_to_ground(spawn.origin)
@@ -406,6 +397,10 @@ func _update_alive_hud() -> void:
 func _on_vehicle_died(veh: Vehicle) -> void:
 	if match_over:
 		return
+	var attacker := veh.get_last_damage_source()
+	if is_instance_valid(attacker) and attacker == player and veh != player:
+		var victim_id := str(veh.get_meta("vehicle_id", VehicleCatalog.DEFAULT_VEHICLE_ID))
+		_player_kills_by_vehicle_id[victim_id] = int(_player_kills_by_vehicle_id.get(victim_id, 0)) + 1
 	var had_finished := _is_vehicle_resolved(veh) and veh.has_finished_race
 	if not _is_vehicle_resolved(veh):
 		_record_dnf(veh)
@@ -590,7 +585,20 @@ func _end_match(player_won: bool, detail: String) -> void:
 	for v in vehicles:
 		if is_instance_valid(v):
 			v.set_match_over(true)
+	_commit_race_progress(player_won)
 	_show_end(player_won, detail)
+
+
+func _commit_race_progress(player_won: bool) -> void:
+	if _race_summary_committed:
+		return
+	_race_summary_committed = true
+	_newly_unlocked_vehicle_ids = GarageProfile.commit_completed_race({
+		"race_id": _race_session_id,
+		"completed": true,
+		"player_first": player_won and _get_player_finish_place() == 1,
+		"player_kills_by_vehicle_id": _player_kills_by_vehicle_id.duplicate(true),
+	})
 
 
 func _show_end(player_won: bool, detail: String) -> void:
@@ -635,6 +643,7 @@ func _show_end(player_won: bool, detail: String) -> void:
 		"difficulty": MatchConfig.ai_difficulty_display_name().to_upper(),
 		"survivors": _living().size(),
 		"results": display_results,
+		"newly_unlocked_vehicle_ids": _newly_unlocked_vehicle_ids,
 	})
 
 

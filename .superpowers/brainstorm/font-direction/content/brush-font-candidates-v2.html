@@ -1,0 +1,24 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=Knewave&family=Permanent+Marker&family=Road+Rage&display=swap');
+.font-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin-top:22px}.font-card{position:relative;overflow:hidden;border:2px solid #3a474c;background:linear-gradient(145deg,#111d21,#050a0d);cursor:pointer;clip-path:polygon(15px 0,calc(100% - 15px) 0,100% 15px,100% calc(100% - 15px),calc(100% - 15px) 100%,15px 100%,0 calc(100% - 15px),0 15px)}.font-card:hover,.font-card.selected{border-color:#16d5e3;box-shadow:0 0 28px #16d5e344}.font-card .tag{position:absolute;right:0;top:0;padding:7px 13px;background:#ffc21c;color:#120e00;font:800 13px 'Barlow Condensed';letter-spacing:.08em}.font-card header{padding:20px 18px 13px;border-bottom:1px solid #354147}.font-card header b{font:800 25px 'Barlow Condensed';text-transform:uppercase}.font-card header small{display:block;color:#91a2a8;font:600 14px 'Barlow Condensed'}.sample{min-height:420px;padding:18px;background:linear-gradient(#071116e8,#030709ed),url('/assets/ui/setup/setup_background.png') center/cover}.sample .title{color:#f5efe3;font-size:54px;line-height:.88;text-transform:uppercase}.sample .place{margin-top:19px;color:#ffbd1a;font-size:83px;line-height:.86;text-shadow:3px 3px #000}.sample .button{margin:20px 0;padding:13px 15px;color:#080600;background:#efaa0b;font-size:45px;line-height:1;text-align:center;transform:skew(-5deg);clip-path:polygon(12px 0,100% 0,calc(100% - 14px) 100%,0 100%)}.sample .row{display:grid;grid-template-columns:1fr auto;gap:7px 14px;padding:12px;border:1px solid #3d484d;background:#04090cdd;font-size:28px}.sample .body{margin-top:14px;color:#bac5c9;font:600 16px/1.35 'Barlow Condensed'}.road{font-family:'Road Rage',cursive}.knewave{font-family:'Knewave',cursive}.marker{font-family:'Permanent Marker',cursive}.verdict{padding:15px 18px;color:#c3ccd0;font:600 15px/1.35 'Barlow Condensed'}.verdict strong{color:#16d5e3}.license{margin-top:18px;padding:13px 16px;border-left:4px solid #16d5e3;background:#061015;color:#aebbc0;font:600 16px 'Barlow Condensed'}@media(max-width:980px){.font-grid{grid-template-columns:1fr}}
+</style>
+<h2>Which brush font feels like Pulse Deathrace?</h2>
+<p class="subtitle">Real open-source candidates, tested with actual HUD language. Small descriptions stay in Barlow Condensed for readability.</p>
+<div class="font-grid">
+  <article class="font-card" data-choice="road-rage" onclick="toggleSelect(this)">
+    <span class="tag">RECOMMENDED</span><header><b>01 — Road Rage</b><small>OFL · closest existing match</small></header>
+    <div class="sample road"><div class="title">Selected Circuit</div><div class="place">2ND PLACE</div><div class="button">Start Race</div><div class="row"><span>POSITION</span><b>1ST / 4</b><span>MISSILES</span><b>12</b><span>AI DIFFICULTY</span><b>HARD</b></div><div class="body">Use for titles, buttons, placements, countdowns and short values—not paragraphs.</div></div>
+    <div class="verdict"><strong>Best fit.</strong> Sharp, fast and irregular, with the dry-brush energy of your reference.</div>
+  </article>
+  <article class="font-card" data-choice="knewave" onclick="toggleSelect(this)">
+    <header><b>02 — Knewave</b><small>OFL · thick painted alternative</small></header>
+    <div class="sample knewave"><div class="title">Selected Circuit</div><div class="place">2ND PLACE</div><div class="button">Start Race</div><div class="row"><span>POSITION</span><b>1ST / 4</b><span>MISSILES</span><b>12</b><span>AI DIFFICULTY</span><b>HARD</b></div><div class="body">Use for titles and large values; Barlow remains the small-text companion.</div></div>
+    <div class="verdict"><strong>More cartoon.</strong> Bold and hand-painted, but rounder and friendlier than the target.</div>
+  </article>
+  <article class="font-card" data-choice="permanent-marker" onclick="toggleSelect(this)">
+    <header><b>03 — Permanent Marker</b><small>Apache 2.0 · readability baseline</small></header>
+    <div class="sample marker"><div class="title">Selected Circuit</div><div class="place">2ND PLACE</div><div class="button">Start Race</div><div class="row"><span>POSITION</span><b>1ST / 4</b><span>MISSILES</span><b>12</b><span>AI DIFFICULTY</span><b>HARD</b></div><div class="body">Very legible, but presented mainly to show how much aggression the final face needs.</div></div>
+    <div class="verdict"><strong>Too friendly.</strong> Useful contrast, but not strong enough for the final identity.</div>
+  </article>
+</div>
+<div class="license">If Road Rage is still not close enough, I recommend creating a custom Pulse Deathrace display font from your alphabet reference, while retaining Barlow Condensed for dense UI text.</div>

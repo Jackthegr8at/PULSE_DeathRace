@@ -21,7 +21,7 @@ var _crate_count: int = 5
 var _missiles_per_crate: int = 2
 
 var _canvas: Control
-var _display_font: SystemFont
+var _display_font: Font
 var _mode_buttons: Dictionary = {}
 var _track_buttons: Dictionary = {}
 var _difficulty_buttons: Dictionary = {}
@@ -34,6 +34,7 @@ var _opponents_value: Label
 var _race_type_value: Label
 var _crates_state_value: Label
 var _preview_image: TextureRect
+var _selected_vehicle_value: Label
 
 
 func _ready() -> void:
@@ -52,9 +53,7 @@ func _ready() -> void:
 
 
 func _create_font() -> void:
-	_display_font = SystemFont.new()
-	_display_font.font_names = PackedStringArray(["Impact", "Bahnschrift Condensed", "Arial Narrow", "Arial"])
-	_display_font.font_weight = 700
+	_display_font = GameStyle.DISPLAY_FONT
 
 
 func _build_screen() -> void:
@@ -112,6 +111,7 @@ func _build_screen() -> void:
 	_build_stepper_targets()
 	_build_dynamic_values()
 	_build_ai_difficulty_selector()
+	_build_garage_target()
 	_build_start_target()
 	_wire_focus_order()
 
@@ -187,6 +187,29 @@ func _build_ai_difficulty_selector() -> void:
 	_add_difficulty_target("DifficultyNovice", "NOVICE", Vector2(575, 852), MatchConfig.AIDifficulty.NOVICE)
 	_add_difficulty_target("DifficultyMedium", "MEDIUM", Vector2(700, 852), MatchConfig.AIDifficulty.MEDIUM)
 	_add_difficulty_target("DifficultyHard", "HARD", Vector2(825, 852), MatchConfig.AIDifficulty.HARD)
+
+
+func _build_garage_target() -> void:
+	var garage := _transparent_button("Garage", Vector2(1050, 806), Vector2(245, 62))
+	garage.text = "GARAGE"
+	garage.add_theme_font_override("font", _display_font)
+	garage.add_theme_font_size_override("font_size", 26)
+	garage.add_theme_color_override("font_color", Color.WHITE)
+	garage.add_theme_color_override("font_hover_color", CYAN)
+	garage.add_theme_color_override("font_focus_color", CYAN)
+	garage.add_theme_stylebox_override("normal", _highlight_style(Color("11191c"), 0.62, 2))
+	garage.add_theme_stylebox_override("hover", _highlight_style(CYAN, 0.18, 3))
+	garage.add_theme_stylebox_override("focus", _highlight_style(CYAN, 0.18, 3))
+	garage.pressed.connect(_on_garage_pressed)
+	_canvas.add_child(garage)
+	_focus_buttons.append(garage)
+	_selected_vehicle_value = _value_label(
+		"SelectedVehicle",
+		Vector2(1050, 850),
+		Vector2(245, 31),
+		18,
+		CYAN
+	)
 
 
 func _add_difficulty_target(name_text: String, label_text: String, at: Vector2, difficulty: MatchConfig.AIDifficulty) -> void:
@@ -284,6 +307,9 @@ func _refresh_all() -> void:
 			_race_type_value.text = "SURVIVE"
 
 	_preview_image.texture = STARTER_PREVIEW if _selected_track == MatchConfig.TrackId.KENNEY_DEFAULT else FIGURE8_PREVIEW
+	if is_instance_valid(_selected_vehicle_value):
+		var selected_entry := VehicleCatalog.get_vehicle(GarageProfile.selected_vehicle_id())
+		_selected_vehicle_value.text = "SELECTED: %s" % str(selected_entry.get("display_name", "RAVAGE"))
 
 
 func _paint_choice(button: Button, selected: bool) -> void:
@@ -371,6 +397,17 @@ func _place(control: Control, at: Vector2, dimensions: Vector2) -> void:
 
 
 func _on_start_pressed() -> void:
+	_store_match_settings()
+	MatchConfig.begin_race_loading()
+	get_tree().change_scene_to_file("res://scenes/LoadingScreen.tscn")
+
+
+func _on_garage_pressed() -> void:
+	_store_match_settings()
+	get_tree().change_scene_to_file("res://scenes/Garage.tscn")
+
+
+func _store_match_settings() -> void:
 	MatchConfig.mode = _selected_mode
 	MatchConfig.track_id = _selected_track
 	MatchConfig.ai_difficulty = _selected_ai_difficulty
@@ -378,5 +415,3 @@ func _on_start_pressed() -> void:
 		MatchConfig.lap_count = _lap_count
 	MatchConfig.crate_count = _crate_count
 	MatchConfig.missiles_per_crate = _missiles_per_crate
-	MatchConfig.begin_race_loading()
-	get_tree().change_scene_to_file("res://scenes/LoadingScreen.tscn")

@@ -115,6 +115,9 @@ var _ai_aim_target: Vehicle = null
 var _ai_aim_timer: float = 0.0
 var _traits_applied: bool = false
 var _ram_cooldowns: Dictionary = {}
+var _last_damage_source: WeakRef = null
+var _last_damage_source_msec: int = 0
+const DAMAGE_ATTRIBUTION_WINDOW_MSEC := 10000
 
 var race_path: Path3D = null
 var _path_length: float = 0.0
@@ -609,14 +612,28 @@ func try_fire() -> bool:
 	return true
 
 
-func take_damage(amount: float, _source: Node = null) -> void:
+func take_damage(amount: float, source: Node = null) -> void:
 	if not is_alive or match_over:
 		return
+	if source is Vehicle and source != self and (source as Vehicle).is_alive:
+		_last_damage_source = weakref(source)
+		_last_damage_source_msec = Time.get_ticks_msec()
 	health = maxf(0.0, health - amount)
 	health_changed.emit(health, max_health)
 	_update_hp_bar_visual()
 	if health <= 0.0:
 		_die()
+
+
+func get_last_damage_source() -> Vehicle:
+	if _last_damage_source == null:
+		return null
+	if Time.get_ticks_msec() - _last_damage_source_msec > DAMAGE_ATTRIBUTION_WINDOW_MSEC:
+		return null
+	var source := _last_damage_source.get_ref() as Vehicle
+	if not is_instance_valid(source) or source == self:
+		return null
+	return source
 
 
 func _die() -> void:

@@ -1,0 +1,33 @@
+{
+  "family_name": "Pulse Deathrace Display Proof",
+  "style_name": "Regular",
+  "version": "0.1.0-proof",
+  "copyright": "Copyright 2026 Pulse Deathrace. Original proof typeface.",
+  "units_per_em": 1000,
+  "metrics": {
+    "baseline": 0,
+    "cap_height": 720,
+    "ascender": 780,
+    "descender": -220,
+    "line_gap": 80,
+    "overshoot": 12,
+    "slant_degrees": 9,
+    "default_left_side_bearing": 48,
+    "default_right_side_bearing": 44,
+    "maximum_points_per_glyph": 320
+  },
+  "proof_characters": "ACDEHLMNOPRSTU0123456789",
+  "specimen_strings": [
+    "PULSE DEATHRACE",
+    "RACE COMPLETE",
+    "2ND PLACE",
+    "0123456789"
+  ],
+  "outputs": {
+    "directory": "assets/fonts/pulse_deathrace_display/generated",
+    "ttf": "PulseDeathraceDisplay-Proof.ttf",
+    "otf": "PulseDeathraceDisplay-Proof.otf",
+    "specimen": "PulseDeathraceDisplay-Proof-Specimen.png",
+    "godot_capture": "PulseDeathraceDisplay-Proof-Godot.png"
+  }
+}

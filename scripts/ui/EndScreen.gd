@@ -70,8 +70,28 @@ func show_results(data: Dictionary) -> void:
 	survivors_value.text = str(data.get("survivors", 0))
 
 	_populate_results(data.get("results", []) as Array)
+	_show_unlocks(data.get("newly_unlocked_vehicle_ids", []) as Array)
 	_fit_to_viewport()
 	_play_entrance()
+
+
+func _show_unlocks(unlocked_ids: Array) -> void:
+	if unlocked_ids.is_empty():
+		return
+	var names: Array[String] = []
+	for vehicle_id in unlocked_ids:
+		var entry := VehicleCatalog.get_vehicle(str(vehicle_id))
+		names.append(str(entry.get("display_name", vehicle_id)).to_upper())
+	var unlock_label := Label.new()
+	unlock_label.text = "VEHICLE UNLOCKED: %s" % ", ".join(names)
+	unlock_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	unlock_label.custom_minimum_size = Vector2(0.0, 30.0)
+	GameStyle.apply_display_label(unlock_label, GameStyle.SUCCESS, 17)
+	unlock_label.add_theme_constant_override("outline_size", 4)
+	unlock_label.add_theme_color_override("font_outline_color", GameStyle.INK)
+	var vbox := $DesignRoot/Card/Content/VBox as VBoxContainer
+	vbox.add_child(unlock_label)
+	vbox.move_child(unlock_label, 4)
 
 
 func _apply_styles() -> void:
@@ -82,7 +102,7 @@ func _apply_styles() -> void:
 	material.shader = shader
 	frame.material = material
 
-	GameStyle.apply_label(kicker_label, GameStyle.SETUP_CYAN, 19)
+	GameStyle.apply_display_label(kicker_label, GameStyle.SETUP_CYAN, 19)
 	kicker_label.add_theme_constant_override("outline_size", 4)
 	kicker_label.add_theme_color_override("font_outline_color", GameStyle.INK)
 	GameStyle.apply_title(title_label, GameStyle.ACCENT, 50)
@@ -96,10 +116,10 @@ func _apply_styles() -> void:
 		var tag := stat.get_child(0) as Label
 		var value := stat.get_child(1) as Label
 		GameStyle.apply_label(tag, GameStyle.TEXT_DIM, 11)
-		GameStyle.apply_label(value, GameStyle.ACCENT, 20)
+		GameStyle.apply_display_label(value, GameStyle.ACCENT, 20)
 
 	var order_title: Label = $DesignRoot/Card/Content/VBox/OrderTitle
-	GameStyle.apply_label(order_title, GameStyle.TEXT, 18)
+	GameStyle.apply_display_label(order_title, GameStyle.TEXT, 18)
 	order_title.add_theme_constant_override("outline_size", 3)
 	order_title.add_theme_color_override("font_outline_color", GameStyle.INK)
 	var column_header: HBoxContainer = $DesignRoot/Card/Content/VBox/ColumnHeader
@@ -123,7 +143,7 @@ func _populate_results(raw_results: Array) -> void:
 		empty.text = "NO CLASSIFIED FINISHERS"
 		empty.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		empty.custom_minimum_size = Vector2(0.0, 48.0)
-		GameStyle.apply_label(empty, GameStyle.TEXT_DIM, 14)
+		GameStyle.apply_display_label(empty, GameStyle.TEXT_DIM, 14)
 		results_list.add_child(empty)
 		return
 
@@ -163,7 +183,7 @@ func _add_result_row(result: Dictionary) -> void:
 	var place := Label.new()
 	place.custom_minimum_size = Vector2(86.0, 0.0)
 	place.text = "DNF" if status == "DNF" else _ordinal(int(result.get("place", 0)))
-	GameStyle.apply_label(place, accent, 15)
+	GameStyle.apply_display_label(place, accent, 15)
 	row.add_child(place)
 
 	var racer := Label.new()
@@ -182,7 +202,7 @@ func _add_result_row(result: Dictionary) -> void:
 			result_value.text = "EST."
 		_:
 			result_value.text = "DNF"
-	GameStyle.apply_label(result_value, accent, 15)
+	GameStyle.apply_display_label(result_value, accent, 15)
 	row.add_child(result_value)
 
 

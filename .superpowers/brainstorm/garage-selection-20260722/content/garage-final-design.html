@@ -1,0 +1,49 @@
+<style>
+  .garage-design { color:#ece7dc; background:#070c10; padding:30px; font-family:system-ui,sans-serif; }
+  .garage-design h1 { color:#f0b51b; margin:0 0 8px; }
+  .garage-design h2 { color:#20d4df; margin:22px 0 8px; }
+  .bay { position:relative; min-height:360px; border:2px solid #8541c8; background:
+    radial-gradient(circle at 50% 55%,#26323a 0,#10171c 35%,#070b0e 72%);
+    overflow:hidden; padding:20px; }
+  .center { width:42%; min-height:190px; margin:65px auto 0; border:2px solid #f0b51b;
+    display:flex; align-items:center; justify-content:center; color:#f0b51b; font-size:24px;
+    transform:perspective(500px) rotateX(3deg); background:#111a20; }
+  .stall { position:absolute; width:19%; min-height:115px; top:105px; border:1px solid #53616a;
+    display:flex; align-items:center; justify-content:center; background:#0d1418; color:#c6ccd0; }
+  .stall.left1 { left:2%; } .stall.left2 { left:23%; top:20px; }
+  .stall.right1 { right:2%; } .stall.right2 { right:23%; top:20px; }
+  .locked { opacity:.62; }
+  .info { display:grid; grid-template-columns:1.3fr 1fr; gap:16px; margin-top:16px; }
+  .panel { border:1px solid #42505a; background:#0d1418; padding:16px; }
+  .button { display:inline-block; background:#e5a711; color:#0c0c0c; font-weight:800;
+    padding:13px 30px; transform:skew(-5deg); margin-top:10px; }
+  .tag { color:#c147ff; font-weight:700; }
+</style>
+<div class="garage-design">
+  <h1>HYBRID COMBAT GARAGE</h1>
+  <p>All vehicles remain visible in live 3D. The selected vehicle moves into the central inspection bay.</p>
+  <div class="bay">
+    <div class="stall left1">BULLDOZE<br><span class="locked">LOCKED 8 / 20</span></div>
+    <div class="stall left2">VENOM<br><span class="locked">LOCKED 12 / 20</span></div>
+    <div class="stall right2">WRAITH<br><span class="locked">LOCKED 31 / 50</span></div>
+    <div class="stall right1">FUTURE VEHICLE</div>
+    <div class="center">RAVAGE — LIVE 3D INSPECTION</div>
+  </div>
+  <div class="info">
+    <div class="panel">
+      <h2>RAVAGE</h2>
+      <p class="tag">ARMORED SURVIVOR</p>
+      <p>15% additional maximum health.</p>
+      <p>Manual mouse/controller rotation only.</p>
+      <span class="button">SELECT VEHICLE</span>
+    </div>
+    <div class="panel">
+      <h2>GARAGE RULES</h2>
+      <p>Ravage starts unlocked.</p>
+      <p>Progress commits only when a race completes.</p>
+      <p>Locked cars remain fully inspectable.</p>
+      <p>AI fills the three vehicles not selected by the player.</p>
+      <p>Selection persists between sessions.</p>
+    </div>
+  </div>
+</div>

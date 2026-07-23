@@ -1,0 +1,128 @@
+{
+  "ttf": {
+    "glyphs": 28,
+    "mapped_characters": 25,
+    "nonempty_glyphs": 25,
+    "maximum_points": 76,
+    "specimen_sequences": {
+      "PULSE DEATHRACE": [
+        "P",
+        "U",
+        "L",
+        "S",
+        "E",
+        "space",
+        "D",
+        "E",
+        "A",
+        "T",
+        "H",
+        "R",
+        "A",
+        "C",
+        "E"
+      ],
+      "RACE COMPLETE": [
+        "R",
+        "A",
+        "C",
+        "E",
+        "space",
+        "C",
+        "O",
+        "M",
+        "P",
+        "L",
+        "E",
+        "T",
+        "E"
+      ],
+      "2ND PLACE": [
+        "two",
+        "N",
+        "D",
+        "space",
+        "P",
+        "L",
+        "A",
+        "C",
+        "E"
+      ],
+      "0123456789": [
+        "zero",
+        "one",
+        "two",
+        "three",
+        "four",
+        "five",
+        "six",
+        "seven",
+        "eight",
+        "nine"
+      ]
+    }
+  },
+  "otf": {
+    "glyphs": 28,
+    "mapped_characters": 25,
+    "nonempty_glyphs": 25,
+    "maximum_points": 0,
+    "specimen_sequences": {
+      "PULSE DEATHRACE": [
+        "P",
+        "U",
+        "L",
+        "S",
+        "E",
+        "space",
+        "D",
+        "E",
+        "A",
+        "T",
+        "H",
+        "R",
+        "A",
+        "C",
+        "E"
+      ],
+      "RACE COMPLETE": [
+        "R",
+        "A",
+        "C",
+        "E",
+        "space",
+        "C",
+        "O",
+        "M",
+        "P",
+        "L",
+        "E",
+        "T",
+        "E"
+      ],
+      "2ND PLACE": [
+        "two",
+        "N",
+        "D",
+        "space",
+        "P",
+        "L",
+        "A",
+        "C",
+        "E"
+      ],
+      "0123456789": [
+        "zero",
+        "one",
+        "two",
+        "three",
+        "four",
+        "five",
+        "six",
+        "seven",
+        "eight",
+        "nine"
+      ]
+    }
+  }
+}
