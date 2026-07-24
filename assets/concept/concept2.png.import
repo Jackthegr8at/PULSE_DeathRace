@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://453tu40fcca0"
-path="res://.godot/imported/figure8_playfield_painted.png-d35540c32a6829ed34c58c1e54b7b04c.ctex"
+uid="uid://c8l44f51we628"
+path="res://.godot/imported/concept2.png-68b304661724fe80a7dc23047e9b9669.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/concept/figure8_playfield_painted.png"
-dest_files=["res://.godot/imported/figure8_playfield_painted.png-d35540c32a6829ed34c58c1e54b7b04c.ctex"]
+source_file="res://assets/concept/concept2.png"
+dest_files=["res://.godot/imported/concept2.png-68b304661724fe80a7dc23047e9b9669.ctex"]
 
 [params]
 

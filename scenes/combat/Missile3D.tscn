@@ -22,6 +22,7 @@ shape = SubResource("SphereShape3D_hit")
 
 [node name="Glow" type="OmniLight3D" parent="." unique_id=669463078]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.006376514, 0.017230317, 0.5489982)
-light_color = Color(1, 0.7, 0.25, 1)
-light_specular = 1.5
-omni_range = 3.0
+light_color = Color(1, 0.18, 0.78, 1)
+light_energy = 1.4
+light_specular = 1.2
+omni_range = 3.2
