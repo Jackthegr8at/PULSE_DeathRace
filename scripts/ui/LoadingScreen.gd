@@ -194,7 +194,18 @@ func _build_screen() -> void:
 	panel.set_anchors_preset(Control.PRESET_CENTER)
 	panel.position = Vector2(-355, -92)
 	panel.size = Vector2(710, 245)
-	panel.add_theme_stylebox_override("panel", _panel_style())
+	var panel_style := StyleBoxFlat.new()
+	panel_style.bg_color = Color(0.03, 0.04, 0.055, 0.9)
+	panel_style.border_color = Color(0.15, 0.72, 0.78, 0.75)
+	panel_style.set_border_width_all(2)
+	panel_style.set_corner_radius_all(8)
+	panel_style.content_margin_left = 28
+	panel_style.content_margin_right = 28
+	panel_style.content_margin_top = 22
+	panel_style.content_margin_bottom = 20
+	panel_style.shadow_color = Color(0, 0, 0, 0.55)
+	panel_style.shadow_size = 12
+	panel.add_theme_stylebox_override("panel", panel_style)
 	add_child(panel)
 
 	var content := VBoxContainer.new()
@@ -238,8 +249,7 @@ func _build_screen() -> void:
 func _display_label(text_value: String, font_size: int, color: Color) -> Label:
 	var label := Label.new()
 	label.text = text_value
-	label.add_theme_font_size_override("font_size", font_size)
-	label.add_theme_color_override("font_color", color)
+	GameStyle.apply_display_label(label, color, font_size)
 	label.add_theme_color_override("font_outline_color", Color("020405"))
 	label.add_theme_constant_override("outline_size", 5)
 	return label
@@ -248,24 +258,10 @@ func _display_label(text_value: String, font_size: int, color: Color) -> Label:
 func _body_label(text_value: String, font_size: int, color: Color) -> Label:
 	var label := Label.new()
 	label.text = text_value
-	label.add_theme_font_size_override("font_size", font_size)
-	label.add_theme_color_override("font_color", color)
+	GameStyle.apply_label(label, color, font_size)
 	label.add_theme_color_override("font_outline_color", Color("020405"))
 	label.add_theme_constant_override("outline_size", 3)
 	return label
-
-
-func _panel_style() -> StyleBoxFlat:
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.01, 0.025, 0.032, 0.94)
-	style.border_color = Color(0.18, 0.78, 0.83, 0.8)
-	style.set_border_width_all(3)
-	style.set_corner_radius_all(9)
-	style.content_margin_left = 26
-	style.content_margin_right = 26
-	style.content_margin_top = 20
-	style.content_margin_bottom = 18
-	return style
 
 
 func _bar_style(background_color: Color, border_color: Color) -> StyleBoxFlat:

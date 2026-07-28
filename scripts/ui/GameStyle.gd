@@ -3,6 +3,13 @@ extends RefCounted
 ## Vibrant painterly toon UI (BotW-style color, Borderlands comic ink).
 ## Thick black outlines, saturated colors, chunky hand-painted feel.
 
+## Typography system:
+## - Teko: condensed display type for titles, buttons, race values and callouts.
+## - Barlow: readable UI type for descriptions, instructions and small labels.
+const DISPLAY_FONT: FontFile = preload("res://assets/fonts/Teko-Variable.ttf")
+const BODY_FONT: FontFile = preload("res://assets/fonts/Barlow-Medium.ttf")
+const BODY_BOLD_FONT: FontFile = preload("res://assets/fonts/Barlow-Bold.ttf")
+
 const BG := Color("2e5a30")
 const BG_DEEP := Color("1a2c1c")
 const SURFACE := Color(0.13, 0.17, 0.12, 0.95)
@@ -210,6 +217,12 @@ static func setup_start_styles() -> Dictionary:
 	return {"normal": normal, "hover": hover, "pressed": pressed}
 
 
+## Shared painted metal box textures (prefer UiBox for full frames).
+const UI_DATA_BOX: Texture2D = preload("res://assets/ui/hud/datas_box.png")
+const UI_STARTUP_BOX: Texture2D = preload("res://assets/ui/hud/startup_box.png")
+const UI_MISSILE_BOX: Texture2D = preload("res://assets/ui/hud/missiles-box.png")
+
+
 static func progress_bg() -> StyleBoxFlat:
 	var s := StyleBoxFlat.new()
 	s.bg_color = Color(0.08, 0.1, 0.07, 0.9)
@@ -236,21 +249,30 @@ static func apply_button(btn: Button, styles: Dictionary, font_color: Color = TE
 	btn.add_theme_color_override("font_hover_color", font_color.lightened(0.08))
 	btn.add_theme_color_override("font_pressed_color", font_color.darkened(0.1))
 	btn.add_theme_color_override("font_disabled_color", TEXT_DIM)
+	btn.add_theme_font_override("font", DISPLAY_FONT)
 
 
 static func apply_label(label: Label, color: Color = TEXT, size: int = 14) -> void:
+	label.add_theme_font_override("font", BODY_FONT)
+	label.add_theme_color_override("font_color", color)
+	label.add_theme_font_size_override("font_size", size)
+
+
+static func apply_bold_label(label: Label, color: Color = TEXT, size: int = 14) -> void:
+	label.add_theme_font_override("font", BODY_BOLD_FONT)
 	label.add_theme_color_override("font_color", color)
 	label.add_theme_font_size_override("font_size", size)
 
 
 static func apply_display_label(label: Label, color: Color = TEXT, size: int = 18) -> void:
-	## Display treatment without forcing a project-wide custom font.
-	apply_label(label, color, size)
+	label.add_theme_font_override("font", DISPLAY_FONT)
+	label.add_theme_color_override("font_color", color)
+	label.add_theme_font_size_override("font_size", size)
 
 
 static func apply_title(label: Label, color: Color = ACCENT, size: int = 32) -> void:
 	## Comic title: vibrant fill + thick black ink outline.
-	apply_label(label, color, size)
+	apply_display_label(label, color, size)
 	label.add_theme_color_override("font_outline_color", INK)
 	label.add_theme_constant_override("outline_size", maxi(int(size * 0.22), 4))
 

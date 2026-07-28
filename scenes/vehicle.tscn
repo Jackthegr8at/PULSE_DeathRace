@@ -113,7 +113,7 @@ contact_monitor = true
 max_contacts_reported = 2
 linear_damp = 0.1
 angular_damp_mode = 1
-angular_damp = 4.0
+angular_damp = 5.5
 
 [node name="CollisionShape" type="CollisionShape3D" parent="Sphere" unique_id=503279956]
 shape = SubResource("SphereShape3D_hhncp")

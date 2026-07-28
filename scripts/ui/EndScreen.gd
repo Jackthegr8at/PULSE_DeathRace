@@ -115,7 +115,7 @@ func _apply_styles() -> void:
 			continue
 		var tag := stat.get_child(0) as Label
 		var value := stat.get_child(1) as Label
-		GameStyle.apply_label(tag, GameStyle.TEXT_DIM, 11)
+		GameStyle.apply_bold_label(tag, GameStyle.TEXT_DIM, 11)
 		GameStyle.apply_display_label(value, GameStyle.ACCENT, 20)
 
 	var order_title: Label = $DesignRoot/Card/Content/VBox/OrderTitle
@@ -126,7 +126,7 @@ func _apply_styles() -> void:
 	for header_node in column_header.get_children():
 		var header := header_node as Label
 		if header:
-			GameStyle.apply_label(header, GameStyle.TEXT_DIM, 11)
+			GameStyle.apply_bold_label(header, GameStyle.TEXT_DIM, 11)
 
 	GameStyle.apply_button(rematch_button, GameStyle.setup_start_styles(), GameStyle.INK)
 	GameStyle.apply_button(setup_button, GameStyle.button_ghost())
@@ -164,14 +164,15 @@ func _add_result_row(result: Dictionary) -> void:
 		accent = GameStyle.DANGER
 
 	var row_panel := PanelContainer.new()
-	row_panel.custom_minimum_size = Vector2(0.0, 43.0)
+	row_panel.custom_minimum_size = Vector2(0.0, 42.0)
+	row_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var row_style := StyleBoxFlat.new()
-	row_style.bg_color = Color(accent.r, accent.g, accent.b, 0.14 if is_player else 0.06)
+	row_style.bg_color = Color(accent.r, accent.g, accent.b, 0.16 if is_player else 0.07)
 	row_style.border_color = accent
 	row_style.border_width_left = 4
 	row_style.set_corner_radius_all(4)
-	row_style.content_margin_left = 13
-	row_style.content_margin_right = 13
+	row_style.content_margin_left = 14
+	row_style.content_margin_right = 14
 	row_style.content_margin_top = 7
 	row_style.content_margin_bottom = 7
 	row_panel.add_theme_stylebox_override("panel", row_style)

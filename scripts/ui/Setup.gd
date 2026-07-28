@@ -53,12 +53,7 @@ func _ready() -> void:
 
 
 func _create_font() -> void:
-	var system_font := SystemFont.new()
-	system_font.font_names = PackedStringArray(
-		["Impact", "Bahnschrift Condensed", "Arial Narrow", "Arial"]
-	)
-	system_font.font_weight = 700
-	_display_font = system_font
+	_display_font = GameStyle.DISPLAY_FONT
 
 
 func _build_screen() -> void:

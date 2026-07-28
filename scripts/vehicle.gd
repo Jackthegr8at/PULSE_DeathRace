@@ -98,6 +98,20 @@ var _thruster_color_hot: Color = Color("a8f7ff")
 @export var modular_chassis_max_drop: float = 0.12
 @export var modular_suspension_smoothing: float = 16.0
 
+@export_group("Handling")
+## Peak yaw rate multiplier (was hard-coded 4 — caused wall-to-wall zig-zag).
+@export var steer_sensitivity: float = 1.85
+## How fast keyboard/gamepad steer eases in toward full lock.
+@export var steer_input_rise: float = 3.2
+## How fast steer returns to center when released.
+@export var steer_input_fall: float = 5.5
+## How quickly angular_speed tracks the desired rate.
+@export var steer_response: float = 2.4
+## At full speed, turn power is scaled by this (arcade: less snap at high speed).
+@export var high_speed_steer_factor: float = 0.38
+## At crawl, turn power scale (still turn, but not spin-on-spot).
+@export var low_speed_steer_factor: float = 0.85
+
 @export_group("Combat")
 @export var max_health: float = 100.0
 @export var fire_cooldown: float = 0.85
@@ -111,7 +125,7 @@ var _thruster_color_hot: Color = Color("a8f7ff")
 @export var path_look_ahead: float = 5.5
 @export var ai_throttle: float = 0.78
 @export var ai_corner_throttle: float = 0.48
-@export var ai_steer_gain: float = 2.1
+@export var ai_steer_gain: float = 1.55
 @export var detect_range: float = 22.0
 ## Must be this aligned with target to actually fire (missile still goes straight forward).
 @export var fire_dot_min: float = 0.93
@@ -156,6 +170,8 @@ var colliding: bool
 var linear_velocity: Vector3
 var prev_position: Vector3
 var calculated_lean: float
+## Smoothed steer (-1..1); raw input.x is filtered to kill keyboard snap oversteer.
+var _steer_smoothed: float = 0.0
 
 
 func get_vehicle_position() -> Vector3:
@@ -573,15 +589,7 @@ func _physics_process(delta: float) -> void:
 		_ai_combat(delta)
 		_ai_drive(delta)
 
-	var direction = sign(linear_speed)
-	if direction == 0:
-		direction = sign(input.z) if abs(input.z) > 0.1 else 1
-
-	var steering_grip = clamp(abs(linear_speed), 0.2, 1.0)
-	var target_angular = -input.x * steering_grip * 4 * direction
-	angular_speed = lerp(angular_speed, target_angular, delta * 4)
-	if vehicle_model:
-		vehicle_model.rotate_y(angular_speed * delta)
+	_update_steering(delta)
 
 	if raycast and raycast.is_colliding():
 		if not colliding:
@@ -599,12 +607,13 @@ func _physics_process(delta: float) -> void:
 	if target_speed > 0.0:
 		target_speed *= forward_speed_multiplier
 	if target_speed < 0 and linear_speed > 0.01:
-		linear_speed = lerp(linear_speed, 0.0, delta * 8)
+		linear_speed = lerpf(linear_speed, 0.0, clampf(delta * 8.0, 0.0, 1.0))
 	else:
 		if target_speed < 0:
-			linear_speed = lerp(linear_speed, target_speed / 2, delta * 2)
+			linear_speed = lerpf(linear_speed, target_speed / 2.0, clampf(delta * 2.0, 0.0, 1.0))
 		else:
-			linear_speed = lerp(linear_speed, target_speed, delta * 6)
+			# Slightly slower throttle ramp = less sudden wall hits while correcting
+			linear_speed = lerpf(linear_speed, target_speed, clampf(delta * 4.5, 0.0, 1.0))
 
 	if sphere and vehicle_model:
 		acceleration = lerpf(acceleration, linear_speed + (abs(sphere.angular_velocity.length() * linear_speed) / 100), delta * 1)
@@ -615,7 +624,8 @@ func _physics_process(delta: float) -> void:
 		raycast.position = sphere.position
 		linear_velocity = (vehicle_model.position - prev_position) / maxf(delta, 0.0001)
 		prev_position = vehicle_model.position
-		sphere.angular_velocity += vehicle_model.get_global_transform().basis.x * (linear_speed * 100) * delta
+		# Slightly less aggressive sphere spin coupling (was * 100)
+		sphere.angular_velocity += vehicle_model.get_global_transform().basis.x * (linear_speed * 72.0) * delta
 
 	effect_engine(delta)
 	effect_body(delta)
@@ -625,6 +635,35 @@ func _physics_process(delta: float) -> void:
 	effect_thruster(delta)
 	_update_lap_progress()
 	_billboard_hp_bar()
+
+
+func _update_steering(delta: float) -> void:
+	## Smooth steer so keyboard left/right doesn't slam full lock and ping-pong walls.
+	var raw_steer := clampf(input.x, -1.0, 1.0)
+	# Rise slower than fall so small corrections don't overshoot; release snaps back cleanly.
+	var rate := steer_input_rise
+	if absf(raw_steer) < absf(_steer_smoothed) or signf(raw_steer) != signf(_steer_smoothed) and absf(raw_steer) < 0.01:
+		rate = steer_input_fall
+	elif signf(raw_steer) != signf(_steer_smoothed) and absf(_steer_smoothed) > 0.05:
+		# Changing direction: ease through center first
+		rate = (steer_input_rise + steer_input_fall) * 0.55
+	_steer_smoothed = move_toward(_steer_smoothed, raw_steer, rate * delta)
+
+	var direction := signf(linear_speed)
+	if direction == 0.0:
+		direction = signf(input.z) if absf(input.z) > 0.1 else 1.0
+
+	var speed_n := clampf(absf(linear_speed), 0.0, 1.0)
+	# Low speed: moderate turn. High speed: much less yaw (stops zig-zag).
+	var speed_steer := lerpf(low_speed_steer_factor, high_speed_steer_factor, speed_n * speed_n)
+	# Barely moving + no throttle: don't pirouette on the spot
+	if speed_n < 0.06 and absf(input.z) < 0.12:
+		speed_steer *= 0.45
+
+	var target_angular := -_steer_smoothed * speed_steer * steer_sensitivity * direction
+	angular_speed = lerpf(angular_speed, target_angular, clampf(delta * steer_response, 0.0, 1.0))
+	if vehicle_model:
+		vehicle_model.rotate_y(angular_speed * delta)
 
 
 func handle_input(_delta: float) -> void:
@@ -975,11 +1014,16 @@ func get_lap_progress_ratio() -> float:
 
 
 func effect_body(delta: float) -> void:
-	calculated_lean = lerp_angle(calculated_lean, -input.x / 5.0 * linear_speed * body_lean_strength, delta * 5)
+	# Use smoothed steer so visual lean matches actual turn, not keyboard snaps
+	calculated_lean = lerp_angle(
+		calculated_lean,
+		-_steer_smoothed / 5.5 * linear_speed * body_lean_strength,
+		delta * 4.0
+	)
 	if vehicle_body == null:
 		return
 	# Pitch under accel/brake + roll in turns (chassis or monomesh)
-	var pitch := clampf(-(linear_speed - acceleration) / 6.0, -0.35, 0.35) * body_lean_strength
+	var pitch := clampf(-(linear_speed - acceleration) / 6.0, -0.28, 0.28) * body_lean_strength
 	# Optional light monomesh road noise (keep low until wheels are separate)
 	if not _has_separate_wheels and monomesh_motion > 0.0:
 		var t := Time.get_ticks_msec() * 0.001
@@ -1075,10 +1119,11 @@ func effect_wheels(delta: float) -> void:
 	for wheel in [wheel_fl, wheel_fr, wheel_bl, wheel_br]:
 		if wheel != null:
 			wheel.rotation.x = _wheel_spin
+	var wheel_yaw := -_steer_smoothed / 2.2
 	if wheel_fl != null:
-		wheel_fl.rotation.y = lerp_angle(wheel_fl.rotation.y, -input.x / 1.5, delta * 10)
+		wheel_fl.rotation.y = lerp_angle(wheel_fl.rotation.y, wheel_yaw, delta * 8.0)
 	if wheel_fr != null:
-		wheel_fr.rotation.y = lerp_angle(wheel_fr.rotation.y, -input.x / 1.5, delta * 10)
+		wheel_fr.rotation.y = lerp_angle(wheel_fr.rotation.y, wheel_yaw, delta * 8.0)
 
 
 func effect_engine(delta: float) -> void:
