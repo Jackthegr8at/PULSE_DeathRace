@@ -122,11 +122,12 @@ func _build_ui() -> void:
 	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	background_layer.add_child(background)
 
-	var atmosphere := ColorRect.new()
-	atmosphere.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	atmosphere.color = Color(0.025, 0.012, 0.025, 0.16)
-	atmosphere.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	background_layer.add_child(atmosphere)
+	# Keep the hangar photo readable: light vignette only at edges, not a grey wash.
+	var vignette := ColorRect.new()
+	vignette.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	vignette.color = Color(0.02, 0.01, 0.03, 0.12)
+	vignette.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	background_layer.add_child(vignette)
 
 	var layer := CanvasLayer.new()
 	layer.layer = 10
@@ -136,102 +137,199 @@ func _build_ui() -> void:
 	_canvas.custom_minimum_size = DESIGN_SIZE
 	layer.add_child(_canvas)
 
+	# --- Top banner ---
 	var top := PanelContainer.new()
-	top.position = Vector2(20, 12)
-	top.size = Vector2(1240, 48)
-	top.add_theme_stylebox_override(
-		"panel",
-		_garage_panel(Color(0.008, 0.01, 0.012, 0.70), Color("5b6265"), 2)
-	)
+	top.position = Vector2(24, 16)
+	top.size = Vector2(1232, 64)
+	top.add_theme_stylebox_override("panel", _metal_panel(Color(0.04, 0.05, 0.07, 0.88), MAGENTA, 3, true))
 	_canvas.add_child(top)
+	var top_margin := MarginContainer.new()
+	top_margin.add_theme_constant_override("margin_left", 18)
+	top_margin.add_theme_constant_override("margin_right", 18)
+	top_margin.add_theme_constant_override("margin_top", 8)
+	top_margin.add_theme_constant_override("margin_bottom", 8)
+	top.add_child(top_margin)
 	var top_row := HBoxContainer.new()
-	top_row.add_theme_constant_override("separation", 24)
-	top.add_child(top_row)
-	var heading := _label("PULSE GARAGE", 30, Color("f6efe2"))
-	heading.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	top_row.add_child(heading)
-	var hint := _label("DRAG OR USE LEFT / RIGHT TO INSPECT", 14, CYAN)
-	hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	top_row.add_child(hint)
+	top_row.add_theme_constant_override("separation", 16)
+	top_margin.add_child(top_row)
 
+	var brand_col := VBoxContainer.new()
+	brand_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	brand_col.add_theme_constant_override("separation", -2)
+	top_row.add_child(brand_col)
+	var kicker := _label("PULSE  ·  VEHICLE BAY", 12, CYAN)
+	brand_col.add_child(kicker)
+	var heading := _label("GARAGE", 34, Color("faf5e6"))
+	brand_col.add_child(heading)
+
+	var hint_chip := PanelContainer.new()
+	hint_chip.add_theme_stylebox_override(
+		"panel",
+		_chip_panel(Color(0.0, 0.12, 0.14, 0.75), CYAN)
+	)
+	top_row.add_child(hint_chip)
+	var hint_margin := MarginContainer.new()
+	hint_margin.add_theme_constant_override("margin_left", 14)
+	hint_margin.add_theme_constant_override("margin_right", 14)
+	hint_margin.add_theme_constant_override("margin_top", 8)
+	hint_margin.add_theme_constant_override("margin_bottom", 8)
+	hint_chip.add_child(hint_margin)
+	var hint := _label("DRAG  ·  ← →  INSPECT", 13, CYAN)
+	hint.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	hint_margin.add_child(hint)
+
+	# --- Vehicle roster cards ---
 	var roster := HBoxContainer.new()
-	roster.position = Vector2(20, 68)
-	roster.size = Vector2(1240, 48)
-	roster.add_theme_constant_override("separation", 12)
+	roster.position = Vector2(24, 92)
+	roster.size = Vector2(1232, 78)
+	roster.add_theme_constant_override("separation", 14)
 	_canvas.add_child(roster)
 	for vehicle_id in VehicleCatalog.get_all_ids():
 		var entry := VehicleCatalog.get_vehicle(vehicle_id)
-		var button := Button.new()
-		button.text = str(entry.get("display_name", vehicle_id))
-		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		button.focus_mode = Control.FOCUS_NONE
-		button.add_theme_font_override("font", _display_font)
-		button.add_theme_constant_override("outline_size", 5)
-		button.add_theme_color_override("font_outline_color", Color("050506"))
-		_apply_garage_button(button, MAGENTA, false)
-		button.add_theme_font_size_override("font_size", 19)
-		button.pressed.connect(_browse_vehicle.bind(vehicle_id))
-		roster.add_child(button)
-		_vehicle_buttons[vehicle_id] = button
+		var accent: Color = entry.get("minimap_color", MAGENTA) as Color
+		var card := Button.new()
+		card.focus_mode = Control.FOCUS_NONE
+		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		card.custom_minimum_size = Vector2(0, 78)
+		card.clip_text = false
+		card.alignment = HORIZONTAL_ALIGNMENT_LEFT
+		card.text = ""
+		card.pressed.connect(_browse_vehicle.bind(vehicle_id))
+		roster.add_child(card)
 
+		# Content overlaid on the styled button
+		var card_margin := MarginContainer.new()
+		card_margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		card_margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card_margin.add_theme_constant_override("margin_left", 14)
+		card_margin.add_theme_constant_override("margin_right", 12)
+		card_margin.add_theme_constant_override("margin_top", 10)
+		card_margin.add_theme_constant_override("margin_bottom", 10)
+		card.add_child(card_margin)
+		var card_row := HBoxContainer.new()
+		card_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card_row.add_theme_constant_override("separation", 12)
+		card_margin.add_child(card_row)
+		var accent_bar := ColorRect.new()
+		accent_bar.custom_minimum_size = Vector2(5, 0)
+		accent_bar.color = accent
+		accent_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card_row.add_child(accent_bar)
+		var card_copy := VBoxContainer.new()
+		card_copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		card_copy.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card_copy.add_theme_constant_override("separation", 0)
+		card_row.add_child(card_copy)
+		var name_l := _label(str(entry.get("display_name", vehicle_id)).to_upper(), 20, Color("faf5e6"))
+		name_l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card_copy.add_child(name_l)
+		var role_l := _label(str(entry.get("role", "")).to_upper(), 11, accent.lightened(0.15))
+		role_l.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		card_copy.add_child(role_l)
+
+		_vehicle_buttons[vehicle_id] = {
+			"button": card,
+			"accent": accent,
+			"name_label": name_l,
+			"role_label": role_l,
+		}
+		_apply_roster_card(card, accent, false)
+
+	# --- Bottom dossier ---
 	var info := PanelContainer.new()
-	info.position = Vector2(20, 568)
-	info.size = Vector2(1240, 132)
-	info.add_theme_stylebox_override(
-		"panel",
-		_garage_panel(Color(0.004, 0.007, 0.009, 0.70), Color("50575a"), 2)
-	)
+	info.position = Vector2(24, 548)
+	info.size = Vector2(1232, 152)
+	info.add_theme_stylebox_override("panel", _metal_panel(Color(0.03, 0.04, 0.055, 0.9), Color("2a3238"), 2, true))
 	_canvas.add_child(info)
+	var info_margin := MarginContainer.new()
+	info_margin.add_theme_constant_override("margin_left", 20)
+	info_margin.add_theme_constant_override("margin_right", 18)
+	info_margin.add_theme_constant_override("margin_top", 14)
+	info_margin.add_theme_constant_override("margin_bottom", 14)
+	info.add_child(info_margin)
 	var info_row := HBoxContainer.new()
-	info_row.add_theme_constant_override("separation", 30)
-	info.add_child(info_row)
+	info_row.add_theme_constant_override("separation", 28)
+	info_margin.add_child(info_row)
 
 	var copy := VBoxContainer.new()
 	copy.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	copy.add_theme_constant_override("separation", 1)
+	copy.add_theme_constant_override("separation", 4)
 	info_row.add_child(copy)
-	_title = _label("RAVAGE", 28, MAGENTA)
-	copy.add_child(_title)
-	_role = _label("ARMORED SURVIVOR", 14, CYAN)
-	copy.add_child(_role)
-	_ability_title = _label("REINFORCED HULL", 15, Color("f5eee3"))
-	copy.add_child(_ability_title)
-	_ability_description = _body_label("", 14, Color("c7c5c1"))
+
+	var title_row := HBoxContainer.new()
+	title_row.add_theme_constant_override("separation", 14)
+	copy.add_child(title_row)
+	_title = _label("RAVAGE", 30, MAGENTA)
+	title_row.add_child(_title)
+	var role_chip := PanelContainer.new()
+	role_chip.add_theme_stylebox_override(
+		"panel",
+		_chip_panel(Color(0.08, 0.1, 0.12, 0.9), Color("4a545c"))
+	)
+	title_row.add_child(role_chip)
+	var role_m := MarginContainer.new()
+	role_m.add_theme_constant_override("margin_left", 10)
+	role_m.add_theme_constant_override("margin_right", 10)
+	role_m.add_theme_constant_override("margin_top", 4)
+	role_m.add_theme_constant_override("margin_bottom", 4)
+	role_chip.add_child(role_m)
+	_role = _label("ARMORED SURVIVOR", 12, CYAN)
+	role_m.add_child(_role)
+
+	var ability_block := VBoxContainer.new()
+	ability_block.add_theme_constant_override("separation", 2)
+	copy.add_child(ability_block)
+	var ability_kicker := _label("SPECIAL ABILITY", 10, Color("8a949c"))
+	ability_block.add_child(ability_kicker)
+	_ability_title = _label("REINFORCED HULL", 16, Color("f5eee3"))
+	ability_block.add_child(_ability_title)
+	_ability_description = _body_label("", 14, Color("c2c8cc"))
 	_ability_description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	copy.add_child(_ability_description)
+	ability_block.add_child(_ability_description)
 
 	var action_column := VBoxContainer.new()
-	action_column.custom_minimum_size.x = 330
-	action_column.add_theme_constant_override("separation", 3)
+	action_column.custom_minimum_size.x = 340
+	action_column.add_theme_constant_override("separation", 8)
 	info_row.add_child(action_column)
-	_status = _label("", 14, PURPLE)
+
+	_status = _label("", 13, Color("d0d6da"))
 	_status.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	action_column.add_child(_status)
+
 	_progress = ProgressBar.new()
-	_progress.custom_minimum_size = Vector2(330, 8)
+	_progress.custom_minimum_size = Vector2(340, 12)
 	_progress.show_percentage = false
-	_progress.add_theme_stylebox_override("background", _garage_panel(Color("111416"), Color("3d4142"), 1))
-	_progress.add_theme_stylebox_override("fill", _garage_panel(PURPLE, PURPLE, 0))
+	_progress.add_theme_stylebox_override(
+		"background",
+		_progress_track()
+	)
+	_progress.add_theme_stylebox_override("fill", _progress_fill(PURPLE))
 	action_column.add_child(_progress)
+
 	_select_button = Button.new()
 	_select_button.text = "SELECT VEHICLE"
-	_select_button.custom_minimum_size = Vector2(330, 36)
-	_apply_garage_button(_select_button, MAGENTA, true)
+	_select_button.custom_minimum_size = Vector2(340, 44)
+	_select_button.focus_mode = Control.FOCUS_NONE
+	_apply_primary_button(_select_button, MAGENTA, true)
 	_select_button.pressed.connect(_confirm_selection)
 	action_column.add_child(_select_button)
+
 	var back := Button.new()
 	back.text = "BACK TO SETUP"
-	back.custom_minimum_size = Vector2(330, 32)
-	_apply_garage_button(back, Color("969c9e"), false)
+	back.custom_minimum_size = Vector2(340, 36)
+	back.focus_mode = Control.FOCUS_NONE
+	_apply_secondary_button(back)
 	back.pressed.connect(func() -> void: get_tree().change_scene_to_file(SETUP_SCENE))
 	action_column.add_child(back)
 
 	if OS.is_debug_build():
 		var unlock_all := Button.new()
 		unlock_all.text = "DEBUG: UNLOCK ALL"
-		unlock_all.position = Vector2(1040, 124)
-		unlock_all.size = Vector2(220, 34)
-		_apply_garage_button(unlock_all, CYAN, false)
+		unlock_all.position = Vector2(1020, 186)
+		unlock_all.size = Vector2(236, 36)
+		unlock_all.focus_mode = Control.FOCUS_NONE
+		_apply_secondary_button(unlock_all)
+		unlock_all.add_theme_color_override("font_color", CYAN)
 		unlock_all.pressed.connect(_debug_unlock_all)
 		_canvas.add_child(unlock_all)
 
@@ -338,8 +436,11 @@ func _browse_vehicle(vehicle_id: String) -> void:
 
 func _refresh_selection() -> void:
 	var entry := VehicleCatalog.get_vehicle(_browsed_id)
+	var accent: Color = entry.get("minimap_color", MAGENTA) as Color
 	_title.text = str(entry.get("display_name", _browsed_id)).to_upper()
+	_title.add_theme_color_override("font_color", accent)
 	_role.text = str(entry.get("role", "")).to_upper()
+	_role.add_theme_color_override("font_color", accent.lightened(0.2))
 	_ability_title.text = str(entry.get("ability_title", "")).to_upper()
 	_ability_description.text = str(entry.get("ability_description", ""))
 	var unlocked := GarageProfile.is_vehicle_unlocked(_browsed_id)
@@ -349,21 +450,36 @@ func _refresh_selection() -> void:
 	_progress.max_value = maxf(float(target), 1.0)
 	_progress.value = float(target if unlocked else mini(current, target))
 	_progress.visible = not unlocked
+	_progress.add_theme_stylebox_override("fill", _progress_fill(accent))
 	if unlocked:
-		_status.text = "SELECTED" if selected else "READY"
+		_status.text = "●  EQUIPPED" if selected else "●  READY TO RACE"
+		_status.add_theme_color_override("font_color", accent if selected else Color("9dffb0"))
 	else:
-		_status.text = "%s  •  %d / %d" % [
+		_status.text = "LOCKED  ·  %s  ·  %d / %d" % [
 			VehicleCatalog.unlock_requirement_text(_browsed_id),
 			current,
 			target,
 		]
+		_status.add_theme_color_override("font_color", Color("c4a070"))
 	_select_button.disabled = not unlocked or selected
-	_select_button.text = "SELECTED" if selected else ("LOCKED" if not unlocked else "SELECT VEHICLE")
-	_apply_garage_button(_select_button, MAGENTA, unlocked and not selected)
+	_select_button.text = (
+		"EQUIPPED"
+		if selected
+		else ("LOCKED" if not unlocked else "SELECT VEHICLE")
+	)
+	_apply_primary_button(_select_button, accent, unlocked and not selected)
 	for vehicle_id in _vehicle_buttons:
-		var button := _vehicle_buttons[vehicle_id] as Button
+		var data: Dictionary = _vehicle_buttons[vehicle_id]
+		var button := data.get("button") as Button
+		var card_accent: Color = data.get("accent", MAGENTA) as Color
 		var is_browsed: bool = vehicle_id == _browsed_id
-		_apply_garage_button(button, MAGENTA, is_browsed)
+		_apply_roster_card(button, card_accent, is_browsed)
+		var name_l := data.get("name_label") as Label
+		if name_l:
+			name_l.add_theme_color_override(
+				"font_color",
+				Color("ffffff") if is_browsed else Color("ece8e0")
+			)
 	_refresh_display_positions()
 
 
@@ -432,7 +548,7 @@ func _label(text_value: String, font_size: int, color: Color) -> Label:
 	GameStyle.apply_label(label, color, font_size)
 	label.add_theme_font_override("font", _display_font)
 	label.add_theme_color_override("font_outline_color", Color("020405"))
-	label.add_theme_constant_override("outline_size", 4)
+	label.add_theme_constant_override("outline_size", maxi(int(font_size * 0.18), 3))
 	return label
 
 
@@ -443,80 +559,165 @@ func _body_label(text_value: String, font_size: int, color: Color) -> Label:
 	return label
 
 
-func _garage_panel(background: Color, border: Color, border_width: int) -> StyleBoxFlat:
+func _metal_panel(background: Color, border: Color, border_width: int, accent_top: bool = false) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
 	style.bg_color = background
 	style.border_color = border
 	style.set_border_width_all(border_width)
-	style.corner_radius_top_left = 4
-	style.corner_radius_top_right = 4
-	style.corner_radius_bottom_left = 4
-	style.corner_radius_bottom_right = 4
-	style.content_margin_left = 18.0
-	style.content_margin_right = 18.0
-	style.content_margin_top = 6.0
-	style.content_margin_bottom = 6.0
-	style.shadow_color = Color(0.0, 0.0, 0.0, 0.72)
-	style.shadow_size = 8
-	style.anti_aliasing = true
-	return style
-
-
-func _garage_button_style(
-	background: Color,
-	border: Color,
-	border_width: int,
-	shadow_size: int = 4
-) -> StyleBoxFlat:
-	var style := StyleBoxFlat.new()
-	style.bg_color = background
-	style.border_color = border
-	style.set_border_width_all(border_width)
-	style.corner_radius_top_left = 3
-	style.corner_radius_top_right = 3
-	style.corner_radius_bottom_left = 3
-	style.corner_radius_bottom_right = 3
-	style.content_margin_left = 14.0
-	style.content_margin_right = 14.0
-	style.content_margin_top = 8.0
-	style.content_margin_bottom = 8.0
+	if accent_top:
+		style.border_width_top = maxi(border_width + 1, 3)
+	style.set_corner_radius_all(6)
+	style.content_margin_left = 4.0
+	style.content_margin_right = 4.0
+	style.content_margin_top = 4.0
+	style.content_margin_bottom = 4.0
 	style.shadow_color = Color(0.0, 0.0, 0.0, 0.78)
-	style.shadow_size = shadow_size
+	style.shadow_size = 10
+	style.shadow_offset = Vector2(0, 4)
 	style.anti_aliasing = true
 	return style
 
 
-func _apply_garage_button(button: Button, accent: Color, selected: bool) -> void:
-	var normal_border := accent if selected else Color("4c4440")
-	var normal_bg := (
-		Color(0.12, 0.035, 0.07, 0.82)
+func _chip_panel(background: Color, border: Color) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = background
+	style.border_color = border
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(4)
+	style.content_margin_left = 2.0
+	style.content_margin_right = 2.0
+	style.content_margin_top = 1.0
+	style.content_margin_bottom = 1.0
+	return style
+
+
+func _progress_track() -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.06, 0.07, 0.09, 0.95)
+	style.border_color = Color("2a3238")
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(4)
+	return style
+
+
+func _progress_fill(accent: Color) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = accent
+	style.set_corner_radius_all(3)
+	style.content_margin_left = 1.0
+	style.content_margin_right = 1.0
+	style.content_margin_top = 1.0
+	style.content_margin_bottom = 1.0
+	return style
+
+
+func _roster_style(background: Color, border: Color, border_width: int, shadow: int) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = background
+	style.border_color = border
+	style.set_border_width_all(border_width)
+	style.set_corner_radius_all(6)
+	style.content_margin_left = 0.0
+	style.content_margin_right = 0.0
+	style.content_margin_top = 0.0
+	style.content_margin_bottom = 0.0
+	style.shadow_color = Color(0.0, 0.0, 0.0, 0.7)
+	style.shadow_size = shadow
+	style.shadow_offset = Vector2(0, 3)
+	style.anti_aliasing = true
+	return style
+
+
+func _apply_roster_card(button: Button, accent: Color, selected: bool) -> void:
+	var border := accent if selected else Color("3a4248")
+	var bg := (
+		Color(accent.r * 0.22, accent.g * 0.18, accent.b * 0.2, 0.88)
 		if selected
-		else Color(0.035, 0.03, 0.03, 0.72)
+		else Color(0.05, 0.055, 0.07, 0.82)
 	)
+	var hover_bg := Color(accent.r * 0.28, accent.g * 0.22, accent.b * 0.24, 0.92)
 	button.add_theme_stylebox_override(
 		"normal",
-		_garage_button_style(normal_bg, normal_border, 3 if selected else 2, 7 if selected else 4)
+		_roster_style(bg, border, 3 if selected else 2, 8 if selected else 5)
 	)
 	button.add_theme_stylebox_override(
 		"hover",
-		_garage_button_style(Color(0.18, 0.045, 0.095, 0.88), accent.lightened(0.14), 3, 8)
+		_roster_style(hover_bg, accent.lightened(0.12), 3, 9)
 	)
 	button.add_theme_stylebox_override(
 		"pressed",
-		_garage_button_style(Color(0.24, 0.035, 0.10, 0.92), accent, 4, 3)
+		_roster_style(bg.darkened(0.15), accent, 3, 3)
 	)
 	button.add_theme_stylebox_override(
 		"disabled",
-		_garage_button_style(Color(0.02, 0.023, 0.023, 0.70), Color("34383a"), 2, 2)
+		_roster_style(Color(0.04, 0.04, 0.05, 0.75), Color("2a2e32"), 2, 2)
 	)
+	button.add_theme_stylebox_override("focus", _roster_style(hover_bg, accent, 3, 8))
+	button.add_theme_color_override("font_color", Color.TRANSPARENT)
+	button.add_theme_color_override("font_hover_color", Color.TRANSPARENT)
+	button.add_theme_color_override("font_pressed_color", Color.TRANSPARENT)
+	button.add_theme_color_override("font_disabled_color", Color.TRANSPARENT)
+
+
+func _apply_primary_button(button: Button, accent: Color, enabled_look: bool) -> void:
+	var normal_bg := accent.darkened(0.12) if enabled_look else Color(0.12, 0.13, 0.15, 0.9)
+	var border := Color(0.08, 0.06, 0.04) if enabled_look else Color("34383a")
+	var style_n := _metal_panel(normal_bg, border, 4 if enabled_look else 2, false)
+	style_n.set_corner_radius_all(5)
+	style_n.content_margin_left = 16
+	style_n.content_margin_right = 16
+	style_n.content_margin_top = 10
+	style_n.content_margin_bottom = 10
+	style_n.shadow_offset = Vector2(4, 5)
+	var style_h := style_n.duplicate() as StyleBoxFlat
+	style_h.bg_color = accent.lightened(0.08) if enabled_look else normal_bg.lightened(0.08)
+	style_h.set_border_width_all(4)
+	var style_p := style_n.duplicate() as StyleBoxFlat
+	style_p.bg_color = accent.darkened(0.25) if enabled_look else normal_bg.darkened(0.1)
+	style_p.shadow_size = 2
+	var style_d := style_n.duplicate() as StyleBoxFlat
+	style_d.bg_color = Color(0.1, 0.11, 0.12, 0.85)
+	style_d.border_color = Color("2e3336")
+	button.add_theme_stylebox_override("normal", style_n)
+	button.add_theme_stylebox_override("hover", style_h)
+	button.add_theme_stylebox_override("pressed", style_p)
+	button.add_theme_stylebox_override("disabled", style_d)
+	button.add_theme_stylebox_override("focus", style_h)
 	button.add_theme_font_override("font", _display_font)
-	button.add_theme_font_size_override("font_size", 21)
-	button.add_theme_color_override("font_color", accent if selected else Color("eee8df"))
+	button.add_theme_font_size_override("font_size", 20)
+	# Readable label on bright car-color CTAs; muted when locked/selected
+	var label_col := Color("101218") if enabled_look else Color("8a8e92")
+	button.add_theme_color_override("font_color", label_col)
+	button.add_theme_color_override("font_hover_color", Color("0a0c10") if enabled_look else Color("b0b4b8"))
+	button.add_theme_color_override("font_pressed_color", Color("050608"))
+	button.add_theme_color_override("font_disabled_color", Color("6a6e72"))
+	button.add_theme_color_override("font_outline_color", Color(1, 1, 1, 0.15 if enabled_look else 0.0))
+	button.add_theme_constant_override("outline_size", 1 if enabled_look else 0)
+
+
+func _apply_secondary_button(button: Button) -> void:
+	var style_n := _metal_panel(Color(0.07, 0.08, 0.1, 0.88), Color("3a444c"), 2, false)
+	style_n.set_corner_radius_all(5)
+	style_n.content_margin_left = 14
+	style_n.content_margin_right = 14
+	style_n.content_margin_top = 8
+	style_n.content_margin_bottom = 8
+	var style_h := style_n.duplicate() as StyleBoxFlat
+	style_h.border_color = CYAN
+	style_h.bg_color = Color(0.08, 0.12, 0.14, 0.92)
+	var style_p := style_n.duplicate() as StyleBoxFlat
+	style_p.bg_color = Color(0.05, 0.06, 0.07, 0.95)
+	button.add_theme_stylebox_override("normal", style_n)
+	button.add_theme_stylebox_override("hover", style_h)
+	button.add_theme_stylebox_override("pressed", style_p)
+	button.add_theme_stylebox_override("focus", style_h)
+	button.add_theme_font_override("font", _display_font)
+	button.add_theme_font_size_override("font_size", 16)
+	button.add_theme_color_override("font_color", Color("d8dde0"))
 	button.add_theme_color_override("font_hover_color", Color.WHITE)
-	button.add_theme_color_override("font_pressed_color", Color.WHITE)
-	button.add_theme_color_override("font_disabled_color", Color("77736e"))
-	button.add_theme_color_override("font_outline_color", Color("050506"))
-	button.add_theme_constant_override("outline_size", 4)
+	button.add_theme_color_override("font_pressed_color", Color("b8c0c4"))
+	button.add_theme_color_override("font_outline_color", Color("050608"))
+	button.add_theme_constant_override("outline_size", 3)
 
 
 func _create_display_font() -> SystemFont:

@@ -35,4 +35,7 @@ transform = Transform3D(0.33, 0, 0, 0, 0.33, 0, 0, 0, 0.33, 0.32, 0.15863499, -0
 [node name="Wheel" parent="WheelBackRight" unique_id=719306556 instance=ExtResource("3_wheel")]
 transform = Transform3D(-3.6199901e-06, 0, 1, 0, 1, 0, -1, 0, -3.6199901e-06, 0, 0, 0)
 
+[node name="ExhaustAnchor" type="Marker3D" parent="." unique_id=1350133190]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.010538737, 0.23105308, -0.68)
+
 [node name="UndersideAttachments" type="Node3D" parent="." unique_id=1423380148]

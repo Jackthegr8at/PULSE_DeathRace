@@ -49,6 +49,16 @@ var _wheel_rest_positions: Dictionary = {}
 @onready var engine_sound: AudioStreamPlayer3D = $Container/EngineSound
 @onready var impact_sound: AudioStreamPlayer3D = $Container/ImpactSound
 
+const THRUSTER_SMOKE_TEX := preload("res://sprites/smoke.png")
+
+var _exhaust_anchor: Node3D = null
+var _thruster_core: GPUParticles3D = null
+var _thruster_spark: GPUParticles3D = null
+var _thruster_light: OmniLight3D = null
+var _thruster_power: float = 0.0
+var _thruster_color: Color = Color("3de8ff")
+var _thruster_color_hot: Color = Color("a8f7ff")
+
 @export_group("Identity")
 @export var is_player: bool = true
 @export var display_name: String = "Vehicle"
@@ -67,6 +77,15 @@ var _wheel_rest_positions: Dictionary = {}
 @export var custom_wheel_track: float = 0.53
 @export var custom_wheel_base: float = 0.55
 @export var custom_wheel_height: float = 0.34
+
+@export_group("Thruster Exhaust")
+@export var thruster_enabled: bool = true
+## Used when the model has no ExhaustAnchor (local space on Container).
+@export var thruster_default_offset: Vector3 = Vector3(0.0, 0.32, -0.72)
+@export var thruster_idle_power: float = 0.12
+@export var thruster_max_power: float = 1.0
+## Multiplier for jet length / particle speed (lower = shorter plume).
+@export var thruster_length_scale: float = 0.55
 
 @export_group("Modular Visual Suspension")
 ## Radius of the source wheel mesh before its scene scale is applied.
@@ -160,6 +179,7 @@ func _ready() -> void:
 	missile_ammo = starting_missile_ammo
 	add_to_group("vehicles")
 	rebind_model_parts()
+	_ensure_thruster_fx()
 	_ensure_hp_bar()
 	health_changed.emit(health, max_health)
 	ammo_changed.emit(missile_ammo, max_missile_ammo)
@@ -225,6 +245,193 @@ func rebind_model_parts() -> void:
 	for wheel in [wheel_fl, wheel_fr, wheel_bl, wheel_br]:
 		if wheel != null:
 			_wheel_rest_positions[wheel] = wheel.position
+	_resolve_exhaust_anchor(model)
+	# Rebuild thruster under the (possibly new) model / anchor
+	if is_inside_tree() and thruster_enabled:
+		_ensure_thruster_fx()
+
+
+func _resolve_exhaust_anchor(model: Node3D) -> void:
+	_exhaust_anchor = null
+	if model != null:
+		_exhaust_anchor = model.get_node_or_null("ExhaustAnchor") as Node3D
+		if _exhaust_anchor == null:
+			_exhaust_anchor = model.find_child("ExhaustAnchor", true, false) as Node3D
+	if _exhaust_anchor == null and vehicle_model != null:
+		_exhaust_anchor = vehicle_model.get_node_or_null("ExhaustAnchor") as Node3D
+
+
+func _thruster_colors_for_type() -> void:
+	## Per-car propulsor identity (keeps missile magenta unique).
+	match vehicle_type:
+		VehicleType.RAVAGE:
+			_thruster_color = Color("3de8ff") # cyan
+			_thruster_color_hot = Color("b8fbff")
+		VehicleType.BULLDOZE:
+			_thruster_color = Color("f6b600") # yellow
+			_thruster_color_hot = Color("ffe566")
+		VehicleType.WRAITH:
+			_thruster_color = Color("e23b3b") # red
+			_thruster_color_hot = Color("ff7a6e")
+		VehicleType.VENOM:
+			_thruster_color = Color("a84cff") # purple
+			_thruster_color_hot = Color("d4a0ff")
+		_:
+			_thruster_color = Color("3de8ff")
+			_thruster_color_hot = Color("b8fbff")
+
+
+func _ensure_thruster_fx() -> void:
+	if not thruster_enabled:
+		return
+	# Parent: preferred ExhaustAnchor on modular model, else Container
+	var parent: Node3D = _exhaust_anchor
+	if parent == null and vehicle_model != null:
+		parent = vehicle_model
+	if parent == null:
+		return
+
+	# Tear down old FX if rebinding
+	if _thruster_core != null and is_instance_valid(_thruster_core):
+		_thruster_core.queue_free()
+	if _thruster_spark != null and is_instance_valid(_thruster_spark):
+		_thruster_spark.queue_free()
+	if _thruster_light != null and is_instance_valid(_thruster_light):
+		_thruster_light.queue_free()
+	_thruster_core = null
+	_thruster_spark = null
+	_thruster_light = null
+
+	_thruster_colors_for_type()
+	var c := _thruster_color
+	var h := _thruster_color_hot
+	var fade := Color(c.r, c.g, c.b, 0.0)
+	var fade_hot := Color(h.r, h.g, h.b, 0.0)
+
+	var local_pos := Vector3.ZERO
+	if _exhaust_anchor == null:
+		local_pos = thruster_default_offset
+
+	var len_s := thruster_length_scale
+	# Shorter plume: lower lifetime + speed, smaller quads
+	_thruster_core = _make_thruster_particles(
+		Color(c.r, c.g, c.b, 0.95),
+		fade_hot,
+		22,
+		0.12 * len_s + 0.06,
+		3.2 * len_s,
+		0.22,
+		0.5,
+		0.38,
+		true
+	)
+	_thruster_core.name = "ThrusterCore"
+	_thruster_core.position = local_pos
+	parent.add_child(_thruster_core)
+
+	_thruster_spark = _make_thruster_particles(
+		Color(h.r, h.g, h.b, 1.0),
+		fade,
+		12,
+		0.08 * len_s + 0.04,
+		4.5 * len_s,
+		0.08,
+		0.18,
+		0.24,
+		true
+	)
+	_thruster_spark.name = "ThrusterSpark"
+	_thruster_spark.position = local_pos
+	parent.add_child(_thruster_spark)
+
+	_thruster_light = OmniLight3D.new()
+	_thruster_light.name = "ThrusterLight"
+	_thruster_light.light_color = c
+	_thruster_light.light_energy = 0.0
+	_thruster_light.omni_range = 2.0
+	_thruster_light.shadow_enabled = false
+	_thruster_light.position = local_pos
+	parent.add_child(_thruster_light)
+
+	_thruster_core.emitting = true
+	_thruster_spark.emitting = true
+
+
+func _make_thruster_particles(
+	color_start: Color,
+	color_end: Color,
+	amount: int,
+	life: float,
+	speed: float,
+	scale_min: float,
+	scale_max: float,
+	quad_size: float,
+	additive: bool
+) -> GPUParticles3D:
+	var p := GPUParticles3D.new()
+	p.emitting = false
+	p.amount = amount
+	p.lifetime = life
+	p.explosiveness = 0.05
+	p.randomness = 0.35
+	p.visibility_aabb = AABB(Vector3(-4, -4, -8), Vector3(8, 8, 12))
+	p.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# Car forward is +Z; exhaust shoots out the back (−Z).
+	p.rotation_degrees = Vector3(0, 180, 0)
+
+	var mat := ParticleProcessMaterial.new()
+	mat.direction = Vector3(0, 0, 1) # local +Z after 180° yaw = world rear of car
+	mat.spread = 10.0
+	mat.initial_velocity_min = speed * 0.5
+	mat.initial_velocity_max = speed
+	mat.gravity = Vector3(0, 0.25, 0)
+	mat.damping_min = 2.2
+	mat.damping_max = 4.0
+	mat.scale_min = scale_min
+	mat.scale_max = scale_max
+	mat.color = color_start
+	mat.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
+	mat.emission_sphere_radius = 0.04
+
+	var grad := Gradient.new()
+	grad.offsets = PackedFloat32Array([0.0, 0.25, 0.7, 1.0])
+	grad.colors = PackedColorArray([
+		color_start,
+		color_start,
+		color_start.lerp(color_end, 0.55),
+		color_end,
+	])
+	var grad_tex := GradientTexture1D.new()
+	grad_tex.gradient = grad
+	mat.color_ramp = grad_tex
+
+	var scale_curve := Curve.new()
+	scale_curve.add_point(Vector2(0.0, 0.7))
+	scale_curve.add_point(Vector2(0.2, 1.0))
+	scale_curve.add_point(Vector2(1.0, 0.05))
+	var scale_tex := CurveTexture.new()
+	scale_tex.curve = scale_curve
+	mat.scale_curve = scale_tex
+
+	p.process_material = mat
+
+	var draw := QuadMesh.new()
+	draw.size = Vector2(quad_size, quad_size)
+	var draw_mat := StandardMaterial3D.new()
+	draw_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	draw_mat.blend_mode = (
+		BaseMaterial3D.BLEND_MODE_ADD if additive else BaseMaterial3D.BLEND_MODE_MIX
+	)
+	draw_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	draw_mat.vertex_color_use_as_albedo = true
+	draw_mat.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
+	draw_mat.billboard_keep_scale = true
+	draw_mat.albedo_texture = THRUSTER_SMOKE_TEX
+	draw_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	draw_mat.proximity_fade_enabled = false
+	p.draw_pass_1 = draw
+	p.material_override = draw_mat
+	return p
 
 
 func _install_custom_wheels(model: Node3D) -> void:
@@ -415,6 +622,7 @@ func _physics_process(delta: float) -> void:
 	effect_wheels(delta)
 	effect_suspension(delta)
 	effect_trails()
+	effect_thruster(delta)
 	_update_lap_progress()
 	_billboard_hp_bar()
 
@@ -900,6 +1108,54 @@ func effect_trails() -> void:
 		target_volume = remap(clamp(drift_intensity, 0.25, 2.0), 0.25, 2.0, -10.0, 0.0)
 	screech_sound.pitch_scale = lerp(screech_sound.pitch_scale, clamp(abs(linear_speed), 1.0, 3.0), 0.1)
 	screech_sound.volume_db = lerp(screech_sound.volume_db, target_volume, 10.0 * get_physics_process_delta_time())
+
+
+func effect_thruster(delta: float) -> void:
+	if not thruster_enabled:
+		return
+	if _thruster_core == null or not is_instance_valid(_thruster_core):
+		return
+	# Forward throttle + speed feed the rear propulsor; idle glow when nearly stopped.
+	var throttle_fwd := clampf(input.z, 0.0, 1.0)
+	var speed_n := clampf(absf(linear_speed), 0.0, 1.0)
+	var target_power := thruster_idle_power
+	if is_alive and not match_over:
+		target_power = thruster_idle_power + (1.0 - thruster_idle_power) * clampf(
+			throttle_fwd * 0.75 + speed_n * 0.45,
+			0.0,
+			thruster_max_power
+		)
+		if throttle_fwd < 0.05 and speed_n < 0.08:
+			target_power = thruster_idle_power * 0.65
+	else:
+		target_power = 0.0
+	_thruster_power = lerpf(_thruster_power, target_power, clampf(delta * 8.0, 0.0, 1.0))
+
+	var on := _thruster_power > 0.02
+	_thruster_core.emitting = on
+	if _thruster_spark:
+		_thruster_spark.emitting = on and _thruster_power > 0.15
+
+	var len_s := thruster_length_scale
+	var core_mat := _thruster_core.process_material as ParticleProcessMaterial
+	if core_mat:
+		var base_spd := (1.8 + _thruster_power * 3.8) * len_s
+		core_mat.initial_velocity_min = base_spd * 0.5
+		core_mat.initial_velocity_max = base_spd
+		core_mat.scale_min = 0.18 + _thruster_power * 0.22
+		core_mat.scale_max = 0.38 + _thruster_power * 0.4
+	if _thruster_spark:
+		var spark_mat := _thruster_spark.process_material as ParticleProcessMaterial
+		if spark_mat:
+			var spark_spd := (2.6 + _thruster_power * 5.0) * len_s
+			spark_mat.initial_velocity_min = spark_spd * 0.55
+			spark_mat.initial_velocity_max = spark_spd
+	if _thruster_light:
+		_thruster_light.light_color = _thruster_color
+		_thruster_light.light_energy = _thruster_power * 2.2
+		_thruster_light.omni_range = 1.2 + _thruster_power * 1.6
+		if _thruster_power > 0.2:
+			_thruster_light.light_energy *= 0.9 + 0.1 * sin(Time.get_ticks_msec() * 0.045)
 
 
 func align_with_y(xform, new_y):
