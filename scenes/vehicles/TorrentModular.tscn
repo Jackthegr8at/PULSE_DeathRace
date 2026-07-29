@@ -9,7 +9,7 @@ transform = Transform3D(1.5, 0, 0, 0, 1.5, 0, 0, 0, 1.5, 0, 0, 0)
 script = ExtResource("1_script")
 
 [node name="Chassis" parent="." unique_id=747434674 instance=ExtResource("2_body")]
-transform = Transform3D(-6.338151e-08, 0, -1.4500002, 0, 1.4500002, 0, 1.4500002, 0, -6.338151e-08, 0, 0.37125176, -0.017715733)
+transform = Transform3D(-6.338151e-08, 0, -1.4500002, 0.07349532, 1.4481363, -3.212582e-09, 1.4481363, -0.07349532, -6.330005e-08, 0, 0.37125176, -0.017715733)
 
 [node name="WheelFrontLeft" type="Node3D" parent="." unique_id=1342548270]
 transform = Transform3D(1.5, 0, 0, 0, 1.5, 0, 0, 0, 1.5, -0.29418844, 0.11400067, 0.35946047)
@@ -36,9 +36,9 @@ transform = Transform3D(1.5, 0, 0, 0, 1.5, 0, 0, 0, 1.5, 0.285, 0.114, -0.442)
 transform = Transform3D(-5.972984e-07, 0, 0.165, 0, 0.165, 0, -0.165, 0, -5.972984e-07, 0, 0, 0)
 
 [node name="ExhaustAnchor" type="Marker3D" parent="." unique_id=874734030]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.23, -0.73)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.13392821, -0.73)
 
 [node name="WeaponAnchor" type="Marker3D" parent="." unique_id=283828489]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.7038056, 0.08714416)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.663054, 0.056803763)
 
 [node name="UndersideAttachments" type="Node3D" parent="." unique_id=328705863]

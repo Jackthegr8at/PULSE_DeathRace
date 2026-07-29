@@ -39,6 +39,6 @@ transform = Transform3D(-5.972984e-07, 0, 0.165, 0, 0.165, 0, -0.165, 0, -5.9729
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.19310956, -0.62)
 
 [node name="WeaponAnchor" type="Marker3D" parent="." unique_id=89422638]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.66599214, 0.053984404)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.69187105, 0.053984404)
 
 [node name="UndersideAttachments" type="Node3D" parent="." unique_id=1423380148]
