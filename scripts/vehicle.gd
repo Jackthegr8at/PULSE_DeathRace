@@ -180,9 +180,22 @@ var _cloak_cooldown_remaining: float = 0.0
 var is_firestorm_active: bool = false
 var _firestorm_elapsed: float = 0.0
 var _firestorm_ticks_done: int = 0
+## Firestorm layered stream (core / outer / embers / smoke).
 var _firestorm_particles: GPUParticles3D = null
+var _firestorm_outer: GPUParticles3D = null
+var _firestorm_embers: GPUParticles3D = null
+var _firestorm_smoke: GPUParticles3D = null
 var _firestorm_light: OmniLight3D = null
+## Always-on pilot flame at the Molten turret tip.
+var _flame_tip_core: GPUParticles3D = null
+var _flame_tip_glow: GPUParticles3D = null
+var _flame_tip_light: OmniLight3D = null
 var _thunderclaw_surge_remaining: float = 0.0
+## Idle + surge electric corona on the Thunderclaw roof electrode.
+var _electrode_sparks: GPUParticles3D = null
+var _electrode_corona: GPUParticles3D = null
+var _electrode_light: OmniLight3D = null
+var _electrode_arc_timer: float = 0.0
 var _cooldown: float = 0.0
 var _ai_aim_target: Vehicle = null
 var _ai_aim_timer: float = 0.0
@@ -239,6 +252,8 @@ func _ready() -> void:
 	add_to_group("vehicles")
 	rebind_model_parts()
 	_ensure_thruster_fx()
+	_ensure_molten_tip_fx()
+	_ensure_thunderclaw_electrode_fx()
 	_ensure_hp_bar()
 	health_changed.emit(health, max_health)
 	ammo_changed.emit(missile_ammo, max_missile_ammo)
@@ -318,9 +333,15 @@ func rebind_model_parts() -> void:
 			_wheel_rest_positions[wheel] = wheel.position
 	_resolve_exhaust_anchor(model)
 	_resolve_weapon_anchor(model)
-	# Rebuild thruster under the (possibly new) model / anchor
+	# Rebuild thruster / special weapon FX under the (possibly new) model / anchor
 	if is_inside_tree() and thruster_enabled:
 		_ensure_thruster_fx()
+	if is_inside_tree():
+		_free_molten_tip_fx()
+		_free_firestorm_fx_nodes()
+		_free_thunderclaw_electrode_fx()
+		_ensure_molten_tip_fx()
+		_ensure_thunderclaw_electrode_fx()
 	if is_cloaked:
 		_set_vehicle_transparency(SPECTER_CLOAK_TRANSPARENCY)
 
@@ -690,6 +711,8 @@ func _physics_process(delta: float) -> void:
 	_update_firestorm(delta)
 	if _thunderclaw_surge_remaining > 0.0:
 		_thunderclaw_surge_remaining = maxf(0.0, _thunderclaw_surge_remaining - delta)
+	_update_molten_tip_fx(delta)
+	_update_thunderclaw_electrode_fx(delta)
 
 	if match_over:
 		input = Vector3.ZERO
@@ -1232,11 +1255,7 @@ func _start_firestorm() -> bool:
 	_firestorm_elapsed = 0.0
 	_firestorm_ticks_done = 0
 	_ensure_firestorm_fx()
-	if _firestorm_particles:
-		_firestorm_particles.restart()
-		_firestorm_particles.emitting = true
-	if _firestorm_light:
-		_firestorm_light.visible = true
+	_set_firestorm_emitting(true)
 	return true
 
 
@@ -1296,49 +1315,197 @@ func _firestorm_has_line_of_sight(
 	return collider == target.sphere or (collider != null and collider.get_parent() == target)
 
 
+func _weapon_fx_parent() -> Node3D:
+	if _weapon_anchor != null and is_instance_valid(_weapon_anchor):
+		return _weapon_anchor
+	return vehicle_model
+
+
+func _weapon_fx_local_origin() -> Vector3:
+	return Vector3.ZERO if _weapon_fx_parent() == _weapon_anchor else Vector3(0, 0.28, 1.1)
+
+
+func _make_weapon_stream_particles(
+	color_start: Color,
+	color_end: Color,
+	amount: int,
+	life: float,
+	speed: float,
+	scale_min: float,
+	scale_max: float,
+	quad_size: float,
+	additive: bool,
+	spread_deg: float,
+	emit_radius: float = 0.03
+) -> GPUParticles3D:
+	## Particles that stream along weapon local +Z (no thruster 180° flip).
+	var p := _make_thruster_particles(
+		color_start,
+		color_end,
+		amount,
+		life,
+		speed,
+		scale_min,
+		scale_max,
+		quad_size,
+		additive
+	)
+	p.rotation_degrees = Vector3.ZERO
+	p.fixed_fps = 30
+	p.interpolate = true
+	p.visibility_aabb = AABB(Vector3(-6, -4, -2), Vector3(12, 10, 16))
+	var mat := p.process_material as ParticleProcessMaterial
+	if mat:
+		mat.direction = Vector3(0, 0, 1)
+		mat.spread = spread_deg
+		mat.gravity = Vector3(0, 0.45, 0)
+		mat.damping_min = 0.4
+		mat.damping_max = 1.6
+		mat.emission_sphere_radius = emit_radius
+	return p
+
+
+func _free_firestorm_fx_nodes() -> void:
+	for node in [
+		_firestorm_particles,
+		_firestorm_outer,
+		_firestorm_embers,
+		_firestorm_smoke,
+		_firestorm_light,
+	]:
+		if node != null and is_instance_valid(node):
+			node.queue_free()
+	_firestorm_particles = null
+	_firestorm_outer = null
+	_firestorm_embers = null
+	_firestorm_smoke = null
+	_firestorm_light = null
+
+
 func _ensure_firestorm_fx() -> void:
 	if _firestorm_particles != null and is_instance_valid(_firestorm_particles):
 		return
 	if vehicle_model == null:
 		return
-	var fx_parent: Node3D = _weapon_anchor if _weapon_anchor != null else vehicle_model
-	_firestorm_particles = _make_thruster_particles(
-		Color(1.0, 0.95, 0.35, 1.0),
-		Color(1.0, 0.08, 0.0, 0.0),
-		96,
-		0.5,
-		16.0,
-		0.35,
-		0.9,
-		0.72,
-		true
+	var fx_parent := _weapon_fx_parent()
+	if fx_parent == null:
+		return
+	var origin := _weapon_fx_local_origin()
+	var full_fx := is_player
+	var half_angle := FIRESTORM_HALF_ANGLE_DEGREES
+
+	# Hot white-yellow core jet
+	_firestorm_particles = _make_weapon_stream_particles(
+		Color(1.0, 0.98, 0.75, 1.0),
+		Color(1.0, 0.35, 0.02, 0.0),
+		72 if full_fx else 36,
+		0.38,
+		18.0,
+		0.22,
+		0.55,
+		0.48,
+		true,
+		half_angle * 0.55,
+		0.02
 	)
-	_firestorm_particles.name = "FirestormFlame"
-	_firestorm_particles.position = (
-		Vector3.ZERO if fx_parent == _weapon_anchor else Vector3(0, 0.28, 1.1)
-	)
-	_firestorm_particles.rotation_degrees = Vector3.ZERO
-	_firestorm_particles.fixed_fps = 30
-	_firestorm_particles.interpolate = true
-	var process_material := _firestorm_particles.process_material as ParticleProcessMaterial
-	if process_material:
-		process_material.direction = Vector3(0, 0, 1)
-		process_material.spread = FIRESTORM_HALF_ANGLE_DEGREES
-		process_material.gravity = Vector3(0, 0.35, 0)
-		process_material.damping_min = 0.5
-		process_material.damping_max = 1.5
+	_firestorm_particles.name = "FirestormCore"
+	_firestorm_particles.position = origin
+	_firestorm_particles.explosiveness = 0.0
+	_firestorm_particles.randomness = 0.25
 	fx_parent.add_child(_firestorm_particles)
+
+	# Broader orange-red flame body
+	_firestorm_outer = _make_weapon_stream_particles(
+		Color(1.0, 0.55, 0.08, 0.95),
+		Color(0.55, 0.04, 0.0, 0.0),
+		90 if full_fx else 40,
+		0.55,
+		14.5,
+		0.4,
+		1.05,
+		0.85,
+		true,
+		half_angle * 1.15,
+		0.05
+	)
+	_firestorm_outer.name = "FirestormOuter"
+	_firestorm_outer.position = origin
+	_firestorm_outer.explosiveness = 0.0
+	var outer_mat := _firestorm_outer.process_material as ParticleProcessMaterial
+	if outer_mat:
+		outer_mat.gravity = Vector3(0, 0.85, 0)
+		outer_mat.damping_min = 0.8
+		outer_mat.damping_max = 2.2
+	fx_parent.add_child(_firestorm_outer)
+
+	if full_fx:
+		# Bright embers / sparks in the stream
+		_firestorm_embers = _make_weapon_stream_particles(
+			Color(1.0, 0.9, 0.4, 1.0),
+			Color(1.0, 0.2, 0.0, 0.0),
+			48,
+			0.45,
+			20.0,
+			0.06,
+			0.18,
+			0.22,
+			true,
+			half_angle * 1.35,
+			0.04
+		)
+		_firestorm_embers.name = "FirestormEmbers"
+		_firestorm_embers.position = origin
+		_firestorm_embers.randomness = 0.55
+		var ember_mat := _firestorm_embers.process_material as ParticleProcessMaterial
+		if ember_mat:
+			ember_mat.gravity = Vector3(0, 1.4, 0)
+			ember_mat.damping_min = 0.2
+			ember_mat.damping_max = 1.0
+		fx_parent.add_child(_firestorm_embers)
+
+		# Soft dark smoke billow mixed in (reads as real fire)
+		_firestorm_smoke = _make_weapon_stream_particles(
+			Color(0.35, 0.18, 0.08, 0.55),
+			Color(0.12, 0.08, 0.06, 0.0),
+			36,
+			0.85,
+			8.5,
+			0.55,
+			1.4,
+			1.15,
+			false,
+			half_angle * 1.5,
+			0.06
+		)
+		_firestorm_smoke.name = "FirestormSmoke"
+		_firestorm_smoke.position = origin + Vector3(0, 0.02, 0.05)
+		var smoke_mat := _firestorm_smoke.process_material as ParticleProcessMaterial
+		if smoke_mat:
+			smoke_mat.gravity = Vector3(0, 1.6, 0)
+			smoke_mat.damping_min = 1.5
+			smoke_mat.damping_max = 3.0
+		fx_parent.add_child(_firestorm_smoke)
 
 	_firestorm_light = OmniLight3D.new()
 	_firestorm_light.name = "FirestormLight"
-	_firestorm_light.light_color = Color("ff6618")
-	_firestorm_light.light_energy = 2.2
-	_firestorm_light.omni_range = 5.0
+	_firestorm_light.light_color = Color("ff6a18")
+	_firestorm_light.light_energy = 3.4
+	_firestorm_light.omni_range = 6.5
 	_firestorm_light.shadow_enabled = false
 	_firestorm_light.position = (
-		Vector3(0, 0, 0.8) if fx_parent == _weapon_anchor else Vector3(0, 0.55, 2.2)
+		origin + Vector3(0, 0.05, 1.1) if fx_parent == _weapon_anchor else Vector3(0, 0.55, 2.2)
 	)
 	fx_parent.add_child(_firestorm_light)
+
+
+func _set_firestorm_emitting(on: bool) -> void:
+	for p in [_firestorm_particles, _firestorm_outer, _firestorm_embers, _firestorm_smoke]:
+		if p != null and is_instance_valid(p):
+			if on:
+				p.restart()
+			p.emitting = on
+	if _firestorm_light and is_instance_valid(_firestorm_light):
+		_firestorm_light.visible = on
 
 
 func _end_firestorm() -> void:
@@ -1347,10 +1514,292 @@ func _end_firestorm() -> void:
 	is_firestorm_active = false
 	_firestorm_elapsed = 0.0
 	_firestorm_ticks_done = 0
-	if _firestorm_particles and is_instance_valid(_firestorm_particles):
-		_firestorm_particles.emitting = false
-	if _firestorm_light and is_instance_valid(_firestorm_light):
-		_firestorm_light.visible = false
+	_set_firestorm_emitting(false)
+
+
+func _free_molten_tip_fx() -> void:
+	for node in [_flame_tip_core, _flame_tip_glow, _flame_tip_light]:
+		if node != null and is_instance_valid(node):
+			node.queue_free()
+	_flame_tip_core = null
+	_flame_tip_glow = null
+	_flame_tip_light = null
+
+
+func _ensure_molten_tip_fx() -> void:
+	if vehicle_type != VehicleType.MOLTEN:
+		return
+	if _flame_tip_core != null and is_instance_valid(_flame_tip_core):
+		return
+	if vehicle_model == null:
+		return
+	var fx_parent := _weapon_fx_parent()
+	if fx_parent == null:
+		return
+	var origin := _weapon_fx_local_origin()
+	var full_fx := is_player
+
+	# Pilot flame: small continuous jet at the nozzle tip
+	_flame_tip_core = _make_weapon_stream_particles(
+		Color(1.0, 0.92, 0.45, 1.0),
+		Color(1.0, 0.25, 0.0, 0.0),
+		28 if full_fx else 14,
+		0.16,
+		3.2,
+		0.1,
+		0.28,
+		0.28,
+		true,
+		12.0,
+		0.012
+	)
+	_flame_tip_core.name = "FlameTipCore"
+	_flame_tip_core.position = origin
+	_flame_tip_core.emitting = true
+	_flame_tip_core.explosiveness = 0.0
+	var tip_mat := _flame_tip_core.process_material as ParticleProcessMaterial
+	if tip_mat:
+		tip_mat.gravity = Vector3(0, 0.9, 0)
+		tip_mat.damping_min = 1.0
+		tip_mat.damping_max = 2.5
+	fx_parent.add_child(_flame_tip_core)
+
+	if full_fx:
+		_flame_tip_glow = _make_weapon_stream_particles(
+			Color(1.0, 0.55, 0.12, 0.9),
+			Color(0.8, 0.1, 0.0, 0.0),
+			18,
+			0.22,
+			2.0,
+			0.18,
+			0.42,
+			0.4,
+			true,
+			22.0,
+			0.02
+		)
+		_flame_tip_glow.name = "FlameTipGlow"
+		_flame_tip_glow.position = origin
+		_flame_tip_glow.emitting = true
+		_flame_tip_glow.explosiveness = 0.0
+		fx_parent.add_child(_flame_tip_glow)
+
+	_flame_tip_light = OmniLight3D.new()
+	_flame_tip_light.name = "FlameTipLight"
+	_flame_tip_light.light_color = Color("ff7a22")
+	_flame_tip_light.light_energy = 1.1
+	_flame_tip_light.omni_range = 2.4
+	_flame_tip_light.shadow_enabled = false
+	_flame_tip_light.position = origin + Vector3(0, 0.02, 0.12)
+	fx_parent.add_child(_flame_tip_light)
+
+
+func _update_molten_tip_fx(_delta: float) -> void:
+	if vehicle_type != VehicleType.MOLTEN:
+		return
+	if _flame_tip_core == null or not is_instance_valid(_flame_tip_core):
+		return
+	var alive := is_alive and not match_over
+	_flame_tip_core.emitting = alive
+	if _flame_tip_glow and is_instance_valid(_flame_tip_glow):
+		_flame_tip_glow.emitting = alive
+	if not alive:
+		if _flame_tip_light and is_instance_valid(_flame_tip_light):
+			_flame_tip_light.light_energy = 0.0
+		return
+
+	# Idle pilot is small; while firestorm is active the tip roars.
+	var power := 1.0
+	if is_firestorm_active:
+		power = 2.4
+	var core_mat := _flame_tip_core.process_material as ParticleProcessMaterial
+	if core_mat:
+		var base_spd := 2.6 + power * 2.8
+		core_mat.initial_velocity_min = base_spd * 0.55
+		core_mat.initial_velocity_max = base_spd
+		core_mat.scale_min = 0.08 + power * 0.06
+		core_mat.scale_max = 0.2 + power * 0.14
+	if _flame_tip_glow and is_instance_valid(_flame_tip_glow):
+		var glow_mat := _flame_tip_glow.process_material as ParticleProcessMaterial
+		if glow_mat:
+			var gspd := 1.6 + power * 1.8
+			glow_mat.initial_velocity_min = gspd * 0.5
+			glow_mat.initial_velocity_max = gspd
+	if _flame_tip_light and is_instance_valid(_flame_tip_light):
+		var flicker := 0.85 + 0.15 * sin(Time.get_ticks_msec() * 0.028)
+		_flame_tip_light.light_energy = (0.85 + power * 0.55) * flicker
+		_flame_tip_light.omni_range = 1.8 + power * 0.9
+		_flame_tip_light.light_color = Color("ff7a22").lerp(
+			Color("ffee88"),
+			clampf(power - 1.0, 0.0, 1.0) * 0.35
+		)
+
+	# Firestorm light flicker while active
+	if is_firestorm_active and _firestorm_light and is_instance_valid(_firestorm_light):
+		var fl := 0.75 + 0.25 * sin(Time.get_ticks_msec() * 0.041)
+		fl *= 0.9 + 0.1 * sin(Time.get_ticks_msec() * 0.097)
+		_firestorm_light.light_energy = 3.2 * fl
+		_firestorm_light.light_color = Color("ff6a18").lerp(
+			Color("ffcc44"),
+			0.15 + 0.2 * sin(Time.get_ticks_msec() * 0.02)
+		)
+
+
+func _free_thunderclaw_electrode_fx() -> void:
+	for node in [_electrode_sparks, _electrode_corona, _electrode_light]:
+		if node != null and is_instance_valid(node):
+			node.queue_free()
+	_electrode_sparks = null
+	_electrode_corona = null
+	_electrode_light = null
+	_electrode_arc_timer = 0.0
+
+
+func _ensure_thunderclaw_electrode_fx() -> void:
+	if vehicle_type != VehicleType.THUNDERCLAW:
+		return
+	if _electrode_sparks != null and is_instance_valid(_electrode_sparks):
+		return
+	if vehicle_model == null:
+		return
+	var fx_parent := _weapon_fx_parent()
+	if fx_parent == null:
+		return
+	# Sit slightly above the weapon socket so sparks hug the roof electrode tip.
+	var origin := _weapon_fx_local_origin() + Vector3(0, 0.1, -0.02)
+	var full_fx := is_player
+	var arc_col := THUNDERCLAW_ARC_COLOR
+	var arc_hot := Color("d8f6ff")
+
+	_electrode_corona = _make_thruster_particles(
+		Color(arc_col.r, arc_col.g, arc_col.b, 0.85),
+		Color(arc_hot.r, arc_hot.g, arc_hot.b, 0.0),
+		22 if full_fx else 10,
+		0.22,
+		1.1,
+		0.12,
+		0.32,
+		0.34,
+		true
+	)
+	_electrode_corona.name = "ElectrodeCorona"
+	_electrode_corona.position = origin
+	_electrode_corona.rotation_degrees = Vector3.ZERO
+	_electrode_corona.fixed_fps = 30
+	_electrode_corona.interpolate = true
+	_electrode_corona.emitting = true
+	_electrode_corona.explosiveness = 0.0
+	_electrode_corona.randomness = 0.5
+	var corona_mat := _electrode_corona.process_material as ParticleProcessMaterial
+	if corona_mat:
+		# Soft radial bloom around the electrode (not a rear thruster jet).
+		corona_mat.direction = Vector3(0, 1, 0)
+		corona_mat.spread = 180.0
+		corona_mat.gravity = Vector3(0, 0.15, 0)
+		corona_mat.damping_min = 2.5
+		corona_mat.damping_max = 4.5
+		corona_mat.emission_sphere_radius = 0.05
+		corona_mat.initial_velocity_min = 0.35
+		corona_mat.initial_velocity_max = 1.1
+	fx_parent.add_child(_electrode_corona)
+
+	_electrode_sparks = _make_thruster_particles(
+		Color(arc_hot.r, arc_hot.g, arc_hot.b, 1.0),
+		Color(arc_col.r, arc_col.g, arc_col.b, 0.0),
+		30 if full_fx else 12,
+		0.12,
+		3.5,
+		0.04,
+		0.12,
+		0.16,
+		true
+	)
+	_electrode_sparks.name = "ElectrodeSparks"
+	_electrode_sparks.position = origin
+	_electrode_sparks.rotation_degrees = Vector3.ZERO
+	_electrode_sparks.fixed_fps = 30
+	_electrode_sparks.interpolate = true
+	_electrode_sparks.emitting = true
+	_electrode_sparks.explosiveness = 0.15
+	_electrode_sparks.randomness = 0.7
+	var spark_mat := _electrode_sparks.process_material as ParticleProcessMaterial
+	if spark_mat:
+		spark_mat.direction = Vector3(0, 1, 0)
+		spark_mat.spread = 160.0
+		spark_mat.gravity = Vector3(0, -0.4, 0)
+		spark_mat.damping_min = 1.0
+		spark_mat.damping_max = 3.0
+		spark_mat.emission_sphere_radius = 0.03
+		spark_mat.initial_velocity_min = 1.2
+		spark_mat.initial_velocity_max = 3.8
+	fx_parent.add_child(_electrode_sparks)
+
+	_electrode_light = OmniLight3D.new()
+	_electrode_light.name = "ElectrodeLight"
+	_electrode_light.light_color = arc_col
+	_electrode_light.light_energy = 1.2
+	_electrode_light.omni_range = 2.8
+	_electrode_light.shadow_enabled = false
+	_electrode_light.position = origin
+	fx_parent.add_child(_electrode_light)
+
+
+func _update_thunderclaw_electrode_fx(delta: float) -> void:
+	if vehicle_type != VehicleType.THUNDERCLAW:
+		return
+	if _electrode_sparks == null or not is_instance_valid(_electrode_sparks):
+		return
+	var alive := is_alive and not match_over
+	_electrode_sparks.emitting = alive
+	if _electrode_corona and is_instance_valid(_electrode_corona):
+		_electrode_corona.emitting = alive
+	if not alive:
+		if _electrode_light and is_instance_valid(_electrode_light):
+			_electrode_light.light_energy = 0.0
+		return
+
+	var surging := _thunderclaw_surge_remaining > 0.0
+	var power := 2.8 if surging else 1.0
+	var t := Time.get_ticks_msec() * 0.001
+	var crackle := 0.7 + 0.3 * sin(t * 28.0) * sin(t * 11.3)
+
+	var spark_mat := _electrode_sparks.process_material as ParticleProcessMaterial
+	if spark_mat:
+		var spd := (2.2 + power * 3.5) * crackle
+		spark_mat.initial_velocity_min = spd * 0.45
+		spark_mat.initial_velocity_max = spd
+		spark_mat.scale_min = 0.03 + power * 0.02
+		spark_mat.scale_max = 0.1 + power * 0.06
+	if _electrode_corona and is_instance_valid(_electrode_corona):
+		var corona_mat := _electrode_corona.process_material as ParticleProcessMaterial
+		if corona_mat:
+			var cspd := 0.5 + power * 1.1
+			corona_mat.initial_velocity_min = cspd * 0.4
+			corona_mat.initial_velocity_max = cspd
+			corona_mat.scale_min = 0.1 + power * 0.08
+			corona_mat.scale_max = 0.25 + power * 0.18
+	if _electrode_light and is_instance_valid(_electrode_light):
+		_electrode_light.light_energy = (0.9 + power * 1.6) * crackle
+		_electrode_light.omni_range = 2.2 + power * 1.8
+		_electrode_light.light_color = THUNDERCLAW_ARC_COLOR.lerp(Color("e8fbff"), 0.25 if surging else 0.0)
+
+	# Occasional micro-arcs snapping off the electrode while surging (player only).
+	if surging and is_player and is_inside_tree():
+		_electrode_arc_timer -= delta
+		if _electrode_arc_timer <= 0.0:
+			_electrode_arc_timer = randf_range(0.22, 0.42)
+			_spawn_electrode_micro_arc()
+
+
+func _spawn_electrode_micro_arc() -> void:
+	if vehicle_model == null:
+		return
+	var origin := _get_weapon_origin() + Vector3(0, 0.12, 0)
+	var yaw := randf() * TAU
+	var pitch := randf_range(0.35, 1.15)
+	var reach := randf_range(0.35, 0.85)
+	var tip := origin + Vector3(cos(yaw) * reach * 0.55, pitch * reach * 0.65, sin(yaw) * reach * 0.55)
+	_spawn_thunderclaw_arc(origin, tip)
 
 
 func is_targetable_by_ai() -> bool:
@@ -1434,6 +1883,18 @@ func _die() -> void:
 	_end_specter_cloak()
 	_end_firestorm()
 	_thunderclaw_surge_remaining = 0.0
+	if _flame_tip_core and is_instance_valid(_flame_tip_core):
+		_flame_tip_core.emitting = false
+	if _flame_tip_glow and is_instance_valid(_flame_tip_glow):
+		_flame_tip_glow.emitting = false
+	if _flame_tip_light and is_instance_valid(_flame_tip_light):
+		_flame_tip_light.light_energy = 0.0
+	if _electrode_sparks and is_instance_valid(_electrode_sparks):
+		_electrode_sparks.emitting = false
+	if _electrode_corona and is_instance_valid(_electrode_corona):
+		_electrode_corona.emitting = false
+	if _electrode_light and is_instance_valid(_electrode_light):
+		_electrode_light.light_energy = 0.0
 	is_alive = false
 	input = Vector3.ZERO
 	linear_speed = 0.0
