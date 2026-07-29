@@ -15,25 +15,25 @@ transform = Transform3D(-6.338151e-08, 0, -1.4500002, 0, 1.4500002, 0, 1.4500002
 transform = Transform3D(1.5, 0, 0, 0, 1.5, 0, 0, 0, 1.5, -0.285, 0.155, 0.405)
 
 [node name="Wheel" parent="WheelFrontLeft" unique_id=1434052487 instance=ExtResource("3_wheel")]
-transform = Transform3D(-5.972984e-07, 0, 0.165, 0, 0.165, 0, -0.165, 0, -5.972984e-07, 0, -0.024671763, 0)
+transform = Transform3D(-5.972984e-07, 0, 0.165, 0, 0.165, 0, -0.165, 0, -5.972984e-07, 0, 0, 0)
 
 [node name="WheelFrontRight" type="Node3D" parent="." unique_id=1922181551]
 transform = Transform3D(1.5, 0, 0, 0, 1.5, 0, 0, 0, 1.5, 0.285, 0.155, 0.405)
 
 [node name="Wheel" parent="WheelFrontRight" unique_id=2080045288 instance=ExtResource("3_wheel")]
-transform = Transform3D(-5.972984e-07, 0, 0.165, 0, 0.165, 0, -0.165, 0, -5.972984e-07, 0, -0.024671763, 0)
+transform = Transform3D(-5.972984e-07, 0, 0.165, 0, 0.165, 0, -0.165, 0, -5.972984e-07, 0, 0, 0)
 
 [node name="WheelBackLeft" type="Node3D" parent="." unique_id=1489052442]
 transform = Transform3D(1.5, 0, 0, 0, 1.5, 0, 0, 0, 1.5, -0.28500003, 0.155, -0.37358803)
 
 [node name="Wheel" parent="WheelBackLeft" unique_id=1122693123 instance=ExtResource("3_wheel")]
-transform = Transform3D(-5.972984e-07, 0, 0.165, 0, 0.165, 0, -0.165, 0, -5.972984e-07, 0, -0.024671763, 0)
+transform = Transform3D(-5.972984e-07, 0, 0.165, 0, 0.165, 0, -0.165, 0, -5.972984e-07, 0, 0, 0)
 
 [node name="WheelBackRight" type="Node3D" parent="." unique_id=1239830273]
 transform = Transform3D(1.5, 0, 0, 0, 1.5, 0, 0, 0, 1.5, 0.28500003, 0.155, -0.37358803)
 
 [node name="Wheel" parent="WheelBackRight" unique_id=872713972 instance=ExtResource("3_wheel")]
-transform = Transform3D(-5.972984e-07, 0, 0.165, 0, 0.165, 0, -0.165, 0, -5.972984e-07, 0, -0.024671763, 0)
+transform = Transform3D(-5.972984e-07, 0, 0.165, 0, 0.165, 0, -0.165, 0, -5.972984e-07, 0, 0, 0)
 
 [node name="ExhaustAnchor" type="Marker3D" parent="." unique_id=387222308]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.23132233, -0.7314768)

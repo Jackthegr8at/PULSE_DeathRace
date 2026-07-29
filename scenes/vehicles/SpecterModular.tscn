@@ -15,25 +15,25 @@ transform = Transform3D(-6.338151e-08, 0, -1.4500002, 0, 1.4500002, 0, 1.4500002
 transform = Transform3D(1.5, 0, 0, 0, 1.5, 0, 0, 0, 1.5, -0.24, 0.144, 0.32)
 
 [node name="Wheel" parent="WheelFrontLeft" unique_id=514714692 instance=ExtResource("3_wheel")]
-transform = Transform3D(-5.972984e-07, 0, 0.165, 0, 0.165, 0, -0.165, 0, -5.972984e-07, 0, -0.024671763, 0)
+transform = Transform3D(-5.972984e-07, 0, 0.165, 0, 0.165, 0, -0.165, 0, -5.972984e-07, 0, 0, 0)
 
 [node name="WheelFrontRight" type="Node3D" parent="." unique_id=188587812]
 transform = Transform3D(1.5, 0, 0, 0, 1.5, 0, 0, 0, 1.5, 0.24, 0.144, 0.32)
 
 [node name="Wheel" parent="WheelFrontRight" unique_id=237250773 instance=ExtResource("3_wheel")]
-transform = Transform3D(-5.791984e-07, 0, 0.16, 0, 0.16, 0, -0.16, 0, -5.791984e-07, 0, -0.024671763, 0)
+transform = Transform3D(-5.791984e-07, 0, 0.16, 0, 0.16, 0, -0.16, 0, -5.791984e-07, 0, 0, 0)
 
 [node name="WheelBackLeft" type="Node3D" parent="." unique_id=1067252065]
 transform = Transform3D(1.5, 0, 0, 0, 1.5, 0, 0, 0, 1.5, -0.25596905, 0.15863499, -0.4265725)
 
 [node name="Wheel" parent="WheelBackLeft" unique_id=723581681 instance=ExtResource("3_wheel")]
-transform = Transform3D(-5.972984e-07, 0, 0.165, 0, 0.165, 0, -0.165, 0, -5.972984e-07, 0, -0.02467177, 0)
+transform = Transform3D(-5.972984e-07, 0, 0.165, 0, 0.165, 0, -0.165, 0, -5.972984e-07, 0, 0, 0)
 
 [node name="WheelBackRight" type="Node3D" parent="." unique_id=1509956255]
-transform = Transform3D(1.5, 0, 0, 0, 1.5, 0, 0, 0, 1.5, 0.3891431, 0.15900001, -0.427)
+transform = Transform3D(1.5, 0, 0, 0, 1.5, 0, 0, 0, 1.5, 0.256, 0.159, -0.427)
 
 [node name="Wheel" parent="WheelBackRight" unique_id=1626164805 instance=ExtResource("3_wheel")]
-transform = Transform3D(-5.972984e-07, 0, 0.165, 0, 0.165, 0, -0.165, 0, -5.972984e-07, -0.08642578, -0.024671763, 0)
+transform = Transform3D(-5.972984e-07, 0, 0.165, 0, 0.165, 0, -0.165, 0, -5.972984e-07, 0, 0, 0)
 
 [node name="ExhaustAnchor" type="Marker3D" parent="." unique_id=1543876918]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.15317222, -0.7032012)
