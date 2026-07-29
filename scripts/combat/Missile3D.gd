@@ -11,17 +11,16 @@ extends Area3D
 ## Punchy Pulse blast (concept sheets: magenta energy + cyan spark).
 @export var explosion_lifetime: float = 0.6
 @export var explosion_scale: float = 1.05
+@export_group("Explosion Palette")
+@export var explosion_primary_color: Color = Color("ff2ec8")
+@export var explosion_hot_color: Color = Color("ff6ef0")
+@export var explosion_accent_color: Color = Color("3de8ff")
+@export var explosion_fade_color: Color = Color("a84cff")
+@export var explosion_rim_color: Color = Color("ff7a2e")
+@export var explosion_core_color: Color = Color("fff0ff")
 
 const SMOKE_TEX := preload("res://sprites/smoke.png")
 const IMPACT_SFX := preload("res://audio/impact.ogg")
-
-# concept1–6 Pulse palette: hot magenta identity, cyan electric, scrap orange secondary.
-const COL_PULSE := Color("ff2ec8") ## Brand pink / missile power-up
-const COL_PULSE_HOT := Color("ff6ef0") ## Hot core
-const COL_CYAN := Color("3de8ff") ## Electric / shield-adjacent
-const COL_PURPLE := Color("a84cff") ## EMP / energy fade
-const COL_SCRAP := Color("ff7a2e") ## Scrap fire secondary
-const COL_WHITE := Color("fff0ff")
 
 var owner_vehicle: Vehicle = null
 var _velocity: Vector3 = Vector3.ZERO
@@ -37,7 +36,6 @@ func setup(shooter: Vehicle, dmg: float, spd: float, dir: Vector3) -> void:
 	damage = dmg
 	speed = spd
 	var d := dir
-	d.y = 0.0
 	if d.length_squared() < 0.0001:
 		d = Vector3(0, 0, 1)
 	_velocity = d.normalized() * speed
@@ -66,10 +64,16 @@ func _apply_model_transform() -> void:
 func _physics_process(delta: float) -> void:
 	if _exploded:
 		return
+	_update_guidance(delta)
 	global_position += _velocity * delta
 	_age += delta
 	if _age >= lifetime:
 		_explode()
+
+
+func _update_guidance(_delta: float) -> void:
+	## Extension point for guided projectile variants.
+	pass
 
 
 func _on_body_entered(body: Node) -> void:
@@ -84,6 +88,8 @@ func _on_body_entered(body: Node) -> void:
 		veh = body as Vehicle
 	if veh and veh != owner_vehicle and veh.is_alive:
 		veh.take_damage(damage, owner_vehicle)
+		if owner_vehicle and is_instance_valid(owner_vehicle):
+			owner_vehicle.on_missile_direct_hit(veh, damage)
 		_explode()
 		return
 	if body is StaticBody3D or body is GridMap:
@@ -123,13 +129,13 @@ func _spawn_explosion_fx() -> void:
 
 	# Magenta core flash + brief cyan kick
 	var flash := OmniLight3D.new()
-	flash.light_color = COL_PULSE
+	flash.light_color = explosion_primary_color
 	flash.light_energy = 9.0 * s
 	flash.omni_range = 6.0 * s
 	flash.shadow_enabled = false
 	add_child(flash)
 	var kick := OmniLight3D.new()
-	kick.light_color = COL_CYAN
+	kick.light_color = explosion_accent_color
 	kick.light_energy = 4.0 * s
 	kick.omni_range = 4.0 * s
 	kick.shadow_enabled = false
@@ -146,8 +152,8 @@ func _spawn_explosion_fx() -> void:
 
 	# White-pink core pop
 	var core := _make_pulse_burst(
-		Color(COL_WHITE.r, COL_WHITE.g, COL_WHITE.b, 1.0),
-		Color(COL_PULSE_HOT.r, COL_PULSE_HOT.g, COL_PULSE_HOT.b, 0.0),
+		Color(explosion_core_color.r, explosion_core_color.g, explosion_core_color.b, 1.0),
+		Color(explosion_hot_color.r, explosion_hot_color.g, explosion_hot_color.b, 0.0),
 		14,
 		explosion_lifetime * 0.35,
 		4.5 * s,
@@ -161,9 +167,9 @@ func _spawn_explosion_fx() -> void:
 
 	# Main Pulse cloud: magenta → purple
 	var pulse := _make_pulse_burst(
-		Color(COL_PULSE.r, COL_PULSE.g, COL_PULSE.b, 1.0),
-		Color(COL_PURPLE.r, COL_PURPLE.g, COL_PURPLE.b, 0.0),
-		26,
+		Color(explosion_primary_color.r, explosion_primary_color.g, explosion_primary_color.b, 1.0),
+		Color(explosion_fade_color.r, explosion_fade_color.g, explosion_fade_color.b, 0.0),
+		18,
 		explosion_lifetime * 0.75,
 		4.0 * s,
 		0.95 * s,
@@ -176,9 +182,9 @@ func _spawn_explosion_fx() -> void:
 
 	# Thin scrap-fire rim (combat grit without dominating the brand color)
 	var scrap := _make_pulse_burst(
-		Color(COL_SCRAP.r, COL_SCRAP.g, COL_SCRAP.b, 0.9),
-		Color(COL_SCRAP.r, COL_SCRAP.g, COL_SCRAP.b, 0.0),
-		10,
+		Color(explosion_rim_color.r, explosion_rim_color.g, explosion_rim_color.b, 0.9),
+		Color(explosion_rim_color.r, explosion_rim_color.g, explosion_rim_color.b, 0.0),
+		8,
 		explosion_lifetime * 0.55,
 		3.2 * s,
 		0.7 * s,
@@ -191,9 +197,9 @@ func _spawn_explosion_fx() -> void:
 
 	# Cyan electric sparks (shield / EMP family)
 	var sparks := _make_pulse_burst(
-		Color(COL_CYAN.r, COL_CYAN.g, COL_CYAN.b, 1.0),
-		Color(COL_PULSE_HOT.r, COL_PULSE_HOT.g, COL_PULSE_HOT.b, 0.0),
-		20,
+		Color(explosion_accent_color.r, explosion_accent_color.g, explosion_accent_color.b, 1.0),
+		Color(explosion_hot_color.r, explosion_hot_color.g, explosion_hot_color.b, 0.0),
+		12,
 		explosion_lifetime * 0.48,
 		7.5 * s,
 		0.15 * s,
@@ -223,9 +229,14 @@ func _spawn_pulse_ring(s: float) -> void:
 	var mat := StandardMaterial3D.new()
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	mat.albedo_color = Color(COL_PULSE.r, COL_PULSE.g, COL_PULSE.b, 0.95)
+	mat.albedo_color = Color(
+		explosion_primary_color.r,
+		explosion_primary_color.g,
+		explosion_primary_color.b,
+		0.95
+	)
 	mat.emission_enabled = true
-	mat.emission = COL_PULSE_HOT
+	mat.emission = explosion_hot_color
 	mat.emission_energy_multiplier = 2.4
 	mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	ring.material_override = mat
@@ -243,9 +254,14 @@ func _spawn_pulse_ring(s: float) -> void:
 	var rim_mat := StandardMaterial3D.new()
 	rim_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	rim_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	rim_mat.albedo_color = Color(COL_CYAN.r, COL_CYAN.g, COL_CYAN.b, 0.55)
+	rim_mat.albedo_color = Color(
+		explosion_accent_color.r,
+		explosion_accent_color.g,
+		explosion_accent_color.b,
+		0.55
+	)
 	rim_mat.emission_enabled = true
-	rim_mat.emission = COL_CYAN
+	rim_mat.emission = explosion_accent_color
 	rim_mat.emission_energy_multiplier = 1.4
 	rim_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
 	rim.material_override = rim_mat

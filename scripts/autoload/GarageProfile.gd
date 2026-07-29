@@ -1,7 +1,7 @@
 extends Node
 ## Persistent vehicle ownership, selection, and completed-race progression.
 
-const SCHEMA_VERSION := 1
+const SCHEMA_VERSION := 5
 const DEFAULT_PROFILE_PATH := "user://garage_profile.json"
 const MAX_COMMITTED_RACE_IDS := 128
 
@@ -23,7 +23,11 @@ func default_profile() -> Dictionary:
 		},
 		"stats": {
 			"first_place_finishes": 0,
+			"hard_first_place_finishes": 0,
+			"last_standing_wins": 0,
+			"hybrid_wins": 0,
 			"total_player_destroys": 0,
+			"direct_missile_hits": 0,
 			"player_destroys_by_vehicle_id": {},
 		},
 		"committed_race_ids": [],
@@ -63,7 +67,11 @@ func _merge_loaded_profile(loaded: Dictionary) -> void:
 	var loaded_stats := loaded.get("stats", {}) as Dictionary
 	var stats := profile["stats"] as Dictionary
 	stats["first_place_finishes"] = maxi(int(loaded_stats.get("first_place_finishes", 0)), 0)
+	stats["hard_first_place_finishes"] = maxi(int(loaded_stats.get("hard_first_place_finishes", 0)), 0)
+	stats["last_standing_wins"] = maxi(int(loaded_stats.get("last_standing_wins", 0)), 0)
+	stats["hybrid_wins"] = maxi(int(loaded_stats.get("hybrid_wins", 0)), 0)
 	stats["total_player_destroys"] = maxi(int(loaded_stats.get("total_player_destroys", 0)), 0)
+	stats["direct_missile_hits"] = maxi(int(loaded_stats.get("direct_missile_hits", 0)), 0)
 	var loaded_by_vehicle := loaded_stats.get("player_destroys_by_vehicle_id", {}) as Dictionary
 	var by_vehicle: Dictionary = {}
 	for vehicle_id in loaded_by_vehicle:
@@ -129,6 +137,12 @@ func commit_completed_race(summary: Dictionary) -> Array[String]:
 	var profile_stats := profile.get("stats", {}) as Dictionary
 	if bool(summary.get("player_first", false)):
 		profile_stats["first_place_finishes"] = int(profile_stats.get("first_place_finishes", 0)) + 1
+		if int(summary.get("difficulty", -1)) == MatchConfig.AIDifficulty.HARD:
+			profile_stats["hard_first_place_finishes"] = int(profile_stats.get("hard_first_place_finishes", 0)) + 1
+		if int(summary.get("mode", -1)) == MatchConfig.Mode.LAST_STANDING:
+			profile_stats["last_standing_wins"] = int(profile_stats.get("last_standing_wins", 0)) + 1
+		if int(summary.get("mode", -1)) == MatchConfig.Mode.HYBRID:
+			profile_stats["hybrid_wins"] = int(profile_stats.get("hybrid_wins", 0)) + 1
 
 	var kills_by_vehicle := summary.get("player_kills_by_vehicle_id", {}) as Dictionary
 	var stored_by_vehicle := profile_stats.get("player_destroys_by_vehicle_id", {}) as Dictionary
@@ -143,6 +157,10 @@ func commit_completed_race(summary: Dictionary) -> Array[String]:
 		stored_by_vehicle[resolved_id] = int(stored_by_vehicle.get(resolved_id, 0)) + added
 		total_added += added
 	profile_stats["total_player_destroys"] = int(profile_stats.get("total_player_destroys", 0)) + total_added
+	profile_stats["direct_missile_hits"] = (
+		int(profile_stats.get("direct_missile_hits", 0))
+		+ maxi(int(summary.get("direct_missile_hits", 0)), 0)
+	)
 	profile_stats["player_destroys_by_vehicle_id"] = stored_by_vehicle
 	profile["stats"] = profile_stats
 

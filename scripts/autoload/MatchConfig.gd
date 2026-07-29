@@ -77,6 +77,9 @@ var missiles_per_crate: int = 2 ## Ammo granted when collecting one crate
 ## cache instead of loading the track and vehicle scenes a second time.
 var loading_resources: Dictionary = {}
 var loading_started_msec: int = 0
+var _race_ai_vehicle_ids: Array[String] = []
+var _race_ai_selected_vehicle_id: String = ""
+var _race_ai_count: int = -1
 
 
 func uses_laps() -> bool:
@@ -116,7 +119,16 @@ func selected_vehicle_scene_path() -> String:
 
 
 func ai_vehicle_ids() -> Array[String]:
-	return VehicleCatalog.get_ai_roster(selected_vehicle_id(), ai_count)
+	var player_vehicle_id := selected_vehicle_id()
+	if (
+		_race_ai_vehicle_ids.is_empty()
+		or _race_ai_selected_vehicle_id != player_vehicle_id
+		or _race_ai_count != ai_count
+	):
+		_race_ai_vehicle_ids = VehicleCatalog.get_ai_roster(player_vehicle_id, ai_count)
+		_race_ai_selected_vehicle_id = player_vehicle_id
+		_race_ai_count = ai_count
+	return _race_ai_vehicle_ids.duplicate()
 
 
 func race_vehicle_scene_paths() -> Array[String]:
@@ -147,6 +159,8 @@ func ai_difficulty_display_name() -> String:
 func begin_race_loading() -> void:
 	loading_resources.clear()
 	loading_started_msec = Time.get_ticks_msec()
+	_clear_ai_roster()
+	ai_vehicle_ids()
 
 
 func retain_loading_resource(path: String, resource: Resource) -> void:
@@ -161,6 +175,13 @@ func get_loading_resource(path: String) -> Resource:
 func clear_loading_resources() -> void:
 	loading_resources.clear()
 	loading_started_msec = 0
+	_clear_ai_roster()
+
+
+func _clear_ai_roster() -> void:
+	_race_ai_vehicle_ids.clear()
+	_race_ai_selected_vehicle_id = ""
+	_race_ai_count = -1
 
 
 func reset_to_defaults() -> void:
@@ -171,3 +192,4 @@ func reset_to_defaults() -> void:
 	track_id = TrackId.KENNEY_DEFAULT
 	crate_count = 5
 	missiles_per_crate = 2
+	_clear_ai_roster()

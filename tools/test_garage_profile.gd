@@ -1,7 +1,7 @@
 extends Node
 ## Local-only profile and unlock progression checks.
 
-const TEST_PATH := "user://garage_profile_test.json"
+const TEST_PATH := "res://.godot/garage_profile_test.json"
 var failures: int = 0
 
 
@@ -17,6 +17,14 @@ func _run() -> void:
 	_expect(GarageProfile.selected_vehicle_id() == "ravage", "fresh profile selects Ravage")
 	_expect(GarageProfile.is_vehicle_unlocked("ravage"), "Ravage starts unlocked")
 	_expect(not GarageProfile.is_vehicle_unlocked("bulldoze"), "Bulldoze starts locked")
+	_expect(not GarageProfile.is_vehicle_unlocked("specter"), "Specter starts locked")
+	_expect(not GarageProfile.is_vehicle_unlocked("molten"), "Molten starts locked")
+	_expect(not GarageProfile.is_vehicle_unlocked("thunderclaw"), "Thunderclaw starts locked")
+	_expect(not GarageProfile.is_vehicle_unlocked("torrent"), "Torrent starts locked")
+	_expect(
+		int(GarageProfile.stats().get("hybrid_wins", -1)) == 0,
+		"profiles without Hybrid history migrate to zero Hybrid wins",
+	)
 	_expect(not GarageProfile.select_vehicle("wraith"), "locked vehicle cannot be selected")
 
 	var no_commit := GarageProfile.commit_completed_race({
@@ -41,6 +49,20 @@ func _run() -> void:
 	var roster := VehicleCatalog.get_ai_roster(GarageProfile.selected_vehicle_id(), 3)
 	_expect(roster.size() == 3, "three AI vehicles are resolved")
 	_expect("bulldoze" not in roster, "selected player vehicle is excluded from AI roster")
+	var ai_candidates := VehicleCatalog.get_ai_candidate_ids(GarageProfile.selected_vehicle_id())
+	_expect("specter" in ai_candidates, "Specter is eligible for the AI rotation")
+	_expect("molten" in ai_candidates, "Molten is eligible for the AI rotation")
+	_expect("thunderclaw" in ai_candidates, "Thunderclaw is eligible for the AI rotation")
+	_expect("torrent" in ai_candidates, "Torrent is eligible for the AI rotation")
+	_expect(ai_candidates.size() == 7, "all seven non-player vehicles are AI candidates")
+	MatchConfig.ai_count = 3
+	MatchConfig.begin_race_loading()
+	var loading_roster := MatchConfig.ai_vehicle_ids()
+	_expect(
+		loading_roster == MatchConfig.ai_vehicle_ids(),
+		"AI rotation stays stable throughout race loading",
+	)
+	MatchConfig.clear_loading_resources()
 
 	var duplicate := GarageProfile.commit_completed_race({
 		"race_id": "race-bulldoze",
@@ -56,9 +78,88 @@ func _run() -> void:
 			"race_id": "win-%d" % index,
 			"completed": true,
 			"player_first": true,
+			"difficulty": MatchConfig.AIDifficulty.NOVICE,
 			"player_kills_by_vehicle_id": {},
 		})
 	_expect(GarageProfile.is_vehicle_unlocked("venom"), "Venom unlocks at 20 first-place finishes")
+	_expect(not GarageProfile.is_vehicle_unlocked("specter"), "non-Hard wins do not unlock Specter")
+
+	for index in 9:
+		GarageProfile.commit_completed_race({
+			"race_id": "hard-win-%d" % index,
+			"completed": true,
+			"player_first": true,
+			"difficulty": MatchConfig.AIDifficulty.HARD,
+			"player_kills_by_vehicle_id": {},
+		})
+	_expect(not GarageProfile.is_vehicle_unlocked("specter"), "Specter remains locked after 9 Hard wins")
+	var specter_unlock := GarageProfile.commit_completed_race({
+		"race_id": "hard-win-9",
+		"completed": true,
+		"player_first": true,
+		"difficulty": MatchConfig.AIDifficulty.HARD,
+		"player_kills_by_vehicle_id": {},
+	})
+	_expect("specter" in specter_unlock, "Specter unlocks at 10 Hard first-place finishes")
+
+	for index in 9:
+		GarageProfile.commit_completed_race({
+			"race_id": "last-standing-win-%d" % index,
+			"completed": true,
+			"player_first": true,
+			"mode": MatchConfig.Mode.LAST_STANDING,
+			"player_kills_by_vehicle_id": {},
+		})
+	_expect(not GarageProfile.is_vehicle_unlocked("molten"), "Molten remains locked after 9 Last Standing wins")
+	var molten_unlock := GarageProfile.commit_completed_race({
+		"race_id": "last-standing-win-9",
+		"completed": true,
+		"player_first": true,
+		"mode": MatchConfig.Mode.LAST_STANDING,
+		"player_kills_by_vehicle_id": {},
+	})
+	_expect("molten" in molten_unlock, "Molten unlocks at 10 Last Standing wins")
+
+	for index in 14:
+		GarageProfile.commit_completed_race({
+			"race_id": "hybrid-win-%d" % index,
+			"completed": true,
+			"player_first": true,
+			"mode": MatchConfig.Mode.HYBRID,
+			"player_kills_by_vehicle_id": {},
+		})
+	_expect(
+		not GarageProfile.is_vehicle_unlocked("thunderclaw"),
+		"Thunderclaw remains locked after 14 Hybrid wins",
+	)
+	var thunderclaw_unlock := GarageProfile.commit_completed_race({
+		"race_id": "hybrid-win-14",
+		"completed": true,
+		"player_first": true,
+		"mode": MatchConfig.Mode.HYBRID,
+		"player_kills_by_vehicle_id": {},
+	})
+	_expect(
+		"thunderclaw" in thunderclaw_unlock,
+		"Thunderclaw unlocks at 15 Hybrid wins",
+	)
+
+	GarageProfile.commit_completed_race({
+		"race_id": "torrent-hits-99",
+		"completed": true,
+		"player_first": false,
+		"direct_missile_hits": 99,
+		"player_kills_by_vehicle_id": {},
+	})
+	_expect(not GarageProfile.is_vehicle_unlocked("torrent"), "Torrent remains locked after 99 direct hits")
+	var torrent_unlock := GarageProfile.commit_completed_race({
+		"race_id": "torrent-hit-100",
+		"completed": true,
+		"player_first": false,
+		"direct_missile_hits": 1,
+		"player_kills_by_vehicle_id": {},
+	})
+	_expect("torrent" in torrent_unlock, "Torrent unlocks at 100 direct missile hits")
 
 	GarageProfile.commit_completed_race({
 		"race_id": "race-wraith",

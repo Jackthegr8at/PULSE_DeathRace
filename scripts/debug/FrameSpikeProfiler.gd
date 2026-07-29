@@ -13,6 +13,10 @@ var _was_in_race := false
 
 
 func _process(delta: float) -> void:
+	# Skip all profiling work in release builds (string formatting + monitors cost CPU).
+	if not OS.is_debug_build():
+		set_process(false)
+		return
 	var in_race := _is_race_scene()
 	if not in_race:
 		_was_in_race = false

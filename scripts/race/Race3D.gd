@@ -36,6 +36,7 @@ var _entrant_count: int = 0
 var _finish_window_started: bool = false
 var _finish_timer: Timer = null
 var _player_kills_by_vehicle_id: Dictionary = {}
+var _player_direct_missile_hits: int = 0
 var _race_summary_committed: bool = false
 var _newly_unlocked_vehicle_ids: Array[String] = []
 var _race_session_id: String = ""
@@ -107,6 +108,7 @@ func _spawn_field() -> void:
 		player.setup_player_laps(path3d)
 	player.died.connect(_on_vehicle_died)
 	player.race_finished.connect(_on_race_finished)
+	player.missile_direct_hit.connect(_on_player_missile_direct_hit)
 	vehicles.append(player)
 
 	# AI
@@ -127,6 +129,10 @@ func _spawn_field() -> void:
 		vehicles.append(ai)
 
 	_update_alive_hud()
+
+
+func _on_player_missile_direct_hit(_target: Vehicle) -> void:
+	_player_direct_missile_hits += 1
 
 
 func _apply_ai_difficulty(ai: Vehicle, ai_index: int) -> void:
@@ -597,7 +603,10 @@ func _commit_race_progress(player_won: bool) -> void:
 		"race_id": _race_session_id,
 		"completed": true,
 		"player_first": player_won and _get_player_finish_place() == 1,
+		"difficulty": MatchConfig.ai_difficulty,
+		"mode": MatchConfig.mode,
 		"player_kills_by_vehicle_id": _player_kills_by_vehicle_id.duplicate(true),
+		"direct_missile_hits": _player_direct_missile_hits,
 	})
 
 

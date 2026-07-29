@@ -75,9 +75,10 @@ transform = Transform3D(1.5, 0, 0, 0, 1.5, 0, 0, 0, 1.5, 0, 0, 0)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.46, 0.05, -0.57)
 material_override = SubResource("StandardMaterial3D_tfk12")
 cast_shadow = 0
-amount = 32
-lifetime = 0.5
-fixed_fps = 60
+amount = 12
+lifetime = 0.4
+fixed_fps = 30
+interpolate = true
 process_material = SubResource("ParticleProcessMaterial_xgt35")
 draw_pass_1 = SubResource("QuadMesh_68fxn")
 
@@ -85,9 +86,10 @@ draw_pass_1 = SubResource("QuadMesh_68fxn")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.46, 0.05, -0.57)
 material_override = SubResource("StandardMaterial3D_tfk12")
 cast_shadow = 0
-amount = 32
-lifetime = 0.5
-fixed_fps = 60
+amount = 12
+lifetime = 0.4
+fixed_fps = 30
+interpolate = true
 process_material = SubResource("ParticleProcessMaterial_xgt35")
 draw_pass_1 = SubResource("QuadMesh_68fxn")
 

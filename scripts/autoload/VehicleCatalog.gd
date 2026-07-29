@@ -60,6 +60,62 @@ const VEHICLES: Dictionary = {
 		"unlock_vehicle_id": "",
 		"garage_y_offset": 0.0,
 	},
+	"specter": {
+		"id": "specter",
+		"display_name": "SPECTER",
+		"role": "STEALTH ASSASSIN",
+		"ability_title": "SHADOW CLOAK",
+		"ability_description": "Firing cloaks the vehicle for 2.5 seconds. 8-second cooldown.",
+		"scene_path": "res://scenes/vehicles/SpecterModular.tscn",
+		"vehicle_type": Vehicle.VehicleType.SPECTER,
+		"minimap_color": Color("8f52c7"),
+		"unlock_rule": "hard_first_place",
+		"unlock_target": 10,
+		"unlock_vehicle_id": "",
+		"garage_y_offset": 0.0,
+	},
+	"molten": {
+		"id": "molten",
+		"display_name": "MOLTEN",
+		"role": "FLAME BRUISER",
+		"ability_title": "FIRESTORM",
+		"ability_description": "One ammo unleashes a 4-second short-range flamethrower.",
+		"scene_path": "res://scenes/vehicles/MoltenModular.tscn",
+		"vehicle_type": Vehicle.VehicleType.MOLTEN,
+		"minimap_color": Color("ff7a18"),
+		"unlock_rule": "last_standing_wins",
+		"unlock_target": 10,
+		"unlock_vehicle_id": "",
+		"garage_y_offset": 0.0,
+	},
+	"thunderclaw": {
+		"id": "thunderclaw",
+		"display_name": "THUNDERCLAW",
+		"role": "STORM CHASER",
+		"ability_title": "CHAIN SURGE",
+		"ability_description": "Firing boosts acceleration; missile hits arc to one nearby rival.",
+		"scene_path": "res://scenes/vehicles/ThunderclawModular.tscn",
+		"vehicle_type": Vehicle.VehicleType.THUNDERCLAW,
+		"minimap_color": Color("28bfff"),
+		"unlock_rule": "hybrid_wins",
+		"unlock_target": 15,
+		"unlock_vehicle_id": "",
+		"garage_y_offset": 0.0,
+	},
+	"torrent": {
+		"id": "torrent",
+		"display_name": "TORRENT",
+		"role": "PRECISION STRIKER",
+		"ability_title": "SEEKER WARHEAD",
+		"ability_description": "Missiles lock onto a visible rival and home for up to 18 meters.",
+		"scene_path": "res://scenes/vehicles/TorrentModular.tscn",
+		"vehicle_type": Vehicle.VehicleType.TORRENT,
+		"minimap_color": Color("15d5d1"),
+		"unlock_rule": "direct_missile_hits",
+		"unlock_target": 100,
+		"unlock_vehicle_id": "",
+		"garage_y_offset": 0.0,
+	},
 }
 
 const ORDERED_IDS: Array[String] = [
@@ -67,6 +123,10 @@ const ORDERED_IDS: Array[String] = [
 	"bulldoze",
 	"venom",
 	"wraith",
+	"specter",
+	"molten",
+	"thunderclaw",
+	"torrent",
 ]
 
 
@@ -94,19 +154,22 @@ func get_id_for_scene_path(scene_path: String) -> String:
 	return DEFAULT_VEHICLE_ID
 
 
-func get_ai_roster(selected_vehicle_id: String, count: int = 3) -> Array[String]:
+func get_ai_candidate_ids(selected_vehicle_id: String) -> Array[String]:
 	var selected_id := selected_vehicle_id if has_vehicle(selected_vehicle_id) else DEFAULT_VEHICLE_ID
 	var candidates: Array[String] = []
 	for vehicle_id in ORDERED_IDS:
 		if vehicle_id != selected_id:
 			candidates.append(vehicle_id)
-	if candidates.is_empty() or count <= 0:
+	return candidates
+
+
+func get_ai_roster(selected_vehicle_id: String, count: int = 3) -> Array[String]:
+	if ORDERED_IDS.size() <= 1 or count <= 0:
 		return []
 
-	var roster: Array[String] = []
-	for index in mini(count, candidates.size()):
-		roster.append(candidates[index])
-	return roster
+	var candidates := get_ai_candidate_ids(selected_vehicle_id)
+	candidates.shuffle()
+	return candidates.slice(0, mini(count, candidates.size()))
 
 
 func get_unlock_progress(vehicle_id: String, stats: Dictionary) -> int:
@@ -116,8 +179,16 @@ func get_unlock_progress(vehicle_id: String, stats: Dictionary) -> int:
 			return int(entry.get("unlock_target", 0))
 		"first_place":
 			return int(stats.get("first_place_finishes", 0))
+		"hard_first_place":
+			return int(stats.get("hard_first_place_finishes", 0))
+		"last_standing_wins":
+			return int(stats.get("last_standing_wins", 0))
+		"hybrid_wins":
+			return int(stats.get("hybrid_wins", 0))
 		"total_kills":
 			return int(stats.get("total_player_destroys", 0))
+		"direct_missile_hits":
+			return int(stats.get("direct_missile_hits", 0))
 		"kill_vehicle":
 			var kills_by_vehicle := stats.get("player_destroys_by_vehicle_id", {}) as Dictionary
 			return int(kills_by_vehicle.get(str(entry.get("unlock_vehicle_id", "")), 0))
@@ -130,7 +201,15 @@ func meets_unlock_requirement(vehicle_id: String, stats: Dictionary) -> bool:
 	var rule := str(entry.get("unlock_rule", "default"))
 	if rule == "default":
 		return true
-	if rule not in ["first_place", "total_kills", "kill_vehicle"]:
+	if rule not in [
+		"first_place",
+		"hard_first_place",
+		"last_standing_wins",
+		"hybrid_wins",
+		"total_kills",
+		"kill_vehicle",
+		"direct_missile_hits",
+	]:
 		push_warning("VehicleCatalog: unknown unlock rule '%s' for %s" % [rule, vehicle_id])
 		return false
 	return get_unlock_progress(vehicle_id, stats) >= int(entry.get("unlock_target", 0))
@@ -144,10 +223,18 @@ func unlock_requirement_text(vehicle_id: String) -> String:
 			return "AVAILABLE"
 		"first_place":
 			return "FINISH 1ST IN %d RACES" % target
+		"hard_first_place":
+			return "WIN %d RACES ON HARD" % target
+		"last_standing_wins":
+			return "WIN %d LAST STANDING RACES" % target
+		"hybrid_wins":
+			return "WIN %d HYBRID RACES" % target
 		"total_kills":
 			return "DESTROY %d CARS" % target
 		"kill_vehicle":
 			var victim := get_vehicle(str(entry.get("unlock_vehicle_id", DEFAULT_VEHICLE_ID)))
 			return "DESTROY %s %d TIMES" % [str(victim.get("display_name", "CAR")), target]
+		"direct_missile_hits":
+			return "LAND %d DIRECT MISSILE HITS" % target
 		_:
 			return "UNAVAILABLE"

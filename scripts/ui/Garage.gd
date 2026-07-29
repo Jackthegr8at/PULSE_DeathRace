@@ -299,12 +299,6 @@ func _build_ui() -> void:
 
 
 func _load_vehicle_displays() -> void:
-	var positions := [
-		Vector3(0.0, 0.0, -1.0),
-		Vector3(-5.0, 0.0, -2.2),
-		Vector3(5.0, 0.0, -2.2),
-		Vector3(0.0, 0.0, -5.0),
-	]
 	for index in VehicleCatalog.get_all_ids().size():
 		var vehicle_id := VehicleCatalog.get_all_ids()[index]
 		var entry := VehicleCatalog.get_vehicle(vehicle_id)
@@ -314,7 +308,9 @@ func _load_vehicle_displays() -> void:
 			continue
 		var pivot := Node3D.new()
 		pivot.name = "%sDisplay" % vehicle_id.capitalize()
-		pivot.position = positions[index]
+		# Only the browsed vehicle is visible. A common origin also supports an
+		# arbitrary number of future garage vehicles without fixed slot arrays.
+		pivot.position = Vector3(0.0, 0.0, -0.35)
 		add_child(pivot)
 		var model := packed.instantiate() as Node3D
 		if model == null:

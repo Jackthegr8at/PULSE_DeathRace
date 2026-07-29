@@ -1,0 +1,44 @@
+[gd_scene format=3 uid="uid://b7f0w3ibllf7w"]
+
+[ext_resource type="Script" uid="uid://bqctlpwodlti" path="res://scripts/cars/ModularTruck.gd" id="1_script"]
+[ext_resource type="PackedScene" uid="uid://cvp42o8s8nbfq" path="res://models/molten.glb" id="2_body"]
+[ext_resource type="PackedScene" uid="uid://lkyli7qikw0u" path="res://models/wheel_b.glb" id="3_wheel"]
+
+[node name="MoltenModular" type="Node3D" unique_id=2070740239 groups=["modular_vehicle_visual"]]
+transform = Transform3D(1.5, 0, 0, 0, 1.5, 0, 0, 0, 1.5, 0, 0, 0)
+script = ExtResource("1_script")
+
+[node name="Chassis" parent="." unique_id=1656228003 instance=ExtResource("2_body")]
+transform = Transform3D(-7.42641e-08, 0, -1.4500002, 0, 1.4500002, 0, 1.7000002, 0, -6.338152e-08, 0, 0.36120638, 0.09730839)
+
+[node name="WheelFrontLeft" type="Node3D" parent="." unique_id=316316279]
+transform = Transform3D(1.5, 0, 0, 0, 1.5, 0, 0, 0, 1.5, -0.216, 0.14903292, 0.48100004)
+
+[node name="Wheel" parent="WheelFrontLeft" unique_id=1386652736 instance=ExtResource("3_wheel")]
+transform = Transform3D(-5.972984e-07, 0, 0.165, 0, 0.165, 0, -0.165, 0, -5.972984e-07, 0, 0, 0)
+
+[node name="WheelFrontRight" type="Node3D" parent="." unique_id=1828994798]
+transform = Transform3D(1.5, 0, 0, 0, 1.5, 0, 0, 0, 1.5, 0.21585068, 0.14866793, 0.48058146)
+
+[node name="Wheel" parent="WheelFrontRight" unique_id=1332302218 instance=ExtResource("3_wheel")]
+transform = Transform3D(-5.972984e-07, 0, 0.165, 0, 0.165, 0, -0.165, 0, -5.972984e-07, 0, 0, 0)
+
+[node name="WheelBackLeft" type="Node3D" parent="." unique_id=900086486]
+transform = Transform3D(1.5, 0, 0, 0, 1.5, 0, 0, 0, 1.5, -0.32, 0.1486679, -0.39369377)
+
+[node name="Wheel" parent="WheelBackLeft" unique_id=1130693008 instance=ExtResource("3_wheel")]
+transform = Transform3D(-5.972984e-07, 0, 0.165, 0, 0.165, 0, -0.165, 0, -5.972984e-07, 0, 0, 0)
+
+[node name="WheelBackRight" type="Node3D" parent="." unique_id=441652887]
+transform = Transform3D(1.5, 0, 0, 0, 1.5, 0, 0, 0, 1.5, 0.32, 0.1486679, -0.39369377)
+
+[node name="Wheel" parent="WheelBackRight" unique_id=1932869289 instance=ExtResource("3_wheel")]
+transform = Transform3D(-5.972984e-07, 0, 0.165, 0, 0.165, 0, -0.165, 0, -5.972984e-07, 0, 0, 0)
+
+[node name="ExhaustAnchor" type="Marker3D" parent="." unique_id=1686771492]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.025541365, 0.1796699, -0.75166154)
+
+[node name="WeaponAnchor" type="Marker3D" parent="." unique_id=1698904052]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.0014313062, 0.590061, 0.23342888)
+
+[node name="UndersideAttachments" type="Node3D" parent="." unique_id=468105517]

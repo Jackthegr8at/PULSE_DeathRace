@@ -7,15 +7,21 @@ signal ammo_changed(current: int, maximum: int)
 signal died(vehicle: Vehicle)
 signal lap_completed(vehicle: Vehicle, laps: int)
 signal race_finished(vehicle: Vehicle)
+signal missile_direct_hit(target: Vehicle)
 
 enum VehicleType {
 	RAVAGE,
 	BULLDOZE,
 	VENOM,
 	WRAITH,
+	SPECTER,
+	MOLTEN,
+	THUNDERCLAW,
+	TORRENT,
 }
 
 const MissileScene: PackedScene = preload("res://scenes/combat/Missile3D.tscn")
+const HomingMissileScene: PackedScene = preload("res://scenes/combat/HomingMissile3D.tscn")
 const CustomWheelScene: PackedScene = preload("res://models/wheel.glb")
 const RAVAGE_HEALTH_MULTIPLIER := 1.15
 const BULLDOZE_RAM_DAMAGE := 7.5
@@ -23,6 +29,30 @@ const BULLDOZE_MIN_IMPACT_SPEED := 1.5
 const BULLDOZE_RAM_COOLDOWN_SECONDS := 1.0
 const VENOM_FORWARD_SPEED_MULTIPLIER := 1.12
 const WRAITH_MISSILE_DAMAGE_MULTIPLIER := 1.5
+const SPECTER_HEALTH_MULTIPLIER := 0.90
+const SPECTER_FORWARD_SPEED_MULTIPLIER := 1.06
+const SPECTER_STEER_MULTIPLIER := 1.10
+const SPECTER_STEER_RESPONSE_MULTIPLIER := 1.12
+const SPECTER_CLOAK_DURATION := 2.5
+const SPECTER_CLOAK_COOLDOWN := 8.0
+const SPECTER_CLOAK_TRANSPARENCY := 0.70
+const MOLTEN_HEALTH_MULTIPLIER := 1.05
+const MOLTEN_STEER_RESPONSE_MULTIPLIER := 0.95
+const THUNDERCLAW_SURGE_DURATION := 2.5
+const THUNDERCLAW_SURGE_SPEED_MULTIPLIER := 1.25
+const THUNDERCLAW_SURGE_ACCELERATION_MULTIPLIER := 1.5
+const THUNDERCLAW_CHAIN_RANGE := 6.0
+const THUNDERCLAW_CHAIN_DAMAGE_MULTIPLIER := 0.5
+const THUNDERCLAW_ARC_DURATION := 0.18
+const THUNDERCLAW_ARC_COLOR := Color("28bfff")
+const HOMING_LOCK_RANGE := 14.0
+const HOMING_LOCK_HALF_ANGLE_DEGREES := 22.5
+const FIRESTORM_DURATION := 4.0
+const FIRESTORM_RANGE := 8.0
+const FIRESTORM_HALF_ANGLE_DEGREES := 17.5
+const FIRESTORM_TICK_INTERVAL := 0.25
+const FIRESTORM_DAMAGE_PER_TICK := 0.75
+const FIRESTORM_TOTAL_TICKS := 16
 
 # Nodes
 @onready var sphere: RigidBody3D = $Sphere
@@ -52,6 +82,7 @@ var _wheel_rest_positions: Dictionary = {}
 const THRUSTER_SMOKE_TEX := preload("res://sprites/smoke.png")
 
 var _exhaust_anchor: Node3D = null
+var _weapon_anchor: Node3D = null
 var _thruster_core: GPUParticles3D = null
 var _thruster_spark: GPUParticles3D = null
 var _thruster_light: OmniLight3D = null
@@ -99,18 +130,18 @@ var _thruster_color_hot: Color = Color("a8f7ff")
 @export var modular_suspension_smoothing: float = 16.0
 
 @export_group("Handling")
-## Peak yaw rate multiplier (was hard-coded 4 — caused wall-to-wall zig-zag).
-@export var steer_sensitivity: float = 1.85
+## Peak yaw rate multiplier (original was 4 — too snappy; 1.85 felt too slow).
+@export var steer_sensitivity: float = 2.65
 ## How fast keyboard/gamepad steer eases in toward full lock.
-@export var steer_input_rise: float = 3.2
+@export var steer_input_rise: float = 5.5
 ## How fast steer returns to center when released.
-@export var steer_input_fall: float = 5.5
+@export var steer_input_fall: float = 7.0
 ## How quickly angular_speed tracks the desired rate.
-@export var steer_response: float = 2.4
-## At full speed, turn power is scaled by this (arcade: less snap at high speed).
-@export var high_speed_steer_factor: float = 0.38
-## At crawl, turn power scale (still turn, but not spin-on-spot).
-@export var low_speed_steer_factor: float = 0.85
+@export var steer_response: float = 3.6
+## At full speed, turn power is scaled by this (still less than low speed to limit zig-zag).
+@export var high_speed_steer_factor: float = 0.62
+## At crawl, turn power scale.
+@export var low_speed_steer_factor: float = 1.05
 
 @export_group("Combat")
 @export var max_health: float = 100.0
@@ -125,7 +156,7 @@ var _thruster_color_hot: Color = Color("a8f7ff")
 @export var path_look_ahead: float = 5.5
 @export var ai_throttle: float = 0.78
 @export var ai_corner_throttle: float = 0.48
-@export var ai_steer_gain: float = 1.55
+@export var ai_steer_gain: float = 1.85
 @export var detect_range: float = 22.0
 ## Must be this aligned with target to actually fire (missile still goes straight forward).
 @export var fire_dot_min: float = 0.93
@@ -143,6 +174,15 @@ var match_over: bool = false
 var race_started: bool = true
 var has_finished_race: bool = false
 var forward_speed_multiplier: float = 1.0
+var is_cloaked: bool = false
+var _cloak_remaining: float = 0.0
+var _cloak_cooldown_remaining: float = 0.0
+var is_firestorm_active: bool = false
+var _firestorm_elapsed: float = 0.0
+var _firestorm_ticks_done: int = 0
+var _firestorm_particles: GPUParticles3D = null
+var _firestorm_light: OmniLight3D = null
+var _thunderclaw_surge_remaining: float = 0.0
 var _cooldown: float = 0.0
 var _ai_aim_target: Vehicle = null
 var _ai_aim_timer: float = 0.0
@@ -172,6 +212,9 @@ var prev_position: Vector3
 var calculated_lean: float
 ## Smoothed steer (-1..1); raw input.x is filtered to kill keyboard snap oversteer.
 var _steer_smoothed: float = 0.0
+## Cycles modular suspension raycasts (4 wheels → 2 rays/frame for cheaper physics).
+var _suspension_phase: int = 0
+var _wheel_suspension_delta: Dictionary = {}
 
 
 func get_vehicle_position() -> Vector3:
@@ -219,6 +262,18 @@ func _apply_vehicle_traits() -> void:
 			missile_damage *= WRAITH_MISSILE_DAMAGE_MULTIPLIER
 		VehicleType.BULLDOZE:
 			pass
+		VehicleType.SPECTER:
+			max_health *= SPECTER_HEALTH_MULTIPLIER
+			forward_speed_multiplier = SPECTER_FORWARD_SPEED_MULTIPLIER
+			steer_sensitivity *= SPECTER_STEER_MULTIPLIER
+			steer_response *= SPECTER_STEER_RESPONSE_MULTIPLIER
+		VehicleType.MOLTEN:
+			max_health *= MOLTEN_HEALTH_MULTIPLIER
+			steer_response *= MOLTEN_STEER_RESPONSE_MULTIPLIER
+		VehicleType.THUNDERCLAW:
+			pass
+		VehicleType.TORRENT:
+			pass
 
 
 ## Call after swapping Container/Model (e.g. AI color trucks or custom GLB).
@@ -262,9 +317,12 @@ func rebind_model_parts() -> void:
 		if wheel != null:
 			_wheel_rest_positions[wheel] = wheel.position
 	_resolve_exhaust_anchor(model)
+	_resolve_weapon_anchor(model)
 	# Rebuild thruster under the (possibly new) model / anchor
 	if is_inside_tree() and thruster_enabled:
 		_ensure_thruster_fx()
+	if is_cloaked:
+		_set_vehicle_transparency(SPECTER_CLOAK_TRANSPARENCY)
 
 
 func _resolve_exhaust_anchor(model: Node3D) -> void:
@@ -275,6 +333,31 @@ func _resolve_exhaust_anchor(model: Node3D) -> void:
 			_exhaust_anchor = model.find_child("ExhaustAnchor", true, false) as Node3D
 	if _exhaust_anchor == null and vehicle_model != null:
 		_exhaust_anchor = vehicle_model.get_node_or_null("ExhaustAnchor") as Node3D
+
+
+func _resolve_weapon_anchor(model: Node3D) -> void:
+	_weapon_anchor = null
+	if model != null:
+		_weapon_anchor = model.get_node_or_null("WeaponAnchor") as Node3D
+		if _weapon_anchor == null:
+			_weapon_anchor = model.find_child("WeaponAnchor", true, false) as Node3D
+	if _weapon_anchor == null and vehicle_model != null:
+		_weapon_anchor = vehicle_model.get_node_or_null("WeaponAnchor") as Node3D
+
+
+func _get_weapon_origin() -> Vector3:
+	if _weapon_anchor != null and is_instance_valid(_weapon_anchor):
+		return _weapon_anchor.global_position
+	var forward := get_forward()
+	return get_vehicle_position() + Vector3(0, 0.75, 0) + forward * 2.2
+
+
+func _get_weapon_forward() -> Vector3:
+	if _weapon_anchor != null and is_instance_valid(_weapon_anchor):
+		var anchor_forward := _weapon_anchor.global_transform.basis.z.normalized()
+		if anchor_forward.length_squared() > 0.0001:
+			return anchor_forward
+	return get_forward()
 
 
 func _thruster_colors_for_type() -> void:
@@ -292,6 +375,18 @@ func _thruster_colors_for_type() -> void:
 		VehicleType.VENOM:
 			_thruster_color = Color("a84cff") # purple
 			_thruster_color_hot = Color("d4a0ff")
+		VehicleType.SPECTER:
+			_thruster_color = Color("7547ff") # spectral violet
+			_thruster_color_hot = Color("d9c7ff")
+		VehicleType.MOLTEN:
+			_thruster_color = Color("ff650d") # furnace orange
+			_thruster_color_hot = Color("fff08a")
+		VehicleType.THUNDERCLAW:
+			_thruster_color = THUNDERCLAW_ARC_COLOR
+			_thruster_color_hot = Color("d8f6ff")
+		VehicleType.TORRENT:
+			_thruster_color = Color("15d5d1")
+			_thruster_color_hot = Color("c8fffd")
 		_:
 			_thruster_color = Color("3de8ff")
 			_thruster_color_hot = Color("b8fbff")
@@ -329,11 +424,12 @@ func _ensure_thruster_fx() -> void:
 		local_pos = thruster_default_offset
 
 	var len_s := thruster_length_scale
-	# Shorter plume: lower lifetime + speed, smaller quads
+	# AI: one cheap core jet only (no spark stream / light) — big multiplayer FPS win.
+	var core_amount := 22 if is_player else 10
 	_thruster_core = _make_thruster_particles(
 		Color(c.r, c.g, c.b, 0.95),
 		fade_hot,
-		22,
+		core_amount,
 		0.12 * len_s + 0.06,
 		3.2 * len_s,
 		0.22,
@@ -343,34 +439,40 @@ func _ensure_thruster_fx() -> void:
 	)
 	_thruster_core.name = "ThrusterCore"
 	_thruster_core.position = local_pos
+	_thruster_core.fixed_fps = 30
+	_thruster_core.interpolate = true
 	parent.add_child(_thruster_core)
 
-	_thruster_spark = _make_thruster_particles(
-		Color(h.r, h.g, h.b, 1.0),
-		fade,
-		12,
-		0.08 * len_s + 0.04,
-		4.5 * len_s,
-		0.08,
-		0.18,
-		0.24,
-		true
-	)
-	_thruster_spark.name = "ThrusterSpark"
-	_thruster_spark.position = local_pos
-	parent.add_child(_thruster_spark)
+	if is_player:
+		_thruster_spark = _make_thruster_particles(
+			Color(h.r, h.g, h.b, 1.0),
+			fade,
+			10,
+			0.08 * len_s + 0.04,
+			4.5 * len_s,
+			0.08,
+			0.18,
+			0.24,
+			true
+		)
+		_thruster_spark.name = "ThrusterSpark"
+		_thruster_spark.position = local_pos
+		_thruster_spark.fixed_fps = 30
+		_thruster_spark.interpolate = true
+		parent.add_child(_thruster_spark)
 
-	_thruster_light = OmniLight3D.new()
-	_thruster_light.name = "ThrusterLight"
-	_thruster_light.light_color = c
-	_thruster_light.light_energy = 0.0
-	_thruster_light.omni_range = 2.0
-	_thruster_light.shadow_enabled = false
-	_thruster_light.position = local_pos
-	parent.add_child(_thruster_light)
+		_thruster_light = OmniLight3D.new()
+		_thruster_light.name = "ThrusterLight"
+		_thruster_light.light_color = c
+		_thruster_light.light_energy = 0.0
+		_thruster_light.omni_range = 2.0
+		_thruster_light.shadow_enabled = false
+		_thruster_light.position = local_pos
+		parent.add_child(_thruster_light)
 
 	_thruster_core.emitting = true
-	_thruster_spark.emitting = true
+	if _thruster_spark:
+		_thruster_spark.emitting = true
 
 
 func _make_thruster_particles(
@@ -540,6 +642,9 @@ func setup_player_laps(path: Path3D) -> void:
 func set_match_over(over: bool) -> void:
 	match_over = over
 	if over:
+		_end_specter_cloak()
+		_end_firestorm()
+		_thunderclaw_surge_remaining = 0.0
 		input = Vector3.ZERO
 		linear_speed = 0.0
 
@@ -548,6 +653,9 @@ func mark_race_finished() -> void:
 	## Finished cars keep driving, but can no longer affect the remaining race
 	## with weapons or missile pickups.
 	has_finished_race = true
+	_end_specter_cloak()
+	_end_firestorm()
+	_thunderclaw_surge_remaining = 0.0
 	_ai_clear_aim()
 
 
@@ -578,6 +686,10 @@ func _physics_process(delta: float) -> void:
 		_cooldown = maxf(0.0, _cooldown - delta)
 	if _lap_cooldown > 0.0:
 		_lap_cooldown = maxf(0.0, _lap_cooldown - delta)
+	_update_specter_cloak(delta)
+	_update_firestorm(delta)
+	if _thunderclaw_surge_remaining > 0.0:
+		_thunderclaw_surge_remaining = maxf(0.0, _thunderclaw_surge_remaining - delta)
 
 	if match_over:
 		input = Vector3.ZERO
@@ -606,14 +718,23 @@ func _physics_process(delta: float) -> void:
 	var target_speed := input.z
 	if target_speed > 0.0:
 		target_speed *= forward_speed_multiplier
+		if _thunderclaw_surge_remaining > 0.0:
+			target_speed *= THUNDERCLAW_SURGE_SPEED_MULTIPLIER
 	if target_speed < 0 and linear_speed > 0.01:
 		linear_speed = lerpf(linear_speed, 0.0, clampf(delta * 8.0, 0.0, 1.0))
 	else:
 		if target_speed < 0:
 			linear_speed = lerpf(linear_speed, target_speed / 2.0, clampf(delta * 2.0, 0.0, 1.0))
 		else:
-			# Slightly slower throttle ramp = less sudden wall hits while correcting
-			linear_speed = lerpf(linear_speed, target_speed, clampf(delta * 4.5, 0.0, 1.0))
+			# Original throttle ramp (speed unchanged by handling retune)
+			var acceleration_rate := 6.0
+			if _thunderclaw_surge_remaining > 0.0:
+				acceleration_rate *= THUNDERCLAW_SURGE_ACCELERATION_MULTIPLIER
+			linear_speed = lerpf(
+				linear_speed,
+				target_speed,
+				clampf(delta * acceleration_rate, 0.0, 1.0),
+			)
 
 	if sphere and vehicle_model:
 		acceleration = lerpf(acceleration, linear_speed + (abs(sphere.angular_velocity.length() * linear_speed) / 100), delta * 1)
@@ -624,8 +745,8 @@ func _physics_process(delta: float) -> void:
 		raycast.position = sphere.position
 		linear_velocity = (vehicle_model.position - prev_position) / maxf(delta, 0.0001)
 		prev_position = vehicle_model.position
-		# Slightly less aggressive sphere spin coupling (was * 100)
-		sphere.angular_velocity += vehicle_model.get_global_transform().basis.x * (linear_speed * 72.0) * delta
+		# Original drive coupling (speed / top-end feel)
+		sphere.angular_velocity += vehicle_model.get_global_transform().basis.x * (linear_speed * 100.0) * delta
 
 	effect_engine(delta)
 	effect_body(delta)
@@ -638,15 +759,16 @@ func _physics_process(delta: float) -> void:
 
 
 func _update_steering(delta: float) -> void:
-	## Smooth steer so keyboard left/right doesn't slam full lock and ping-pong walls.
+	## Smooth steer: quick into the turn, still filtered enough to avoid wall-to-wall zig-zag.
 	var raw_steer := clampf(input.x, -1.0, 1.0)
-	# Rise slower than fall so small corrections don't overshoot; release snaps back cleanly.
 	var rate := steer_input_rise
-	if absf(raw_steer) < absf(_steer_smoothed) or signf(raw_steer) != signf(_steer_smoothed) and absf(raw_steer) < 0.01:
+	if absf(raw_steer) < absf(_steer_smoothed) or (
+		signf(raw_steer) != signf(_steer_smoothed) and absf(raw_steer) < 0.01
+	):
 		rate = steer_input_fall
 	elif signf(raw_steer) != signf(_steer_smoothed) and absf(_steer_smoothed) > 0.05:
-		# Changing direction: ease through center first
-		rate = (steer_input_rise + steer_input_fall) * 0.55
+		# Flip direction quickly but not instantly
+		rate = steer_input_rise * 0.9
 	_steer_smoothed = move_toward(_steer_smoothed, raw_steer, rate * delta)
 
 	var direction := signf(linear_speed)
@@ -654,11 +776,10 @@ func _update_steering(delta: float) -> void:
 		direction = signf(input.z) if absf(input.z) > 0.1 else 1.0
 
 	var speed_n := clampf(absf(linear_speed), 0.0, 1.0)
-	# Low speed: moderate turn. High speed: much less yaw (stops zig-zag).
-	var speed_steer := lerpf(low_speed_steer_factor, high_speed_steer_factor, speed_n * speed_n)
-	# Barely moving + no throttle: don't pirouette on the spot
-	if speed_n < 0.06 and absf(input.z) < 0.12:
-		speed_steer *= 0.45
+	# Mild high-speed falloff (linear, not squared — squared felt too soft mid-turn)
+	var speed_steer := lerpf(low_speed_steer_factor, high_speed_steer_factor, speed_n)
+	if speed_n < 0.05 and absf(input.z) < 0.12:
+		speed_steer *= 0.55
 
 	var target_angular := -_steer_smoothed * speed_steer * steer_sensitivity * direction
 	angular_speed = lerpf(angular_speed, target_angular, clampf(delta * steer_response, 0.0, 1.0))
@@ -742,7 +863,7 @@ func _ai_drive(_delta: float) -> void:
 func _ai_apply_aim_steer() -> void:
 	if _ai_aim_target == null or not is_instance_valid(_ai_aim_target):
 		return
-	if not _ai_aim_target.is_alive:
+	if not _ai_aim_target.is_targetable_by_ai():
 		_ai_clear_aim()
 		return
 	var to_enemy := _ai_aim_target.get_vehicle_position() - get_vehicle_position()
@@ -772,7 +893,7 @@ func _ai_pick_fire_target(acquire_dot: float) -> Vehicle:
 		if node == self or not (node is Vehicle):
 			continue
 		var other := node as Vehicle
-		if not other.is_alive or other.has_finished_race:
+		if not other.is_targetable_by_ai():
 			continue
 		var offset: Vector3 = other.get_vehicle_position() - origin
 		var dist := offset.length()
@@ -790,9 +911,16 @@ func _ai_combat(delta: float) -> void:
 	if has_finished_race or match_over or not is_alive or missile_ammo <= 0 or _cooldown > 0.0:
 		_ai_clear_aim()
 		return
+	if vehicle_type == VehicleType.MOLTEN:
+		_ai_firestorm_combat(delta)
+		return
 
 	# Keep or acquire a target in a wide forward cone, then steer (in _ai_drive) before firing
-	if _ai_aim_target != null and is_instance_valid(_ai_aim_target) and _ai_aim_target.is_alive:
+	if (
+		_ai_aim_target != null
+		and is_instance_valid(_ai_aim_target)
+		and _ai_aim_target.is_targetable_by_ai()
+	):
 		var offset := _ai_aim_target.get_vehicle_position() - get_vehicle_position()
 		var dist := offset.length()
 		offset.y = 0.0
@@ -825,6 +953,62 @@ func _ai_combat(delta: float) -> void:
 			_ai_clear_aim()
 
 
+func _ai_firestorm_combat(delta: float) -> void:
+	if is_firestorm_active:
+		_ai_clear_aim()
+		return
+
+	if (
+		_ai_aim_target != null
+		and is_instance_valid(_ai_aim_target)
+		and _ai_aim_target.is_targetable_by_ai()
+	):
+		var offset := _ai_aim_target.get_vehicle_position() - get_vehicle_position()
+		offset.y = 0.0
+		var distance := offset.length()
+		if distance > FIRESTORM_RANGE or distance < 1.0:
+			_ai_clear_aim()
+			return
+		_ai_aim_timer += delta
+		var alignment := _get_weapon_forward().dot(offset.normalized())
+		if alignment >= cos(deg_to_rad(FIRESTORM_HALF_ANGLE_DEGREES)):
+			try_fire()
+			_ai_clear_aim()
+			return
+		if _ai_aim_timer >= ai_aim_time_max:
+			_ai_clear_aim()
+		return
+
+	_ai_clear_aim()
+	var candidate := _ai_pick_firestorm_target(0.65)
+	if candidate:
+		_ai_aim_target = candidate
+		_ai_aim_timer = 0.0
+
+
+func _ai_pick_firestorm_target(acquire_dot: float) -> Vehicle:
+	var best: Vehicle = null
+	var best_distance := FIRESTORM_RANGE
+	var forward := _get_weapon_forward()
+	var origin := _get_weapon_origin()
+	for node in get_tree().get_nodes_in_group("vehicles"):
+		if node == self or not (node is Vehicle):
+			continue
+		var other := node as Vehicle
+		if not other.is_targetable_by_ai():
+			continue
+		var offset := other.get_vehicle_position() - origin
+		offset.y = 0.0
+		var distance := offset.length()
+		if distance < 1.0 or distance > best_distance:
+			continue
+		if forward.dot(offset.normalized()) < acquire_dot:
+			continue
+		best = other
+		best_distance = distance
+	return best
+
+
 func add_missiles(amount: int) -> bool:
 	## Returns true if any ammo was actually added (pickup may respawn).
 	if amount <= 0 or not is_alive or match_over or has_finished_race:
@@ -841,13 +1025,20 @@ func try_fire() -> bool:
 		return false
 	if missile_ammo <= 0:
 		return false
+	if vehicle_type == VehicleType.MOLTEN:
+		return _start_firestorm()
+	var was_cloaked := is_cloaked
+	if was_cloaked:
+		_end_specter_cloak()
 	missile_ammo -= 1
 	ammo_changed.emit(missile_ammo, max_missile_ammo)
 	_cooldown = fire_cooldown
-	var forward := get_forward()
-	var missile: Area3D = MissileScene.instantiate()
-	# Spawn well ahead of the nose so it never pops out the rear
-	var origin := get_vehicle_position() + Vector3(0, 0.75, 0) + forward * 2.2
+	var forward := _get_weapon_forward()
+	var origin := _get_weapon_origin()
+	var projectile_scene := (
+		HomingMissileScene if vehicle_type == VehicleType.TORRENT else MissileScene
+	)
+	var missile: Area3D = projectile_scene.instantiate()
 	var host := get_tree().current_scene
 	if host:
 		host.add_child(missile)
@@ -856,7 +1047,361 @@ func try_fire() -> bool:
 	missile.global_position = origin
 	if missile.has_method("setup"):
 		missile.setup(self, missile_damage, missile_speed, forward)
+	if vehicle_type == VehicleType.TORRENT and missile.has_method("setup_homing"):
+		missile.setup_homing(_find_homing_missile_target(origin, forward))
+	if vehicle_type == VehicleType.SPECTER and not was_cloaked:
+		_start_specter_cloak()
+	if vehicle_type == VehicleType.THUNDERCLAW:
+		_thunderclaw_surge_remaining = THUNDERCLAW_SURGE_DURATION
 	return true
+
+
+func on_missile_direct_hit(direct_target: Vehicle, direct_damage: float) -> void:
+	if direct_target != null and is_instance_valid(direct_target):
+		missile_direct_hit.emit(direct_target)
+	## Thunderclaw chains exactly once from a successful direct missile hit.
+	if (
+		vehicle_type != VehicleType.THUNDERCLAW
+		or not is_alive
+		or match_over
+		or direct_target == null
+		or not is_instance_valid(direct_target)
+	):
+		return
+	var chain_target := _find_thunderclaw_chain_target(direct_target)
+	if chain_target == null:
+		return
+	var arc_start := direct_target.get_vehicle_position() + Vector3(0, 0.55, 0)
+	var arc_end := chain_target.get_vehicle_position() + Vector3(0, 0.55, 0)
+	chain_target.take_damage(
+		direct_damage * THUNDERCLAW_CHAIN_DAMAGE_MULTIPLIER,
+		self,
+	)
+	_spawn_thunderclaw_arc(arc_start, arc_end)
+
+
+func _find_homing_missile_target(origin: Vector3, forward: Vector3) -> Vehicle:
+	var best: Vehicle = null
+	var best_distance := HOMING_LOCK_RANGE
+	var minimum_dot := cos(deg_to_rad(HOMING_LOCK_HALF_ANGLE_DEGREES))
+	for node in get_tree().get_nodes_in_group("vehicles"):
+		if node == self or not (node is Vehicle):
+			continue
+		var candidate := node as Vehicle
+		if (
+			not candidate.is_alive
+			or candidate.has_finished_race
+			or candidate.is_cloaked
+		):
+			continue
+		var target_position := candidate.get_vehicle_position() + Vector3(0, 0.45, 0)
+		var offset := target_position - origin
+		var distance := offset.length()
+		if distance <= 0.01 or distance > best_distance:
+			continue
+		if forward.dot(offset.normalized()) < minimum_dot:
+			continue
+		if not _has_weapon_line_of_sight(origin, target_position, candidate):
+			continue
+		best = candidate
+		best_distance = distance
+	return best
+
+
+func _has_weapon_line_of_sight(
+	origin: Vector3,
+	target_position: Vector3,
+	target: Vehicle
+) -> bool:
+	if get_world_3d() == null:
+		return true
+	var query := PhysicsRayQueryParameters3D.create(origin, target_position)
+	query.collide_with_areas = false
+	query.collide_with_bodies = true
+	if sphere:
+		query.exclude = [sphere.get_rid()]
+	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	if hit.is_empty():
+		return true
+	var collider := hit.get("collider") as Node
+	return collider == target.sphere or (collider != null and collider.get_parent() == target)
+
+
+func _find_thunderclaw_chain_target(direct_target: Vehicle) -> Vehicle:
+	var best: Vehicle = null
+	var best_distance := THUNDERCLAW_CHAIN_RANGE
+	var origin := direct_target.get_vehicle_position()
+	for node in get_tree().get_nodes_in_group("vehicles"):
+		if node == self or node == direct_target or not (node is Vehicle):
+			continue
+		var candidate := node as Vehicle
+		if not candidate.is_alive or candidate.has_finished_race:
+			continue
+		var distance := origin.distance_to(candidate.get_vehicle_position())
+		if distance > best_distance:
+			continue
+		best = candidate
+		best_distance = distance
+	return best
+
+
+func _spawn_thunderclaw_arc(start: Vector3, finish: Vector3) -> void:
+	var host := get_tree().current_scene
+	if host == null:
+		return
+	var arc_root := Node3D.new()
+	arc_root.name = "ThunderclawArc"
+	host.add_child(arc_root)
+
+	var material := StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.albedo_color = THUNDERCLAW_ARC_COLOR
+	material.emission_enabled = true
+	material.emission = Color("9be9ff")
+	material.emission_energy_multiplier = 4.0
+
+	var direction := finish - start
+	var perpendicular := direction.cross(Vector3.UP).normalized()
+	if perpendicular.length_squared() < 0.001:
+		perpendicular = Vector3.RIGHT
+	var points: Array[Vector3] = [start]
+	for index in range(1, 5):
+		var fraction := float(index) / 5.0
+		var offset := perpendicular * sin(float(index) * 4.7) * 0.16
+		offset.y += sin(float(index) * 7.1) * 0.09
+		points.append(start.lerp(finish, fraction) + offset)
+	points.append(finish)
+
+	for index in range(points.size() - 1):
+		_add_thunderclaw_arc_segment(
+			arc_root,
+			points[index],
+			points[index + 1],
+			material,
+		)
+
+	var light := OmniLight3D.new()
+	light.light_color = THUNDERCLAW_ARC_COLOR
+	light.light_energy = 3.0
+	light.omni_range = 4.0
+	light.shadow_enabled = false
+	light.global_position = start.lerp(finish, 0.5)
+	arc_root.add_child(light)
+
+	var tween := arc_root.create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(material, "albedo_color:a", 0.0, THUNDERCLAW_ARC_DURATION)
+	tween.tween_property(material, "emission_energy_multiplier", 0.0, THUNDERCLAW_ARC_DURATION)
+	tween.tween_property(light, "light_energy", 0.0, THUNDERCLAW_ARC_DURATION)
+	tween.chain().tween_callback(arc_root.queue_free)
+
+
+func _add_thunderclaw_arc_segment(
+	parent: Node3D,
+	start: Vector3,
+	finish: Vector3,
+	material: StandardMaterial3D
+) -> void:
+	var segment_direction := finish - start
+	var segment_length := segment_direction.length()
+	if segment_length <= 0.001:
+		return
+	var segment := MeshInstance3D.new()
+	var cylinder := CylinderMesh.new()
+	cylinder.top_radius = 0.025
+	cylinder.bottom_radius = 0.025
+	cylinder.height = segment_length
+	cylinder.radial_segments = 5
+	cylinder.rings = 1
+	segment.mesh = cylinder
+	segment.material_override = material
+	segment.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	parent.add_child(segment)
+	segment.global_position = start.lerp(finish, 0.5)
+	segment.quaternion = Quaternion(Vector3.UP, segment_direction.normalized())
+
+
+func _start_firestorm() -> bool:
+	if vehicle_type != VehicleType.MOLTEN or is_firestorm_active or missile_ammo <= 0:
+		return false
+	missile_ammo -= 1
+	ammo_changed.emit(missile_ammo, max_missile_ammo)
+	_cooldown = maxf(fire_cooldown, FIRESTORM_DURATION)
+	is_firestorm_active = true
+	_firestorm_elapsed = 0.0
+	_firestorm_ticks_done = 0
+	_ensure_firestorm_fx()
+	if _firestorm_particles:
+		_firestorm_particles.restart()
+		_firestorm_particles.emitting = true
+	if _firestorm_light:
+		_firestorm_light.visible = true
+	return true
+
+
+func _update_firestorm(delta: float) -> void:
+	if not is_firestorm_active:
+		return
+	_firestorm_elapsed = minf(_firestorm_elapsed + delta, FIRESTORM_DURATION)
+	while (
+		_firestorm_ticks_done < FIRESTORM_TOTAL_TICKS
+		and _firestorm_elapsed + 0.0001
+			>= float(_firestorm_ticks_done + 1) * FIRESTORM_TICK_INTERVAL
+	):
+		_apply_firestorm_tick()
+		_firestorm_ticks_done += 1
+	if _firestorm_elapsed >= FIRESTORM_DURATION:
+		_end_firestorm()
+
+
+func _apply_firestorm_tick() -> void:
+	var origin := _get_weapon_origin()
+	var forward := _get_weapon_forward()
+	var minimum_dot := cos(deg_to_rad(FIRESTORM_HALF_ANGLE_DEGREES))
+	for node in get_tree().get_nodes_in_group("vehicles"):
+		if node == self or not (node is Vehicle):
+			continue
+		var target := node as Vehicle
+		if not target.is_alive or target.has_finished_race:
+			continue
+		var target_position := target.get_vehicle_position() + Vector3(0, 0.35, 0)
+		var offset := target_position - origin
+		var distance := offset.length()
+		if distance <= 0.01 or distance > FIRESTORM_RANGE:
+			continue
+		if forward.dot(offset.normalized()) < minimum_dot:
+			continue
+		if not _firestorm_has_line_of_sight(origin, target_position, target):
+			continue
+		target.take_damage(FIRESTORM_DAMAGE_PER_TICK, self)
+
+
+func _firestorm_has_line_of_sight(
+	origin: Vector3,
+	target_position: Vector3,
+	target: Vehicle
+) -> bool:
+	if get_world_3d() == null:
+		return true
+	var query := PhysicsRayQueryParameters3D.create(origin, target_position)
+	query.collide_with_areas = false
+	query.collide_with_bodies = true
+	if sphere:
+		query.exclude = [sphere.get_rid()]
+	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	if hit.is_empty():
+		return true
+	var collider := hit.get("collider") as Node
+	return collider == target.sphere or (collider != null and collider.get_parent() == target)
+
+
+func _ensure_firestorm_fx() -> void:
+	if _firestorm_particles != null and is_instance_valid(_firestorm_particles):
+		return
+	if vehicle_model == null:
+		return
+	var fx_parent: Node3D = _weapon_anchor if _weapon_anchor != null else vehicle_model
+	_firestorm_particles = _make_thruster_particles(
+		Color(1.0, 0.95, 0.35, 1.0),
+		Color(1.0, 0.08, 0.0, 0.0),
+		96,
+		0.5,
+		16.0,
+		0.35,
+		0.9,
+		0.72,
+		true
+	)
+	_firestorm_particles.name = "FirestormFlame"
+	_firestorm_particles.position = (
+		Vector3.ZERO if fx_parent == _weapon_anchor else Vector3(0, 0.28, 1.1)
+	)
+	_firestorm_particles.rotation_degrees = Vector3.ZERO
+	_firestorm_particles.fixed_fps = 30
+	_firestorm_particles.interpolate = true
+	var process_material := _firestorm_particles.process_material as ParticleProcessMaterial
+	if process_material:
+		process_material.direction = Vector3(0, 0, 1)
+		process_material.spread = FIRESTORM_HALF_ANGLE_DEGREES
+		process_material.gravity = Vector3(0, 0.35, 0)
+		process_material.damping_min = 0.5
+		process_material.damping_max = 1.5
+	fx_parent.add_child(_firestorm_particles)
+
+	_firestorm_light = OmniLight3D.new()
+	_firestorm_light.name = "FirestormLight"
+	_firestorm_light.light_color = Color("ff6618")
+	_firestorm_light.light_energy = 2.2
+	_firestorm_light.omni_range = 5.0
+	_firestorm_light.shadow_enabled = false
+	_firestorm_light.position = (
+		Vector3(0, 0, 0.8) if fx_parent == _weapon_anchor else Vector3(0, 0.55, 2.2)
+	)
+	fx_parent.add_child(_firestorm_light)
+
+
+func _end_firestorm() -> void:
+	if not is_firestorm_active and _firestorm_particles == null:
+		return
+	is_firestorm_active = false
+	_firestorm_elapsed = 0.0
+	_firestorm_ticks_done = 0
+	if _firestorm_particles and is_instance_valid(_firestorm_particles):
+		_firestorm_particles.emitting = false
+	if _firestorm_light and is_instance_valid(_firestorm_light):
+		_firestorm_light.visible = false
+
+
+func is_targetable_by_ai() -> bool:
+	return is_alive and not has_finished_race and not is_cloaked
+
+
+func _update_specter_cloak(delta: float) -> void:
+	if vehicle_type != VehicleType.SPECTER:
+		return
+	if _cloak_cooldown_remaining > 0.0:
+		_cloak_cooldown_remaining = maxf(0.0, _cloak_cooldown_remaining - delta)
+	if not is_cloaked:
+		return
+	_cloak_remaining = maxf(0.0, _cloak_remaining - delta)
+	if _cloak_remaining <= 0.0:
+		_end_specter_cloak()
+
+
+func _start_specter_cloak() -> void:
+	if (
+		vehicle_type != VehicleType.SPECTER
+		or not is_alive
+		or is_cloaked
+		or _cloak_cooldown_remaining > 0.0
+	):
+		return
+	is_cloaked = true
+	_cloak_remaining = SPECTER_CLOAK_DURATION
+	_cloak_cooldown_remaining = SPECTER_CLOAK_COOLDOWN
+	_set_vehicle_transparency(SPECTER_CLOAK_TRANSPARENCY)
+	if _hp_root:
+		_hp_root.visible = false
+
+
+func _end_specter_cloak() -> void:
+	if not is_cloaked:
+		return
+	is_cloaked = false
+	_cloak_remaining = 0.0
+	_set_vehicle_transparency(0.0)
+	if _hp_root and is_alive:
+		_hp_root.visible = true
+
+
+func _set_vehicle_transparency(amount: float) -> void:
+	if vehicle_model == null:
+		return
+	for descendant in vehicle_model.find_children("*", "GeometryInstance3D", true, false):
+		var geometry := descendant as GeometryInstance3D
+		if geometry:
+			geometry.transparency = amount
 
 
 func take_damage(amount: float, source: Node = null) -> void:
@@ -886,6 +1431,9 @@ func get_last_damage_source() -> Vehicle:
 func _die() -> void:
 	if not is_alive:
 		return
+	_end_specter_cloak()
+	_end_firestorm()
+	_thunderclaw_surge_remaining = 0.0
 	is_alive = false
 	input = Vector3.ZERO
 	linear_speed = 0.0
@@ -1059,43 +1607,76 @@ func effect_suspension(delta: float) -> void:
 func _effect_modular_suspension(delta: float) -> void:
 	## Visual-only wheel contact. Physics remains on Sphere; these pivots keep
 	## the rendered tyres on the road and prevent them from entering the chassis.
+	## Only 2 of 4 wheels raycast each frame (staggered) to cut physics queries ~50%.
 	if _wheel_rest_positions.is_empty():
 		return
-	var total_delta := 0.0
-	var contact_count := 0
-	for wheel in [wheel_fl, wheel_fr, wheel_bl, wheel_br]:
+	var wheels: Array[Node3D] = [wheel_fl, wheel_fr, wheel_bl, wheel_br]
+	_suspension_phase = (_suspension_phase + 1) % 2
+	# Phase 0: front pair, phase 1: rear pair (or whatever two indices).
+	var start_i := _suspension_phase * 2
+	for offset in 2:
+		var i := start_i + offset
+		if i >= wheels.size():
+			continue
+		var wheel := wheels[i]
 		if wheel == null or not _wheel_rest_positions.has(wheel):
 			continue
 		var parent := wheel.get_parent() as Node3D
 		if parent == null:
 			continue
 		var rest: Vector3 = _wheel_rest_positions[wheel]
-		# Ray from the wheel's authored X/Z location, not its current suspended height.
 		var authored_world := parent.to_global(Vector3(rest.x, 0.0, rest.z))
 		var hit := _get_road_hit(authored_world)
 		var target_y := rest.y
 		if not hit.is_empty():
 			var wheel_visual := wheel.get_node_or_null("Wheel") as Node3D
-			var wheel_scale: float = wheel_visual.global_transform.basis.get_scale().y if wheel_visual else wheel.global_transform.basis.get_scale().y
+			var wheel_scale: float = (
+				wheel_visual.global_transform.basis.get_scale().y
+				if wheel_visual
+				else wheel.global_transform.basis.get_scale().y
+			)
 			var radius := modular_wheel_radius * wheel_scale
 			var hit_position: Vector3 = hit["position"]
 			var hub_world := Vector3(authored_world.x, hit_position.y + radius, authored_world.z)
 			target_y = parent.to_local(hub_world).y
-		# The upper limit keeps tyres out of fenders; the lower limit prevents
-		# a missed/low contact from visually dropping through the road.
 		target_y = clampf(target_y, rest.y - modular_wheel_travel_down, rest.y + modular_wheel_travel_up)
-		wheel.position.y = lerpf(wheel.position.y, target_y, clampf(delta * modular_suspension_smoothing, 0.0, 1.0))
-		total_delta += target_y - rest.y
+		_wheel_suspension_delta[wheel] = target_y - rest.y
+		wheel.position.y = lerpf(
+			wheel.position.y,
+			target_y,
+			clampf(delta * modular_suspension_smoothing, 0.0, 1.0)
+		)
+
+	# Smooth all wheels toward last known targets (non-raycasted wheels keep previous delta).
+	var total_delta := 0.0
+	var contact_count := 0
+	for wheel in wheels:
+		if wheel == null or not _wheel_rest_positions.has(wheel):
+			continue
+		var rest2: Vector3 = _wheel_rest_positions[wheel]
+		if not _wheel_suspension_delta.has(wheel):
+			_wheel_suspension_delta[wheel] = 0.0
+		var d: float = _wheel_suspension_delta[wheel]
+		# Non-updated wheels still ease toward cached target height.
+		if wheel != wheels[start_i] and wheel != wheels[mini(start_i + 1, wheels.size() - 1)]:
+			var cached_y := rest2.y + d
+			wheel.position.y = lerpf(
+				wheel.position.y,
+				cached_y,
+				clampf(delta * modular_suspension_smoothing * 0.75, 0.0, 1.0)
+			)
+		total_delta += d
 		contact_count += 1
 
 	var body_target_y := _body_rest.y
 	if contact_count > 0:
 		body_target_y += total_delta / float(contact_count)
-	# Authored body height is the clearance reference. This makes every modular
-	# car keep its own silhouette clearance instead of applying a truck-specific
-	# absolute height to every chassis.
 	body_target_y = maxf(body_target_y, _body_rest.y - modular_chassis_max_drop)
-	vehicle_body.position.y = lerpf(vehicle_body.position.y, body_target_y, clampf(delta * modular_suspension_smoothing, 0.0, 1.0))
+	vehicle_body.position.y = lerpf(
+		vehicle_body.position.y,
+		body_target_y,
+		clampf(delta * modular_suspension_smoothing, 0.0, 1.0)
+	)
 
 
 func _get_road_hit(world_position: Vector3) -> Dictionary:
@@ -1172,6 +1753,8 @@ func effect_thruster(delta: float) -> void:
 		)
 		if throttle_fwd < 0.05 and speed_n < 0.08:
 			target_power = thruster_idle_power * 0.65
+		if _thunderclaw_surge_remaining > 0.0:
+			target_power = thruster_max_power
 	else:
 		target_power = 0.0
 	_thruster_power = lerpf(_thruster_power, target_power, clampf(delta * 8.0, 0.0, 1.0))

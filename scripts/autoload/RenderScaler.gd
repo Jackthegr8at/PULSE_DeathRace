@@ -1,16 +1,20 @@
 extends Node
 ## Keeps the 3D race affordable when the game window is maximized.
 ## Canvas/HUD rendering stays at the full window resolution.
+## Prefers cheap spatial upscale over FSR2 (temporal) for steadier frame times.
 
 const HD_PIXEL_LIMIT := 1280 * 800
-const FULL_HD_PIXEL_LIMIT := 1920 * 1200
+const FULL_HD_PIXEL_LIMIT := 1920 * 1080
+const QHD_PIXEL_LIMIT := 2560 * 1440
 const EMBEDDED_MAXIMIZED_MIN_WIDTH := 1340.0
 const EMBEDDED_MAXIMIZED_MAX_HEIGHT := 800.0
-const FSR_QUALITY_SCALE := 0.67
-const FSR_PERFORMANCE_SCALE := 0.50
-const NATIVE_LOD_THRESHOLD := 3.0
-const FSR_QUALITY_LOD_THRESHOLD := 5.0
-const FSR_PERFORMANCE_LOD_THRESHOLD := 8.0
+const SCALE_QUALITY := 0.75
+const SCALE_BALANCED := 0.62
+const SCALE_PERFORMANCE := 0.50
+const NATIVE_LOD_THRESHOLD := 4.0
+const QUALITY_LOD_THRESHOLD := 6.0
+const BALANCED_LOD_THRESHOLD := 8.0
+const PERFORMANCE_LOD_THRESHOLD := 10.0
 const RESIZE_DEBOUNCE_SECONDS := 0.15
 
 var _resize_timer: Timer
@@ -44,44 +48,45 @@ func _apply_for_current_size() -> void:
 
 	_applied_scale = target_scale
 	viewport.scaling_3d_scale = target_scale
-	# The imported environment meshes contain generated LOD index buffers. Their
-	# base meshes can exceed one million triangles per GridMap tile, so use those
-	# LODs earlier in the distant, top-down race view.
+	# Environment meshes can be dense; use LODs earlier for the top-down race camera.
 	viewport.mesh_lod_threshold = target_lod_threshold
 	if target_scale < 1.0:
-		viewport.scaling_3d_mode = Viewport.SCALING_3D_MODE_FSR2
-		viewport.fsr_sharpness = 0.30
-		# FSR2 already performs temporal anti-aliasing. Avoid paying for MSAA too.
+		# FSR2 is temporal and can hitch; FSR1 (spatial) is cheaper/steadier for arcade racing.
+		viewport.scaling_3d_mode = Viewport.SCALING_3D_MODE_FSR
+		viewport.fsr_sharpness = 0.35
 		viewport.msaa_3d = Viewport.MSAA_DISABLED
 	else:
 		viewport.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
+		# Light AA only when rendering native 3D resolution.
 		viewport.msaa_3d = Viewport.MSAA_2X
 
 	print("[RenderScaler] viewport=%dx%d 3D scale=%.2f mode=%s lod=%.1f" % [
 		int(viewport_size.x),
 		int(viewport_size.y),
 		target_scale,
-		"FSR2" if target_scale < 1.0 else "native",
+		"FSR" if target_scale < 1.0 else "native",
 		target_lod_threshold,
 	])
 
 
 func _scale_for_viewport_size(viewport_size: Vector2, pixel_count: int) -> float:
-	# With editor game embedding and Canvas Items stretching, a maximized 4K
-	# panel can be exposed to the game as a wide logical 720p viewport (such as
-	# 1389x720). Detect that signature before using physical pixel thresholds.
+	# Embedded Game view maximized often reports a wide ~720p logical size.
 	if viewport_size.x >= EMBEDDED_MAXIMIZED_MIN_WIDTH and viewport_size.y <= EMBEDDED_MAXIMIZED_MAX_HEIGHT:
-		return FSR_PERFORMANCE_SCALE
+		return SCALE_PERFORMANCE
 	if pixel_count <= HD_PIXEL_LIMIT:
 		return 1.0
 	if pixel_count <= FULL_HD_PIXEL_LIMIT:
-		return FSR_QUALITY_SCALE
-	return FSR_PERFORMANCE_SCALE
+		return SCALE_QUALITY
+	if pixel_count <= QHD_PIXEL_LIMIT:
+		return SCALE_BALANCED
+	return SCALE_PERFORMANCE
 
 
 func _lod_threshold_for_scale(render_scale: float) -> float:
-	if render_scale <= FSR_PERFORMANCE_SCALE:
-		return FSR_PERFORMANCE_LOD_THRESHOLD
-	if render_scale <= FSR_QUALITY_SCALE:
-		return FSR_QUALITY_LOD_THRESHOLD
+	if render_scale <= SCALE_PERFORMANCE:
+		return PERFORMANCE_LOD_THRESHOLD
+	if render_scale <= SCALE_BALANCED:
+		return BALANCED_LOD_THRESHOLD
+	if render_scale <= SCALE_QUALITY:
+		return QUALITY_LOD_THRESHOLD
 	return NATIVE_LOD_THRESHOLD
