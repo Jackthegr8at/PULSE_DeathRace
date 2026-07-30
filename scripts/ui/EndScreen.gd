@@ -34,6 +34,10 @@ void fragment() {
 @onready var laps_value: Label = $DesignRoot/Card/Content/VBox/Summary/LapsStat/LapsValue
 @onready var difficulty_value: Label = $DesignRoot/Card/Content/VBox/Summary/DifficultyStat/DifficultyValue
 @onready var survivors_value: Label = $DesignRoot/Card/Content/VBox/Summary/SurvivorsStat/SurvivorsValue
+@onready var credit_reward: PanelContainer = %CreditReward
+@onready var credit_title: Label = %Title
+@onready var credit_breakdown: Label = %Breakdown
+@onready var credit_total: Label = %Total
 
 
 func _ready() -> void:
@@ -70,6 +74,7 @@ func show_results(data: Dictionary) -> void:
 	survivors_value.text = str(data.get("survivors", 0))
 
 	_populate_results(data.get("results", []) as Array)
+	_show_credit_reward(data.get("credit_reward", {}) as Dictionary)
 	_show_unlocks(data.get("newly_unlocked_vehicle_ids", []) as Array)
 	_fit_to_viewport()
 	_play_entrance()
@@ -118,6 +123,14 @@ func _apply_styles() -> void:
 		GameStyle.apply_bold_label(tag, GameStyle.TEXT_DIM, 11)
 		GameStyle.apply_display_label(value, GameStyle.ACCENT, 20)
 
+	credit_reward.add_theme_stylebox_override(
+		"panel",
+		GameStyle.setup_panel(Color("081218"), GameStyle.SETUP_YELLOW.darkened(0.38), 2)
+	)
+	GameStyle.apply_display_label(credit_title, GameStyle.SETUP_YELLOW, 17)
+	GameStyle.apply_label(credit_breakdown, GameStyle.TEXT_MUTED, 12)
+	GameStyle.apply_display_label(credit_total, GameStyle.SETUP_YELLOW, 29)
+
 	var order_title: Label = $DesignRoot/Card/Content/VBox/OrderTitle
 	GameStyle.apply_display_label(order_title, GameStyle.TEXT, 18)
 	order_title.add_theme_constant_override("outline_size", 3)
@@ -132,6 +145,32 @@ func _apply_styles() -> void:
 	GameStyle.apply_button(setup_button, GameStyle.button_ghost())
 	rematch_button.add_theme_font_size_override("font_size", 18)
 	setup_button.add_theme_font_size_override("font_size", 18)
+
+
+func _show_credit_reward(reward: Dictionary) -> void:
+	if reward.is_empty():
+		credit_reward.visible = false
+		return
+	credit_reward.visible = true
+	var placement := int(reward.get("placement_reward", 0))
+	var elimination_count := int(reward.get("elimination_count", 0))
+	var elimination_reward := int(reward.get("elimination_reward", 0))
+	var drone_eliminations := int(reward.get("drone_eliminations", 0))
+	var drone_bonus := int(reward.get("drone_bonus", 0))
+	var multiplier := float(reward.get("multiplier", 1.0))
+	var parts: Array[String] = []
+	if placement > 0:
+		parts.append("PLACE +%d" % placement)
+	if elimination_count > 0:
+		parts.append("%d ELIM +%d" % [elimination_count, elimination_reward])
+	if drone_eliminations > 0:
+		parts.append("%d DRONE KO +%d" % [drone_eliminations, drone_bonus])
+	parts.append("DIFFICULTY x%.2f" % multiplier)
+	credit_breakdown.text = "  •  ".join(parts)
+	credit_total.text = "+%d\n%d TOTAL" % [
+		int(reward.get("total", 0)),
+		int(reward.get("wallet_after", 0)),
+	]
 
 
 func _populate_results(raw_results: Array) -> void:

@@ -159,6 +159,45 @@ layout_mode = 2
 text = "4"
 horizontal_alignment = 1
 
+[node name="CreditReward" type="PanelContainer" parent="DesignRoot/Card/Content/VBox"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(0, 64)
+layout_mode = 2
+
+[node name="Margin" type="MarginContainer" parent="DesignRoot/Card/Content/VBox/CreditReward"]
+layout_mode = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 7
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 7
+
+[node name="Row" type="HBoxContainer" parent="DesignRoot/Card/Content/VBox/CreditReward/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 14
+
+[node name="Text" type="VBoxContainer" parent="DesignRoot/Card/Content/VBox/CreditReward/Margin/Row"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 0
+
+[node name="Title" type="Label" parent="DesignRoot/Card/Content/VBox/CreditReward/Margin/Row/Text"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "CREDIT PAYOUT"
+
+[node name="Breakdown" type="Label" parent="DesignRoot/Card/Content/VBox/CreditReward/Margin/Row/Text"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "PLACE +10  •  ELIMINATIONS +5  •  NOVICE x1.00"
+
+[node name="Total" type="Label" parent="DesignRoot/Card/Content/VBox/CreditReward/Margin/Row"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(154, 0)
+layout_mode = 2
+text = "+15"
+horizontal_alignment = 2
+vertical_alignment = 1
+
 [node name="OrderTitle" type="Label" parent="DesignRoot/Card/Content/VBox"]
 layout_mode = 2
 text = "FINISH ORDER"
@@ -184,7 +223,7 @@ text = "RESULT"
 horizontal_alignment = 2
 
 [node name="OrderScroll" type="ScrollContainer" parent="DesignRoot/Card/Content/VBox"]
-custom_minimum_size = Vector2(0, 190)
+custom_minimum_size = Vector2(0, 136)
 layout_mode = 2
 size_flags_vertical = 3
 horizontal_scroll_mode = 0

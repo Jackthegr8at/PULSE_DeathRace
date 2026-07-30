@@ -21,6 +21,7 @@ func _run() -> void:
 	_expect(not GarageProfile.is_vehicle_unlocked("molten"), "Molten starts locked")
 	_expect(not GarageProfile.is_vehicle_unlocked("thunderclaw"), "Thunderclaw starts locked")
 	_expect(not GarageProfile.is_vehicle_unlocked("torrent"), "Torrent starts locked")
+	_expect(not GarageProfile.is_vehicle_unlocked("wreckmonger"), "Wreckmonger starts locked")
 	_expect(
 		int(GarageProfile.stats().get("hybrid_wins", -1)) == 0,
 		"profiles without Hybrid history migrate to zero Hybrid wins",
@@ -54,7 +55,8 @@ func _run() -> void:
 	_expect("molten" in ai_candidates, "Molten is eligible for the AI rotation")
 	_expect("thunderclaw" in ai_candidates, "Thunderclaw is eligible for the AI rotation")
 	_expect("torrent" in ai_candidates, "Torrent is eligible for the AI rotation")
-	_expect(ai_candidates.size() == 7, "all seven non-player vehicles are AI candidates")
+	_expect("wreckmonger" in ai_candidates, "Wreckmonger is eligible for the AI rotation")
+	_expect(ai_candidates.size() == 8, "all eight non-player vehicles are AI candidates")
 	MatchConfig.ai_count = 3
 	MatchConfig.begin_race_loading()
 	var loading_roster := MatchConfig.ai_vehicle_ids()
@@ -168,6 +170,27 @@ func _run() -> void:
 		"player_kills_by_vehicle_id": {"wraith": 30},
 	})
 	_expect(GarageProfile.is_vehicle_unlocked("wraith"), "Wraith unlocks at 50 total kills")
+
+	GarageProfile.commit_completed_race({
+		"race_id": "wreckmonger-kills-74",
+		"completed": true,
+		"player_first": false,
+		"player_kills_by_vehicle_id": {"ravage": 24},
+	})
+	_expect(
+		not GarageProfile.is_vehicle_unlocked("wreckmonger"),
+		"Wreckmonger remains locked after 74 total kills",
+	)
+	var wreckmonger_unlock := GarageProfile.commit_completed_race({
+		"race_id": "wreckmonger-kill-75",
+		"completed": true,
+		"player_first": false,
+		"player_kills_by_vehicle_id": {"ravage": 1},
+	})
+	_expect(
+		"wreckmonger" in wreckmonger_unlock,
+		"Wreckmonger unlocks at 75 total kills",
+	)
 
 	GarageProfile.profile["selected_vehicle_id"] = "missing-car"
 	_expect(GarageProfile.selected_vehicle_id() == "ravage", "invalid selected ID falls back to Ravage")

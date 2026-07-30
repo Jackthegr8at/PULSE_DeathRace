@@ -35,6 +35,7 @@ var _race_type_value: Label
 var _crates_state_value: Label
 var _preview_image: TextureRect
 var _selected_vehicle_value: Label
+var _selected_drone_value: Label
 
 
 func _ready() -> void:
@@ -111,6 +112,7 @@ func _build_screen() -> void:
 	_build_stepper_targets()
 	_build_dynamic_values()
 	_build_ai_difficulty_selector()
+	_build_drone_bay_target()
 	_build_garage_target()
 	_build_start_target()
 	_wire_focus_order()
@@ -212,6 +214,29 @@ func _build_garage_target() -> void:
 	)
 
 
+func _build_drone_bay_target() -> void:
+	var drone_bay := _transparent_button("DroneBay", Vector2(790, 806), Vector2(245, 62))
+	drone_bay.text = "DRONE BAY"
+	drone_bay.add_theme_font_override("font", _display_font)
+	drone_bay.add_theme_font_size_override("font_size", 26)
+	drone_bay.add_theme_color_override("font_color", Color.WHITE)
+	drone_bay.add_theme_color_override("font_hover_color", PURPLE)
+	drone_bay.add_theme_color_override("font_focus_color", PURPLE)
+	drone_bay.add_theme_stylebox_override("normal", _highlight_style(Color("11191c"), 0.62, 2))
+	drone_bay.add_theme_stylebox_override("hover", _highlight_style(PURPLE, 0.18, 3))
+	drone_bay.add_theme_stylebox_override("focus", _highlight_style(PURPLE, 0.18, 3))
+	drone_bay.pressed.connect(_on_drone_bay_pressed)
+	_canvas.add_child(drone_bay)
+	_focus_buttons.append(drone_bay)
+	_selected_drone_value = _value_label(
+		"SelectedDrone",
+		Vector2(790, 850),
+		Vector2(245, 31),
+		18,
+		PURPLE
+	)
+
+
 func _add_difficulty_target(name_text: String, label_text: String, at: Vector2, difficulty: MatchConfig.AIDifficulty) -> void:
 	var button := _transparent_button(name_text, at, Vector2(115, 56))
 	button.text = label_text
@@ -310,6 +335,16 @@ func _refresh_all() -> void:
 	if is_instance_valid(_selected_vehicle_value):
 		var selected_entry := VehicleCatalog.get_vehicle(GarageProfile.selected_vehicle_id())
 		_selected_vehicle_value.text = "SELECTED: %s" % str(selected_entry.get("display_name", "RAVAGE"))
+	if is_instance_valid(_selected_drone_value):
+		var equipped := GarageProfile.equipped_drone()
+		if str(equipped.get("id", "")).is_empty():
+			_selected_drone_value.text = "NO DRONE EQUIPPED"
+		else:
+			var drone := DroneCatalog.get_drone(str(equipped.get("id", "")))
+			_selected_drone_value.text = "%s  T%d" % [
+				str(drone.get("display_name", "DRONE")).to_upper(),
+				int(equipped.get("tier", 0)),
+			]
 
 
 func _paint_choice(button: Button, selected: bool) -> void:
@@ -405,6 +440,11 @@ func _on_start_pressed() -> void:
 func _on_garage_pressed() -> void:
 	_store_match_settings()
 	get_tree().change_scene_to_file("res://scenes/Garage.tscn")
+
+
+func _on_drone_bay_pressed() -> void:
+	_store_match_settings()
+	get_tree().change_scene_to_file("res://scenes/DroneBay.tscn")
 
 
 func _store_match_settings() -> void:

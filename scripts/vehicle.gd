@@ -18,6 +18,7 @@ enum VehicleType {
 	MOLTEN,
 	THUNDERCLAW,
 	TORRENT,
+	WRECKMONGER,
 }
 
 const MissileScene: PackedScene = preload("res://scenes/combat/Missile3D.tscn")
@@ -47,6 +48,12 @@ const THUNDERCLAW_ARC_DURATION := 0.18
 const THUNDERCLAW_ARC_COLOR := Color("28bfff")
 const HOMING_LOCK_RANGE := 14.0
 const HOMING_LOCK_HALF_ANGLE_DEGREES := 22.5
+const WRECKMONGER_HEALTH_MULTIPLIER := 1.20
+const WRECKMONGER_STEER_MULTIPLIER := 0.92
+const WRECKMONGER_STEER_RESPONSE_MULTIPLIER := 0.90
+const WRECKMONGER_HARVEST_RADIUS := 20.0
+const WRECKMONGER_HARVEST_HEALTH_RATIO := 0.25
+const WRECKMONGER_HARVEST_MISSILES := 2
 const FIRESTORM_DURATION := 4.0
 const FIRESTORM_RANGE := 8.0
 const FIRESTORM_HALF_ANGLE_DEGREES := 17.5
@@ -203,6 +210,7 @@ var _traits_applied: bool = false
 var _ram_cooldowns: Dictionary = {}
 var _last_damage_source: WeakRef = null
 var _last_damage_source_msec: int = 0
+var _last_damage_kind: StringName = &"vehicle"
 const DAMAGE_ATTRIBUTION_WINDOW_MSEC := 10000
 
 var race_path: Path3D = null
@@ -289,6 +297,10 @@ func _apply_vehicle_traits() -> void:
 			pass
 		VehicleType.TORRENT:
 			pass
+		VehicleType.WRECKMONGER:
+			max_health *= WRECKMONGER_HEALTH_MULTIPLIER
+			steer_sensitivity *= WRECKMONGER_STEER_MULTIPLIER
+			steer_response *= WRECKMONGER_STEER_RESPONSE_MULTIPLIER
 
 
 ## Call after swapping Container/Model (e.g. AI color trucks or custom GLB).
@@ -1041,6 +1053,35 @@ func add_missiles(amount: int) -> bool:
 	missile_ammo = mini(max_missile_ammo, missile_ammo + amount)
 	ammo_changed.emit(missile_ammo, max_missile_ammo)
 	return true
+
+
+func restore_health(amount: float) -> bool:
+	## Restores health without reviving destroyed cars or exceeding maximum health.
+	if amount <= 0.0 or not is_alive or match_over or has_finished_race:
+		return false
+	if health >= max_health:
+		return false
+	health = minf(max_health, health + amount)
+	health_changed.emit(health, max_health)
+	return true
+
+
+func can_scrap_harvest(wreck_position: Vector3) -> bool:
+	return (
+		vehicle_type == VehicleType.WRECKMONGER
+		and is_alive
+		and not match_over
+		and not has_finished_race
+		and get_vehicle_position().distance_to(wreck_position) <= WRECKMONGER_HARVEST_RADIUS
+	)
+
+
+func apply_scrap_harvest() -> bool:
+	if vehicle_type != VehicleType.WRECKMONGER or not is_alive:
+		return false
+	var restored := restore_health(max_health * WRECKMONGER_HARVEST_HEALTH_RATIO)
+	var rearmed := add_missiles(WRECKMONGER_HARVEST_MISSILES)
+	return restored or rearmed
 
 
 func try_fire() -> bool:
@@ -1853,12 +1894,13 @@ func _set_vehicle_transparency(amount: float) -> void:
 			geometry.transparency = amount
 
 
-func take_damage(amount: float, source: Node = null) -> void:
+func take_damage(amount: float, source: Node = null, damage_kind: StringName = &"vehicle") -> void:
 	if not is_alive or match_over:
 		return
 	if source is Vehicle and source != self and (source as Vehicle).is_alive:
 		_last_damage_source = weakref(source)
 		_last_damage_source_msec = Time.get_ticks_msec()
+		_last_damage_kind = damage_kind
 	health = maxf(0.0, health - amount)
 	health_changed.emit(health, max_health)
 	_update_hp_bar_visual()
@@ -1875,6 +1917,12 @@ func get_last_damage_source() -> Vehicle:
 	if not is_instance_valid(source) or source == self:
 		return null
 	return source
+
+
+func get_last_damage_kind() -> StringName:
+	if get_last_damage_source() == null:
+		return &""
+	return _last_damage_kind
 
 
 func _die() -> void:

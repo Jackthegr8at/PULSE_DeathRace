@@ -116,6 +116,20 @@ const VEHICLES: Dictionary = {
 		"unlock_vehicle_id": "",
 		"garage_y_offset": 0.0,
 	},
+	"wreckmonger": {
+		"id": "wreckmonger",
+		"display_name": "WRECKMONGER",
+		"role": "SCRAP LORD",
+		"ability_title": "SCRAP HARVEST",
+		"ability_description": "Nearby wrecks restore 25% health and provide 2 missiles.",
+		"scene_path": "res://scenes/vehicles/WreckmongerModular.tscn",
+		"vehicle_type": Vehicle.VehicleType.WRECKMONGER,
+		"minimap_color": Color("b13a2e"),
+		"unlock_rule": "total_kills",
+		"unlock_target": 75,
+		"unlock_vehicle_id": "",
+		"garage_y_offset": 0.0,
+	},
 }
 
 const ORDERED_IDS: Array[String] = [
@@ -127,6 +141,7 @@ const ORDERED_IDS: Array[String] = [
 	"molten",
 	"thunderclaw",
 	"torrent",
+	"wreckmonger",
 ]
 
 

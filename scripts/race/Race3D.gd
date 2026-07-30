@@ -2,6 +2,7 @@ extends Node3D
 ## 3D race host: track, player + AI, combat win rules, HUD / end screen.
 
 const VehicleScene: PackedScene = preload("res://scenes/vehicle.tscn")
+const DroneScene: PackedScene = preload("res://scenes/drones/DroneController.tscn")
 const EndScreenScene: PackedScene = preload("res://scenes/ui/EndScreen.tscn")
 const STARTUP_PANEL_TEXTURE: Texture2D = preload("res://assets/ui/hud/startup_box.png")
 const COUNTDOWN_TEXTURES: Dictionary = {
@@ -37,6 +38,9 @@ var _finish_window_started: bool = false
 var _finish_timer: Timer = null
 var _player_kills_by_vehicle_id: Dictionary = {}
 var _player_direct_missile_hits: int = 0
+var _player_drone_eliminations: int = 0
+var _credit_reward: Dictionary = {}
+var _drones: Array[DroneController] = []
 var _race_summary_committed: bool = false
 var _newly_unlocked_vehicle_ids: Array[String] = []
 var _race_session_id: String = ""
@@ -128,7 +132,31 @@ func _spawn_field() -> void:
 		ai.path_look_ahead = 5.2 + float(i % 3) * 0.4
 		vehicles.append(ai)
 
+	_spawn_drones()
 	_update_alive_hud()
+
+
+func _spawn_drones() -> void:
+	var equipped := GarageProfile.equipped_drone()
+	var player_drone_id := str(equipped.get("id", DroneCatalog.NO_DRONE_ID))
+	var player_tier := int(equipped.get("tier", 0))
+	if not player_drone_id.is_empty() and player_tier > 0:
+		_spawn_drone_for(player, player_drone_id, player_tier)
+	for i in range(1, vehicles.size()):
+		var tier := DroneCatalog.ai_tier_for_difficulty(MatchConfig.ai_difficulty, i - 1)
+		_spawn_drone_for(vehicles[i], DroneCatalog.SCRAPJAW_ID, tier)
+
+
+func _spawn_drone_for(owner: Vehicle, drone_id: String, tier: int) -> void:
+	var drone := DroneScene.instantiate() as DroneController
+	if drone == null:
+		return
+	drone.name = "%s_%s_T%d" % [owner.display_name, drone_id, tier]
+	add_child(drone)
+	if drone.configure(owner, drone_id, tier):
+		_drones.append(drone)
+	else:
+		drone.queue_free()
 
 
 func _on_player_missile_direct_hit(_target: Vehicle) -> void:
@@ -403,10 +431,13 @@ func _update_alive_hud() -> void:
 func _on_vehicle_died(veh: Vehicle) -> void:
 	if match_over:
 		return
+	_apply_wreckmonger_scrap_harvest(veh)
 	var attacker := veh.get_last_damage_source()
 	if is_instance_valid(attacker) and attacker == player and veh != player:
 		var victim_id := str(veh.get_meta("vehicle_id", VehicleCatalog.DEFAULT_VEHICLE_ID))
 		_player_kills_by_vehicle_id[victim_id] = int(_player_kills_by_vehicle_id.get(victim_id, 0)) + 1
+		if veh.get_last_damage_kind() == &"drone":
+			_player_drone_eliminations += 1
 	var had_finished := _is_vehicle_resolved(veh) and veh.has_finished_race
 	if not _is_vehicle_resolved(veh):
 		_record_dnf(veh)
@@ -427,6 +458,18 @@ func _on_vehicle_died(veh: Vehicle) -> void:
 			or MatchConfig.mode == MatchConfig.Mode.HYBRID
 		):
 			_end_match(true, "Last car standing!")
+
+
+func _apply_wreckmonger_scrap_harvest(destroyed_vehicle: Vehicle) -> void:
+	var wreck_position := destroyed_vehicle.get_vehicle_position()
+	for candidate in vehicles:
+		if (
+			candidate == destroyed_vehicle
+			or not is_instance_valid(candidate)
+			or not candidate.can_scrap_harvest(wreck_position)
+		):
+			continue
+		candidate.apply_scrap_harvest()
 
 
 func _on_race_finished(veh: Vehicle) -> void:
@@ -606,8 +649,21 @@ func _commit_race_progress(player_won: bool) -> void:
 		"difficulty": MatchConfig.ai_difficulty,
 		"mode": MatchConfig.mode,
 		"player_kills_by_vehicle_id": _player_kills_by_vehicle_id.duplicate(true),
+		"player_eliminations": _player_elimination_count(),
+		"player_drone_eliminations": _player_drone_eliminations,
+		"player_place": _get_player_finish_place(),
 		"direct_missile_hits": _player_direct_missile_hits,
 	})
+	_credit_reward = (
+		GarageProfile.last_commit_result().get("credit_reward", {}) as Dictionary
+	).duplicate(true)
+
+
+func _player_elimination_count() -> int:
+	var total := 0
+	for count in _player_kills_by_vehicle_id.values():
+		total += maxi(int(count), 0)
+	return total
 
 
 func _show_end(player_won: bool, detail: String) -> void:
@@ -653,6 +709,7 @@ func _show_end(player_won: bool, detail: String) -> void:
 		"survivors": _living().size(),
 		"results": display_results,
 		"newly_unlocked_vehicle_ids": _newly_unlocked_vehicle_ids,
+		"credit_reward": _credit_reward.duplicate(true),
 	})
 
 

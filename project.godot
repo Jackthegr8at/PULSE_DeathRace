@@ -26,6 +26,7 @@ config/icon="res://icon.png"
 
 MatchConfig="*res://scripts/autoload/MatchConfig.gd"
 VehicleCatalog="*res://scripts/autoload/VehicleCatalog.gd"
+DroneCatalog="*res://scripts/autoload/DroneCatalog.gd"
 GarageProfile="*res://scripts/autoload/GarageProfile.gd"
 RenderScaler="*res://scripts/autoload/RenderScaler.gd"
 FrameSpikeProfiler="*res://scripts/debug/FrameSpikeProfiler.gd"
