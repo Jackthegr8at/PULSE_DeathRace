@@ -25,6 +25,11 @@ func _run() -> void:
 		is_equal_approx(DroneCatalog.get_model_yaw_degrees("scrapjaw"), 90.0),
 		"Scrapjaw visual uses its authored +X forward-axis correction",
 	)
+	_expect(DroneCatalog.has_drone("bomblet"), "Bomblet is registered")
+	_expect(DroneCatalog.is_tier_available("bomblet", 1), "Bomblet Tier 1 is available")
+	_expect(DroneCatalog.is_tier_available("bomblet", 2), "Bomblet Tier 2 is available")
+	_expect(DroneCatalog.is_tier_available("bomblet", 3), "Bomblet Tier 3 is available")
+	_expect(DroneCatalog.is_tier_available("bomblet", 4), "Bomblet Tier 4 is available")
 
 	var novice := GarageProfile.calculate_credit_reward({
 		"player_place": 1,
@@ -96,6 +101,23 @@ func _run() -> void:
 			_expect(model != null, "Scrapjaw Tier %d model instantiates" % tier)
 			if model:
 				model.free()
+
+	for tier in range(DroneCatalog.MIN_TIER, DroneCatalog.MAX_TIER + 1):
+		var path := DroneCatalog.get_scene_path("bomblet", tier)
+		var packed := load(path) as PackedScene
+		_expect(packed != null, "Bomblet Tier %d model loads" % tier)
+		if packed:
+			var model := packed.instantiate()
+			_expect(model != null, "Bomblet Tier %d model instantiates" % tier)
+			if model:
+				model.free()
+
+	var mine_scene := load("res://scenes/drones/BombletMine.tscn") as PackedScene
+	_expect(mine_scene != null, "Bomblet mine scene loads")
+	if mine_scene:
+		var mine := mine_scene.instantiate()
+		_expect(mine is BombletMine, "Bomblet mine scene has the expected script")
+		mine.free()
 
 	var controller_scene := load("res://scenes/drones/DroneController.tscn") as PackedScene
 	_expect(controller_scene != null, "DroneController scene loads")

@@ -17,6 +17,7 @@ const RETURN_SPEED := 10.0
 const HIT_DISTANCE := 1.15
 const TARGET_HEIGHT := 0.65
 const MODEL_TARGET_SIZE := 1.35
+const BombletBombdropScript := preload("res://scripts/drone/abilities/BombletBombdrop.gd")
 
 var owner_vehicle: Vehicle = null
 var drone_id: String = DroneCatalog.SCRAPJAW_ID
@@ -31,6 +32,7 @@ var _visual: Node3D = null
 var _model: Node3D = null
 var _bob_time: float = 0.0
 var _last_owner_position := Vector3.ZERO
+var _ability: BombletBombdrop = null
 
 
 func configure(vehicle: Vehicle, configured_drone_id: String, configured_tier: int) -> bool:
@@ -43,6 +45,11 @@ func configure(vehicle: Vehicle, configured_drone_id: String, configured_tier: i
 	cooldown_duration = float(tier_data.get("cooldown", 12.0))
 	damage_ratio = float(tier_data.get("damage_ratio", 0.60))
 	_build_visual(str(tier_data.get("scene_path", "")))
+	if DroneCatalog.get_attack_type(drone_id) == "bombdrop":
+		_ability = BombletBombdropScript.new()
+		_ability.name = "BombdropAbility"
+		add_child(_ability)
+		_ability.configure(self, owner_vehicle, tier_data)
 	_last_owner_position = owner_vehicle.get_vehicle_position()
 	global_position = _hover_target_position()
 	add_to_group("combat_drones")
@@ -54,13 +61,16 @@ func _process(delta: float) -> void:
 		queue_free()
 		return
 	_bob_time += delta
-	match _state:
-		State.FOLLOW:
-			_update_follow(delta)
-		State.LUNGE:
-			_update_lunge(delta)
-		State.RETURN:
-			_update_return(delta)
+	if is_instance_valid(_ability):
+		_ability.tick(delta)
+	else:
+		match _state:
+			State.FOLLOW:
+				_update_follow(delta)
+			State.LUNGE:
+				_update_lunge(delta)
+			State.RETURN:
+				_update_return(delta)
 	_update_visual_attitude(delta)
 	_last_owner_position = owner_vehicle.get_vehicle_position()
 
@@ -178,6 +188,31 @@ func _hover_target_position() -> Vector3:
 		+ Vector3.UP * (HOVER_HEIGHT + bob)
 		- owner_vehicle.get_forward() * HOVER_REAR_OFFSET
 	)
+
+
+func ability_follow_owner(delta: float) -> void:
+	var destination := _hover_target_position()
+	global_position = global_position.lerp(
+		destination,
+		1.0 - exp(-FOLLOW_SMOOTHNESS * delta)
+	)
+	_face_direction(owner_vehicle.get_forward(), delta)
+
+
+func ability_hover_target_position() -> Vector3:
+	return _hover_target_position()
+
+
+func ability_face_direction(direction: Vector3, delta: float) -> void:
+	_face_direction(direction, delta)
+
+
+func ability_combat_is_active() -> bool:
+	return _combat_is_active()
+
+
+func ability_find_target() -> Vehicle:
+	return _find_target()
 
 
 func _face_direction(direction: Vector3, delta: float) -> void:

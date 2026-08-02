@@ -143,8 +143,14 @@ func _spawn_drones() -> void:
 	if not player_drone_id.is_empty() and player_tier > 0:
 		_spawn_drone_for(player, player_drone_id, player_tier)
 	for i in range(1, vehicles.size()):
-		var tier := DroneCatalog.ai_tier_for_difficulty(MatchConfig.ai_difficulty, i - 1)
-		_spawn_drone_for(vehicles[i], DroneCatalog.SCRAPJAW_ID, tier)
+		var drone_id := DroneCatalog.ai_drone_for_index(i - 1)
+		var requested_tier := DroneCatalog.ai_tier_for_difficulty(
+			MatchConfig.ai_difficulty,
+			i - 1,
+		)
+		var tier := DroneCatalog.resolve_available_tier(drone_id, requested_tier)
+		if not drone_id.is_empty() and tier > 0:
+			_spawn_drone_for(vehicles[i], drone_id, tier)
 
 
 func _spawn_drone_for(owner: Vehicle, drone_id: String, tier: int) -> void:

@@ -2,6 +2,7 @@ extends Node
 ## Authoritative drone metadata shared by progression, race spawning, and UI.
 
 const SCRAPJAW_ID := "scrapjaw"
+const BOMBLET_ID := "bomblet"
 const NO_DRONE_ID := ""
 const MIN_TIER := 1
 const MAX_TIER := 4
@@ -47,6 +48,59 @@ const DRONES: Dictionary = {
 			},
 		},
 	},
+	BOMBLET_ID: {
+		"id": BOMBLET_ID,
+		"display_name": "Bomblet",
+		"role": "Scout / Bomber Drone",
+		"ability": "Bombdrop",
+		"description": "Dashes ahead, seeds the racing line with proximity mines, then returns.",
+		"accent": Color("ef8611"),
+		"attack_type": "bombdrop",
+		# Bomblet uses the same authored +X forward convention as Scrapjaw.
+		"model_yaw_degrees": 90.0,
+		"tiers": {
+			1: {
+				"label": "COMMON",
+				"scene_path": "res://models/Drones/bomblet_t1.glb",
+				"price": 100,
+				"cooldown": 12.0,
+				"damage_ratio": 0.30,
+				"bomb_count": 3,
+				"mine_lifetime": 3.0,
+				"bombdrop_distance": 8.0,
+			},
+			2: {
+				"label": "RARE",
+				"scene_path": "res://models/Drones/bomblet_t2.glb",
+				"price": 250,
+				"cooldown": 10.0,
+				"damage_ratio": 0.35,
+				"bomb_count": 4,
+				"mine_lifetime": 3.25,
+				"bombdrop_distance": 8.5,
+			},
+			3: {
+				"label": "EPIC",
+				"scene_path": "res://models/Drones/bomblet_t3.glb",
+				"price": 500,
+				"cooldown": 8.0,
+				"damage_ratio": 0.40,
+				"bomb_count": 5,
+				"mine_lifetime": 3.5,
+				"bombdrop_distance": 9.0,
+			},
+			4: {
+				"label": "LEGENDARY",
+				"scene_path": "res://models/Drones/bomblet_t4.glb",
+				"price": 900,
+				"cooldown": 6.0,
+				"damage_ratio": 0.50,
+				"bomb_count": 6,
+				"mine_lifetime": 4.0,
+				"bombdrop_distance": 10.0,
+			},
+		},
+	},
 }
 
 
@@ -77,6 +131,40 @@ func get_scene_path(drone_id: String, tier: int) -> String:
 
 func get_model_yaw_degrees(drone_id: String) -> float:
 	return float(get_drone(drone_id).get("model_yaw_degrees", 0.0))
+
+
+func get_attack_type(drone_id: String) -> String:
+	return str(get_drone(drone_id).get("attack_type", "chomp"))
+
+
+func is_tier_available(drone_id: String, tier: int) -> bool:
+	var tier_data := get_tier(drone_id, tier)
+	if tier_data.is_empty():
+		return false
+	var scene_path := str(tier_data.get("scene_path", ""))
+	return not scene_path.is_empty() and ResourceLoader.exists(scene_path)
+
+
+func get_max_available_tier(drone_id: String) -> int:
+	for tier in range(MAX_TIER, MIN_TIER - 1, -1):
+		if is_tier_available(drone_id, tier):
+			return tier
+	return 0
+
+
+func resolve_available_tier(drone_id: String, requested_tier: int) -> int:
+	var maximum := mini(clampi(requested_tier, MIN_TIER, MAX_TIER), get_max_available_tier(drone_id))
+	for tier in range(maximum, MIN_TIER - 1, -1):
+		if is_tier_available(drone_id, tier):
+			return tier
+	return 0
+
+
+func ai_drone_for_index(ai_index: int) -> String:
+	var ids := get_all_ids()
+	if ids.is_empty():
+		return NO_DRONE_ID
+	return ids[posmod(ai_index, ids.size())]
 
 
 func get_price(drone_id: String, tier: int) -> int:

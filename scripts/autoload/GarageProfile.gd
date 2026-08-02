@@ -186,13 +186,18 @@ func equipped_drone() -> Dictionary:
 	var drones := profile.get("drones", {}) as Dictionary
 	var drone_id := str(drones.get("equipped_id", DroneCatalog.NO_DRONE_ID))
 	var tier := int(drones.get("equipped_tier", 0))
-	if not owns_drone_tier(drone_id, tier):
+	if (
+		not owns_drone_tier(drone_id, tier)
+		or not DroneCatalog.is_tier_available(drone_id, tier)
+	):
 		return {"id": DroneCatalog.NO_DRONE_ID, "tier": 0}
 	return {"id": drone_id, "tier": tier}
 
 
 func can_purchase_drone_tier(drone_id: String, tier: int) -> bool:
 	if not DroneCatalog.has_drone(drone_id) or tier < DroneCatalog.MIN_TIER or tier > DroneCatalog.MAX_TIER:
+		return false
+	if not DroneCatalog.is_tier_available(drone_id, tier):
 		return false
 	if owns_drone_tier(drone_id, tier):
 		return false
@@ -218,7 +223,7 @@ func purchase_drone_tier(drone_id: String, tier: int) -> bool:
 
 
 func equip_drone(drone_id: String, tier: int) -> bool:
-	if not owns_drone_tier(drone_id, tier):
+	if not owns_drone_tier(drone_id, tier) or not DroneCatalog.is_tier_available(drone_id, tier):
 		return false
 	var drones := profile.get("drones", {}) as Dictionary
 	drones["equipped_id"] = drone_id

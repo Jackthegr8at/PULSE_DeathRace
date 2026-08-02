@@ -269,6 +269,7 @@ func _select_tier(tier: int) -> void:
 func _refresh() -> void:
 	var drone := DroneCatalog.get_drone(_selected_drone_id)
 	var tier_data := DroneCatalog.get_tier(_selected_drone_id, _selected_tier)
+	var tier_available := DroneCatalog.is_tier_available(_selected_drone_id, _selected_tier)
 	var equipped := GarageProfile.equipped_drone()
 	var owned_tier := GarageProfile.owned_drone_tier(_selected_drone_id)
 	var owned := GarageProfile.owns_drone_tier(_selected_drone_id, _selected_tier)
@@ -281,10 +282,23 @@ func _refresh() -> void:
 		str(drone.get("ability", "")),
 	]
 	_description_label.text = str(drone.get("description", ""))
-	_stats_label.text = "ATTACK: %d%% MISSILE DAMAGE\nCOOLDOWN: %.0f SECONDS\nTARGET RANGE: 12 METERS" % [
-		int(round(float(tier_data.get("damage_ratio", 0.0)) * 100.0)),
-		float(tier_data.get("cooldown", 0.0)),
-	]
+	if not tier_available:
+		_stats_label.text = "COMING SOON\nMODEL IN DEVELOPMENT"
+	elif DroneCatalog.get_attack_type(_selected_drone_id) == "bombdrop":
+		_stats_label.text = (
+			"BOMBDROP: %d MINES\nDAMAGE: %d%% MISSILE DAMAGE\n"
+			+ "COOLDOWN: %.0f SECONDS\nMINE LIFE: %.1f SECONDS"
+		) % [
+			int(tier_data.get("bomb_count", 0)),
+			int(round(float(tier_data.get("damage_ratio", 0.0)) * 100.0)),
+			float(tier_data.get("cooldown", 0.0)),
+			float(tier_data.get("mine_lifetime", 0.0)),
+		]
+	else:
+		_stats_label.text = "ATTACK: %d%% MISSILE DAMAGE\nCOOLDOWN: %.0f SECONDS\nTARGET RANGE: 12 METERS" % [
+			int(round(float(tier_data.get("damage_ratio", 0.0)) * 100.0)),
+			float(tier_data.get("cooldown", 0.0)),
+		]
 	for tier in _tier_buttons:
 		var tier_button := _tier_buttons[tier] as Button
 		GameStyle.apply_button(
@@ -292,12 +306,18 @@ func _refresh() -> void:
 			GameStyle.setup_choice_styles(GameStyle.SETUP_PURPLE, int(tier) == _selected_tier)
 		)
 		tier_button.text = "%d%s" % [int(tier), " ✓" if int(tier) <= owned_tier else ""]
+		if not DroneCatalog.is_tier_available(_selected_drone_id, int(tier)):
+			tier_button.text = "%d —" % int(tier)
 
 	var is_equipped := (
 		str(equipped.get("id", "")) == _selected_drone_id
 		and int(equipped.get("tier", 0)) == _selected_tier
 	)
-	if is_equipped:
+	if not tier_available:
+		_status_label.text = "THIS TIER IS COMING SOON"
+		_action_button.text = "MODEL IN DEVELOPMENT"
+		_action_button.disabled = true
+	elif is_equipped:
 		_status_label.text = "THIS DRONE IS EQUIPPED"
 		_action_button.text = "EQUIPPED"
 		_action_button.disabled = true
@@ -323,6 +343,8 @@ func _reload_preview() -> void:
 	if is_instance_valid(_preview_model):
 		_preview_model.queue_free()
 		_preview_model = null
+	if not DroneCatalog.is_tier_available(_selected_drone_id, _selected_tier):
+		return
 	var packed := load(DroneCatalog.get_scene_path(_selected_drone_id, _selected_tier)) as PackedScene
 	if packed == null:
 		_status_label.text = "PREVIEW MODEL COULD NOT BE LOADED"
