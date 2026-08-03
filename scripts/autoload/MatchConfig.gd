@@ -81,6 +81,12 @@ var _race_ai_vehicle_ids: Array[String] = []
 var _race_ai_selected_vehicle_id: String = ""
 var _race_ai_count: int = -1
 
+const SETTINGS_PATH := "user://match_settings.cfg"
+
+
+func _ready() -> void:
+	_load_settings()
+
 
 func uses_laps() -> bool:
 	return mode != Mode.LAST_STANDING
@@ -182,6 +188,33 @@ func _clear_ai_roster() -> void:
 	_race_ai_vehicle_ids.clear()
 	_race_ai_selected_vehicle_id = ""
 	_race_ai_count = -1
+
+
+func _load_settings() -> void:
+	var cfg := ConfigFile.new()
+	if cfg.load(SETTINGS_PATH) != OK:
+		return
+	mode = int(cfg.get_value("match", "mode", mode)) as Mode
+	lap_count = int(cfg.get_value("match", "lap_count", lap_count))
+	ai_count = int(cfg.get_value("match", "ai_count", ai_count))
+	ai_difficulty = int(cfg.get_value("match", "ai_difficulty", ai_difficulty)) as AIDifficulty
+	track_id = int(cfg.get_value("match", "track_id", track_id)) as TrackId
+	crate_count = int(cfg.get_value("match", "crate_count", crate_count))
+	missiles_per_crate = int(cfg.get_value("match", "missiles_per_crate", missiles_per_crate))
+
+
+func save_match_settings() -> void:
+	var cfg := ConfigFile.new()
+	cfg.set_value("match", "mode", int(mode))
+	cfg.set_value("match", "lap_count", lap_count)
+	cfg.set_value("match", "ai_count", ai_count)
+	cfg.set_value("match", "ai_difficulty", int(ai_difficulty))
+	cfg.set_value("match", "track_id", int(track_id))
+	cfg.set_value("match", "crate_count", crate_count)
+	cfg.set_value("match", "missiles_per_crate", missiles_per_crate)
+	var err := cfg.save(SETTINGS_PATH)
+	if err != OK:
+		push_error("Failed to save match settings: ", err)
 
 
 func reset_to_defaults() -> void:

@@ -39,6 +39,10 @@ func configure(controller: DroneController, owner: Vehicle, tier_data: Dictionar
 	_drop_distance = maxf(float(tier_data.get("bombdrop_distance", 8.0)), 2.0)
 
 
+func is_busy() -> bool:
+	return _state == State.OUTBOUND or _state == State.RETURN
+
+
 func tick(delta: float) -> void:
 	if not is_instance_valid(_controller) or not is_instance_valid(_owner):
 		return

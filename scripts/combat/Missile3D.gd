@@ -26,6 +26,8 @@ var owner_vehicle: Vehicle = null
 var _velocity: Vector3 = Vector3.ZERO
 var _age: float = 0.0
 var _exploded: bool = false
+var _flight_trail: GPUParticles3D = null
+var _flight_sparks: GPUParticles3D = null
 
 @onready var model: Node3D = get_node_or_null("Model")
 @onready var flight_glow: OmniLight3D = get_node_or_null("Glow")
@@ -42,6 +44,7 @@ func setup(shooter: Vehicle, dmg: float, spd: float, dir: Vector3) -> void:
 	if _velocity.length_squared() > 0.001:
 		look_at(global_position + _velocity, Vector3.UP)
 	_apply_model_transform()
+	_ensure_flight_trail()
 
 
 func _ready() -> void:
@@ -50,6 +53,7 @@ func _ready() -> void:
 	collision_layer = 16
 	collision_mask = 1 | 8
 	_apply_model_transform()
+	_ensure_flight_trail()
 
 
 func _apply_model_transform() -> void:
@@ -87,7 +91,7 @@ func _on_body_entered(body: Node) -> void:
 	elif body is Vehicle:
 		veh = body as Vehicle
 	if veh and veh != owner_vehicle and veh.is_alive:
-		veh.take_damage(damage, owner_vehicle)
+		veh.take_damage(damage, owner_vehicle, &"missile")
 		if owner_vehicle and is_instance_valid(owner_vehicle):
 			owner_vehicle.on_missile_direct_hit(veh, damage)
 		_explode()
@@ -110,6 +114,10 @@ func _explode() -> void:
 		model.visible = false
 	if flight_glow:
 		flight_glow.visible = false
+	if _flight_trail and is_instance_valid(_flight_trail):
+		_flight_trail.emitting = false
+	if _flight_sparks and is_instance_valid(_flight_sparks):
+		_flight_sparks.emitting = false
 	var shape := get_node_or_null("CollisionShape3D") as CollisionShape3D
 	if shape:
 		shape.set_deferred("disabled", true)
@@ -120,6 +128,86 @@ func _explode() -> void:
 	await get_tree().create_timer(explosion_lifetime).timeout
 	if is_instance_valid(self):
 		queue_free()
+
+
+func _ensure_flight_trail() -> void:
+	if _flight_trail != null and is_instance_valid(_flight_trail):
+		return
+	# Exhaust streams opposite of look_at forward (-Z is forward → trail along +Z local).
+	_flight_trail = CombatFx.make_particles(
+		Color(
+			explosion_primary_color.r,
+			explosion_primary_color.g,
+			explosion_primary_color.b,
+			0.95
+		),
+		Color(
+			explosion_fade_color.r,
+			explosion_fade_color.g,
+			explosion_fade_color.b,
+			0.0
+		),
+		22,
+		0.28,
+		6.5,
+		0.18,
+		0.42,
+		0.38,
+		true,
+		false
+	)
+	_flight_trail.name = "FlightTrail"
+	_flight_trail.position = Vector3(0, 0, 0.35)
+	_flight_trail.emitting = true
+	var trail_mat := _flight_trail.process_material as ParticleProcessMaterial
+	if trail_mat:
+		trail_mat.direction = Vector3(0, 0, 1)
+		trail_mat.spread = 8.0
+		trail_mat.gravity = Vector3(0, 0.15, 0)
+		trail_mat.emission_sphere_radius = 0.04
+		trail_mat.initial_velocity_min = 3.5
+		trail_mat.initial_velocity_max = 7.5
+	add_child(_flight_trail)
+
+	_flight_sparks = CombatFx.make_particles(
+		Color(
+			explosion_accent_color.r,
+			explosion_accent_color.g,
+			explosion_accent_color.b,
+			1.0
+		),
+		Color(
+			explosion_hot_color.r,
+			explosion_hot_color.g,
+			explosion_hot_color.b,
+			0.0
+		),
+		12,
+		0.16,
+		8.0,
+		0.06,
+		0.14,
+		0.18,
+		true,
+		false
+	)
+	_flight_sparks.name = "FlightSparks"
+	_flight_sparks.position = Vector3(0, 0, 0.3)
+	_flight_sparks.emitting = true
+	var spark_mat := _flight_sparks.process_material as ParticleProcessMaterial
+	if spark_mat:
+		spark_mat.direction = Vector3(0, 0, 1)
+		spark_mat.spread = 16.0
+		spark_mat.gravity = Vector3(0, -0.2, 0)
+		spark_mat.emission_sphere_radius = 0.03
+		spark_mat.initial_velocity_min = 4.0
+		spark_mat.initial_velocity_max = 9.0
+	add_child(_flight_sparks)
+
+	if flight_glow:
+		flight_glow.light_color = explosion_primary_color
+		flight_glow.light_energy = 1.6
+		flight_glow.omni_range = 3.2
 
 
 func _spawn_explosion_fx() -> void:

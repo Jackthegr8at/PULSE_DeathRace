@@ -363,16 +363,19 @@ func _paint_choice(button: Button, selected: bool) -> void:
 func _select_mode(mode: MatchConfig.Mode) -> void:
 	_selected_mode = mode
 	_refresh_all()
+	_store_match_settings()
 
 
 func _select_track(track: MatchConfig.TrackId) -> void:
 	_selected_track = track
 	_refresh_all()
+	_store_match_settings()
 
 
 func _select_ai_difficulty(difficulty: MatchConfig.AIDifficulty) -> void:
 	_selected_ai_difficulty = difficulty
 	_refresh_all()
+	_store_match_settings()
 
 
 func _change_laps(delta: int) -> void:
@@ -380,16 +383,19 @@ func _change_laps(delta: int) -> void:
 		return
 	_lap_count = clampi(_lap_count + delta, 1, 99)
 	_refresh_all()
+	_store_match_settings()
 
 
 func _change_crate_count(delta: int) -> void:
 	_crate_count = clampi(_crate_count + delta, 0, 24)
 	_refresh_all()
+	_store_match_settings()
 
 
 func _change_missiles_per_crate(delta: int) -> void:
 	_missiles_per_crate = clampi(_missiles_per_crate + delta, 1, 5)
 	_refresh_all()
+	_store_match_settings()
 
 
 func _fit_canvas() -> void:
@@ -455,3 +461,4 @@ func _store_match_settings() -> void:
 		MatchConfig.lap_count = _lap_count
 	MatchConfig.crate_count = _crate_count
 	MatchConfig.missiles_per_crate = _missiles_per_crate
+	MatchConfig.save_match_settings()
