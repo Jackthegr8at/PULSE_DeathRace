@@ -41,4 +41,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.23132233, -0.7314768)
 [node name="WeaponAnchor" type="Marker3D" parent="." unique_id=472902741]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5890186, 0.26362562)
 
+[node name="ElectrodeAnchor" type="Marker3D" parent="." unique_id=873401192]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.72395384, -0.44500002)
+
 [node name="UndersideAttachments" type="Node3D" parent="." unique_id=1696460744]

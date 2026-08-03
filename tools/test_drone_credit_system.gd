@@ -30,6 +30,16 @@ func _run() -> void:
 	_expect(DroneCatalog.is_tier_available("bomblet", 2), "Bomblet Tier 2 is available")
 	_expect(DroneCatalog.is_tier_available("bomblet", 3), "Bomblet Tier 3 is available")
 	_expect(DroneCatalog.is_tier_available("bomblet", 4), "Bomblet Tier 4 is available")
+	_expect(DroneCatalog.has_drone("welder"), "Welder is registered")
+	_expect(DroneCatalog.get_all_ids().has("welder"), "Welder participates in AI drone rotation")
+	_expect(DroneCatalog.is_tier_available("welder", 1), "Welder Tier 1 is available")
+	_expect(not DroneCatalog.is_tier_available("welder", 2), "Welder Tier 2 is coming soon")
+	_expect(not DroneCatalog.is_tier_available("welder", 3), "Welder Tier 3 is coming soon")
+	_expect(not DroneCatalog.is_tier_available("welder", 4), "Welder Tier 4 is coming soon")
+	_expect(
+		DroneCatalog.get_attack_type("welder") == "repair_beam",
+		"Welder uses the repair-beam strategy",
+	)
 
 	var novice := GarageProfile.calculate_credit_reward({
 		"player_place": 1,
@@ -112,6 +122,24 @@ func _run() -> void:
 			if model:
 				model.free()
 
+	var welder_path := DroneCatalog.get_scene_path("welder", 1)
+	var welder_model_scene := load(welder_path) as PackedScene
+	_expect(welder_model_scene != null, "Welder Tier 1 model loads")
+	if welder_model_scene:
+		var welder_model := welder_model_scene.instantiate()
+		_expect(welder_model != null, "Welder Tier 1 model instantiates")
+		if welder_model:
+			welder_model.free()
+
+	var repair_vehicle := Vehicle.new()
+	repair_vehicle.max_health = 100.0
+	repair_vehicle.health = 50.0
+	_expect(repair_vehicle.restore_health(12.0), "Vehicle accepts Welder repair health")
+	_expect(is_equal_approx(repair_vehicle.health, 62.0), "Welder repair amount is applied")
+	_expect(repair_vehicle.restore_health(100.0), "Vehicle accepts a repair that reaches full health")
+	_expect(is_equal_approx(repair_vehicle.health, 100.0), "Welder repair clamps at maximum health")
+	repair_vehicle.free()
+
 	var mine_scene := load("res://scenes/drones/BombletMine.tscn") as PackedScene
 	_expect(mine_scene != null, "Bomblet mine scene loads")
 	if mine_scene:
@@ -125,6 +153,39 @@ func _run() -> void:
 		var controller := controller_scene.instantiate()
 		_expect(controller is DroneController, "DroneController scene has the expected script")
 		controller.free()
+		var vehicle_scene := load("res://scenes/vehicle.tscn") as PackedScene
+		_expect(vehicle_scene != null, "Vehicle scene loads for Welder behavior test")
+		var welder_owner := vehicle_scene.instantiate() as Vehicle
+		var welder_controller := controller_scene.instantiate() as DroneController
+		add_child(welder_owner)
+		add_child(welder_controller)
+		await get_tree().process_frame
+		welder_owner.max_health = 100.0
+		welder_owner.health = 50.0
+		welder_owner.race_started = true
+		welder_owner.match_over = false
+		welder_owner.has_finished_race = false
+		_expect(
+			welder_controller.configure(welder_owner, DroneCatalog.WELDER_ID, 1),
+			"DroneController configures Welder Tier 1",
+		)
+		_expect(
+			welder_controller.get_node_or_null("RepairBeamAbility") is WelderRepairBeam,
+			"DroneController creates the Welder repair strategy",
+		)
+		welder_controller.set_process(false)
+		var repair_ability := welder_controller.get_node_or_null("RepairBeamAbility") as WelderRepairBeam
+		if repair_ability:
+			repair_ability.tick(1.0)
+			for repair_step in range(12):
+				repair_ability.tick(0.25)
+		_expect(
+			is_equal_approx(welder_owner.health, 62.0),
+			"Welder restores 12 percent maximum health over three seconds",
+		)
+		welder_controller.queue_free()
+		welder_owner.queue_free()
+		await get_tree().process_frame
 
 	var bay_scene := load("res://scenes/DroneBay.tscn") as PackedScene
 	_expect(bay_scene != null, "Drone Bay scene loads")

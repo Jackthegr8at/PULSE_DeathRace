@@ -18,6 +18,7 @@ const HIT_DISTANCE := 1.15
 const TARGET_HEIGHT := 0.65
 const MODEL_TARGET_SIZE := 1.35
 const BombletBombdropScript := preload("res://scripts/drone/abilities/BombletBombdrop.gd")
+const WelderRepairBeamScript := preload("res://scripts/drone/abilities/WelderRepairBeam.gd")
 
 var owner_vehicle: Vehicle = null
 var drone_id: String = DroneCatalog.SCRAPJAW_ID
@@ -32,7 +33,7 @@ var _visual: Node3D = null
 var _model: Node3D = null
 var _bob_time: float = 0.0
 var _last_owner_position := Vector3.ZERO
-var _ability: BombletBombdrop = null
+var _ability = null
 
 
 func configure(vehicle: Vehicle, configured_drone_id: String, configured_tier: int) -> bool:
@@ -45,9 +46,14 @@ func configure(vehicle: Vehicle, configured_drone_id: String, configured_tier: i
 	cooldown_duration = float(tier_data.get("cooldown", 12.0))
 	damage_ratio = float(tier_data.get("damage_ratio", 0.60))
 	_build_visual(str(tier_data.get("scene_path", "")))
-	if DroneCatalog.get_attack_type(drone_id) == "bombdrop":
-		_ability = BombletBombdropScript.new()
-		_ability.name = "BombdropAbility"
+	match DroneCatalog.get_attack_type(drone_id):
+		"bombdrop":
+			_ability = BombletBombdropScript.new()
+			_ability.name = "BombdropAbility"
+		"repair_beam":
+			_ability = WelderRepairBeamScript.new()
+			_ability.name = "RepairBeamAbility"
+	if _ability != null:
 		add_child(_ability)
 		_ability.configure(self, owner_vehicle, tier_data)
 	_last_owner_position = owner_vehicle.get_vehicle_position()

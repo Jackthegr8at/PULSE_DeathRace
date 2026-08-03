@@ -90,6 +90,7 @@ const THRUSTER_SMOKE_TEX := preload("res://sprites/smoke.png")
 
 var _exhaust_anchor: Node3D = null
 var _weapon_anchor: Node3D = null
+var _electrode_anchor: Node3D = null
 var _thruster_core: GPUParticles3D = null
 var _thruster_spark: GPUParticles3D = null
 var _thruster_light: OmniLight3D = null
@@ -345,6 +346,7 @@ func rebind_model_parts() -> void:
 			_wheel_rest_positions[wheel] = wheel.position
 	_resolve_exhaust_anchor(model)
 	_resolve_weapon_anchor(model)
+	_resolve_electrode_anchor(model)
 	# Rebuild thruster / special weapon FX under the (possibly new) model / anchor
 	if is_inside_tree() and thruster_enabled:
 		_ensure_thruster_fx()
@@ -376,6 +378,35 @@ func _resolve_weapon_anchor(model: Node3D) -> void:
 			_weapon_anchor = model.find_child("WeaponAnchor", true, false) as Node3D
 	if _weapon_anchor == null and vehicle_model != null:
 		_weapon_anchor = vehicle_model.get_node_or_null("WeaponAnchor") as Node3D
+
+
+func _resolve_electrode_anchor(model: Node3D) -> void:
+	## Thunderclaw roof electrode is separate from the front WeaponAnchor muzzle.
+	_electrode_anchor = null
+	if model != null:
+		_electrode_anchor = model.get_node_or_null("ElectrodeAnchor") as Node3D
+		if _electrode_anchor == null:
+			_electrode_anchor = model.find_child("ElectrodeAnchor", true, false) as Node3D
+	if _electrode_anchor == null and vehicle_model != null:
+		_electrode_anchor = vehicle_model.get_node_or_null("ElectrodeAnchor") as Node3D
+		if _electrode_anchor == null:
+			_electrode_anchor = vehicle_model.find_child("ElectrodeAnchor", true, false) as Node3D
+
+
+func _electrode_fx_parent() -> Node3D:
+	if _electrode_anchor != null and is_instance_valid(_electrode_anchor):
+		return _electrode_anchor
+	# Fallback only if an older scene lacks ElectrodeAnchor.
+	if vehicle_model != null:
+		return vehicle_model
+	return null
+
+
+func _electrode_fx_local_origin() -> Vector3:
+	if _electrode_anchor != null and is_instance_valid(_electrode_anchor):
+		return Vector3.ZERO
+	# Roof peak estimate when no dedicated anchor is authored.
+	return Vector3(0.0, 0.76, -0.445)
 
 
 func _get_weapon_origin() -> Vector3:
@@ -1703,11 +1734,11 @@ func _ensure_thunderclaw_electrode_fx() -> void:
 		return
 	if vehicle_model == null:
 		return
-	var fx_parent := _weapon_fx_parent()
+	var fx_parent := _electrode_fx_parent()
 	if fx_parent == null:
 		return
-	# Sit slightly above the weapon socket so sparks hug the roof electrode tip.
-	var origin := _weapon_fx_local_origin() + Vector3(0, 0.1, -0.02)
+	# Local origin of ElectrodeAnchor (roof spike), not the front WeaponAnchor.
+	var origin := _electrode_fx_local_origin()
 	var full_fx := is_player
 	var arc_col := THUNDERCLAW_ARC_COLOR
 	var arc_hot := Color("d8f6ff")
@@ -1835,7 +1866,13 @@ func _update_thunderclaw_electrode_fx(delta: float) -> void:
 func _spawn_electrode_micro_arc() -> void:
 	if vehicle_model == null:
 		return
-	var origin := _get_weapon_origin() + Vector3(0, 0.12, 0)
+	var origin := Vector3.ZERO
+	if _electrode_anchor != null and is_instance_valid(_electrode_anchor):
+		origin = _electrode_anchor.global_position
+	elif _electrode_sparks != null and is_instance_valid(_electrode_sparks):
+		origin = _electrode_sparks.global_position
+	else:
+		origin = vehicle_model.global_position + Vector3(0, 1.1, -0.6)
 	var yaw := randf() * TAU
 	var pitch := randf_range(0.35, 1.15)
 	var reach := randf_range(0.35, 0.85)

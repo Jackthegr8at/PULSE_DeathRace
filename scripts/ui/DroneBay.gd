@@ -294,6 +294,15 @@ func _refresh() -> void:
 			float(tier_data.get("cooldown", 0.0)),
 			float(tier_data.get("mine_lifetime", 0.0)),
 		]
+	elif DroneCatalog.get_attack_type(_selected_drone_id) == "repair_beam":
+		_stats_label.text = (
+			"REPAIR: %d%% MAX HEALTH\nBEAM DURATION: %.0f SECONDS\n"
+			+ "COOLDOWN: %.0f SECONDS\nTARGET: OWNER"
+		) % [
+			int(round(float(tier_data.get("heal_ratio", 0.0)) * 100.0)),
+			float(tier_data.get("beam_duration", 0.0)),
+			float(tier_data.get("cooldown", 0.0)),
+		]
 	else:
 		_stats_label.text = "ATTACK: %d%% MISSILE DAMAGE\nCOOLDOWN: %.0f SECONDS\nTARGET RANGE: 12 METERS" % [
 			int(round(float(tier_data.get("damage_ratio", 0.0)) * 100.0)),

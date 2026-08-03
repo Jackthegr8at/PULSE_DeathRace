@@ -3,6 +3,7 @@ extends Node
 
 const SCRAPJAW_ID := "scrapjaw"
 const BOMBLET_ID := "bomblet"
+const WELDER_ID := "welder"
 const NO_DRONE_ID := ""
 const MIN_TIER := 1
 const MAX_TIER := 4
@@ -98,6 +99,42 @@ const DRONES: Dictionary = {
 				"bomb_count": 6,
 				"mine_lifetime": 4.0,
 				"bombdrop_distance": 10.0,
+			},
+		},
+	},
+	WELDER_ID: {
+		"id": WELDER_ID,
+		"display_name": "Welder",
+		"role": "Support Drone",
+		"ability": "Repair Beam",
+		"description": "Projects a repair beam that steadily restores its owner's damaged armor.",
+		"accent": Color("43c95c"),
+		"attack_type": "repair_beam",
+		# Welder uses the same authored +X forward convention as the other drones.
+		"model_yaw_degrees": 90.0,
+		"tiers": {
+			1: {
+				"label": "COMMON",
+				"scene_path": "res://models/Drones/welder_t1.glb",
+				"price": 100,
+				"cooldown": 12.0,
+				"beam_duration": 3.0,
+				"heal_ratio": 0.12,
+			},
+			2: {
+				"label": "RARE",
+				"scene_path": "",
+				"price": 250,
+			},
+			3: {
+				"label": "EPIC",
+				"scene_path": "",
+				"price": 500,
+			},
+			4: {
+				"label": "LEGENDARY",
+				"scene_path": "",
+				"price": 900,
 			},
 		},
 	},
