@@ -241,6 +241,21 @@ func unequip_drone() -> bool:
 
 
 func calculate_credit_reward(summary: Dictionary) -> Dictionary:
+	if not bool(summary.get("rewards_enabled", true)):
+		return {
+			"rewards_enabled": false,
+			"practice": true,
+			"placement_reward": 0,
+			"elimination_count": 0,
+			"elimination_reward": 0,
+			"drone_eliminations": 0,
+			"drone_bonus": 0,
+			"subtotal": 0,
+			"multiplier": 1.0,
+			"total": 0,
+			"wallet_before": credit_balance(),
+			"wallet_after": credit_balance(),
+		}
 	var player_place := maxi(int(summary.get("player_place", 0)), 0)
 	var placement_reward := 0
 	if bool(summary.get("player_first", false)) or player_place == 1:
@@ -302,6 +317,21 @@ func commit_completed_race(summary: Dictionary) -> Array[String]:
 		return []
 
 	var credit_reward := calculate_credit_reward(summary)
+	if not bool(summary.get("rewards_enabled", true)):
+		# Consume the race ID, but deliberately leave credits and every unlock
+		# statistic untouched. One-lap lap races are practice sessions.
+		committed.append(race_id)
+		if committed.size() > MAX_COMMITTED_RACE_IDS:
+			committed.pop_front()
+		profile["committed_race_ids"] = committed
+		_save_profile()
+		_last_commit_result = {
+			"committed": true,
+			"duplicate": false,
+			"newly_unlocked_vehicle_ids": [],
+			"credit_reward": credit_reward.duplicate(true),
+		}
+		return []
 
 	var profile_stats := profile.get("stats", {}) as Dictionary
 	if bool(summary.get("player_first", false)):

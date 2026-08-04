@@ -56,8 +56,9 @@ func _format_sample(tag: String, delta: float) -> String:
 	var physics_ms := Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * 1000.0
 	var static_memory_mb := Performance.get_monitor(Performance.MEMORY_STATIC) / 1048576.0
 	var video_memory_mb := Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED) / 1048576.0
+	var prims := int(Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME))
 	return ("[%s] frame=%.1fms process=%.1fms physics=%.1fms fps=%.0f "
-		+ "draws=%d primitives=%d objects=%d nodes=%d active3d=%d pairs3d=%d "
+		+ "draws=%d primitives=%d (%.1fM) objects=%d nodes=%d active3d=%d pairs3d=%d "
 		+ "ram=%.0fMB vram=%.0fMB pipelines(canvas=%d mesh=%d surface=%d draw=%d)") % [
 		tag,
 		delta * 1000.0,
@@ -65,7 +66,8 @@ func _format_sample(tag: String, delta: float) -> String:
 		physics_ms,
 		Performance.get_monitor(Performance.TIME_FPS),
 		int(Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME)),
-		int(Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME)),
+		prims,
+		float(prims) / 1000000.0,
 		int(Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME)),
 		int(Performance.get_monitor(Performance.OBJECT_NODE_COUNT)),
 		int(Performance.get_monitor(Performance.PHYSICS_3D_ACTIVE_OBJECTS)),

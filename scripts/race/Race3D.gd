@@ -50,7 +50,8 @@ func _ready() -> void:
 	var ready_started_msec := Time.get_ticks_msec()
 	_race_session_id = "%d-%d" % [Time.get_unix_time_from_system(), Time.get_ticks_usec()]
 	RenderingServer.set_default_clear_color(Color(0.68, 0.76, 0.97))
-	MatchConfig.ai_count = maxi(MatchConfig.ai_count, 3)
+	_apply_race_performance_budget()
+	MatchConfig.ai_count = clampi(MatchConfig.ai_count, 1, 7)
 	var phase_started_msec := Time.get_ticks_msec()
 	_load_track()
 	_print_load_phase("track load and instantiation", phase_started_msec)
@@ -76,6 +77,182 @@ func _print_load_phase(label: String, started_msec: int) -> void:
 	print("[RaceLoad] %s: %.2f s" % [label, elapsed_seconds])
 
 
+## Mesh LODs off: use original MeshLibrary / car meshes (full decoration quality).
+const USE_TRACK_MESH_LODS := false
+const USE_CAR_MESH_LODS := false
+
+
+func _apply_race_performance_budget() -> void:
+	## Mild runtime budget only — no decorative mesh swaps.
+	var viewport := get_viewport()
+	if viewport:
+		if viewport.scaling_3d_scale > 0.85:
+			viewport.scaling_3d_scale = 0.85
+		viewport.scaling_3d_mode = Viewport.SCALING_3D_MODE_FSR
+		viewport.fsr_sharpness = 0.35
+		viewport.msaa_3d = Viewport.MSAA_DISABLED
+		viewport.mesh_lod_threshold = 6.0
+	var world_env := get_node_or_null("Environment") as WorldEnvironment
+	if world_env and world_env.environment:
+		var env := world_env.environment
+		env.ssao_enabled = false
+		env.ssil_enabled = false
+		env.ssr_enabled = false
+		env.sdfgi_enabled = false
+	var sun := get_node_or_null("Sun") as DirectionalLight3D
+	if sun:
+		sun.shadow_enabled = false
+	print(
+		"[RacePerf] scale=%.2f sun_shadows=off track_lods=%s car_lods=%s (original decorations)"
+		% [
+			viewport.scaling_3d_scale if viewport else 0.0,
+			str(USE_TRACK_MESH_LODS),
+			str(USE_CAR_MESH_LODS),
+		]
+	)
+
+
+func _lighten_track_mesh_library(track_node: Node3D) -> void:
+	## Swap GridMap decoration/road meshes for UV-preserving race_lod variants.
+	if not USE_TRACK_MESH_LODS:
+		return
+	if track_node == null:
+		return
+	var grid := track_node.find_child("GridMap", true, false) as GridMap
+	if grid == null or grid.mesh_library == null:
+		return
+	var source_lib := grid.mesh_library
+	var lib := source_lib.duplicate(true) as MeshLibrary
+	if lib == null:
+		lib = source_lib
+	var replaced := 0
+	var total_tris_before := 0
+	var total_tris_after := 0
+	for item_id in lib.get_item_list():
+		var item_name := lib.get_item_name(item_id).to_lower()
+		var old_mesh := lib.get_item_mesh(item_id)
+		var before := _count_mesh_triangles(old_mesh)
+		total_tris_before += before
+		var lod_path := _race_lod_path_for_library_item(item_name)
+		if lod_path.is_empty() or not ResourceLoader.exists(lod_path):
+			# Still disable shadows on heavy original decorations.
+			if before > 50000:
+				lib.set_item_mesh_cast_shadow(item_id, RenderingServer.SHADOW_CASTING_SETTING_OFF)
+			total_tris_after += before
+			continue
+		var new_mesh := _extract_mesh_from_scene(lod_path)
+		if new_mesh == null:
+			total_tris_after += before
+			continue
+		lib.set_item_mesh(item_id, new_mesh)
+		lib.set_item_mesh_cast_shadow(item_id, RenderingServer.SHADOW_CASTING_SETTING_OFF)
+		var after := _count_mesh_triangles(new_mesh)
+		total_tris_after += after
+		replaced += 1
+		print("[RacePerf] track item '%s' tris %d -> %d" % [item_name, before, after])
+	if lib != source_lib:
+		grid.mesh_library = lib
+	print(
+		"[RacePerf] GridMap library items replaced=%d unique-item tris %d -> %d"
+		% [replaced, total_tris_before, total_tris_after]
+	)
+
+
+func _race_lod_path_for_library_item(item_name: String) -> String:
+	## MeshLibrary item names vs source glb names (Kenney + custom).
+	if item_name.contains("corner") or item_name == "road-corner":
+		return "res://models/race_lod/track-corner.glb"
+	if item_name.contains("straight") or item_name == "track-straight":
+		return "res://models/race_lod/track-straight.glb"
+	if item_name.contains("finish"):
+		return "res://models/race_lod/track-finish.glb"
+	if item_name.contains("forest"):
+		return "res://models/race_lod/decoration-forest.glb"
+	if item_name.contains("watchtower"):
+		return "res://models/race_lod/decoration-watchtower.glb"
+	if item_name.contains("pitstop"):
+		return "res://models/race_lod/decoration-pitstop.glb"
+	if item_name.contains("empty") or item_name.contains("decoration-empty"):
+		return "res://models/race_lod/decoration-empty.glb"
+	return ""
+
+
+func _extract_mesh_from_scene(scene_path: String) -> Mesh:
+	## Prefer Godot's imported Mesh resource (materials/UVs intact) over re-baking arrays.
+	var packed := load(scene_path) as PackedScene
+	if packed == null:
+		return null
+	var root := packed.instantiate()
+	if root == null:
+		return null
+	var mesh_instances: Array[MeshInstance3D] = []
+	for node in root.find_children("*", "MeshInstance3D", true, false):
+		var mi := node as MeshInstance3D
+		if mi and mi.mesh:
+			mesh_instances.append(mi)
+	if mesh_instances.is_empty():
+		root.free()
+		return null
+	# Single mesh: duplicate as-is (preserves materials + import LODs).
+	if mesh_instances.size() == 1 and mesh_instances[0].transform.is_equal_approx(Transform3D.IDENTITY):
+		var only: Mesh = mesh_instances[0].mesh.duplicate()
+		root.free()
+		return only
+	# Multi-surface / transformed: merge while keeping surface materials.
+	var combined := ArrayMesh.new()
+	var surface_i := 0
+	for mi in mesh_instances:
+		var src := mi.mesh
+		var xform := mi.transform
+		for s in src.get_surface_count():
+			var arrays := src.surface_get_arrays(s)
+			if arrays.is_empty() or arrays[Mesh.ARRAY_VERTEX] == null:
+				continue
+			if not xform.is_equal_approx(Transform3D.IDENTITY):
+				var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+				var baked := PackedVector3Array()
+				baked.resize(verts.size())
+				for i in verts.size():
+					baked[i] = xform * verts[i]
+				arrays[Mesh.ARRAY_VERTEX] = baked
+				if arrays[Mesh.ARRAY_NORMAL] != null:
+					var norms: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+					var basis := xform.basis.orthonormalized()
+					var baked_n := PackedVector3Array()
+					baked_n.resize(norms.size())
+					for i in norms.size():
+						baked_n[i] = (basis * norms[i]).normalized()
+					arrays[Mesh.ARRAY_NORMAL] = baked_n
+			combined.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+			var mat := src.surface_get_material(s)
+			if mat == null:
+				mat = mi.get_active_material(s)
+			if mat:
+				combined.surface_set_material(surface_i, mat)
+			surface_i += 1
+	root.free()
+	if surface_i == 0:
+		return null
+	return combined
+
+
+func _count_mesh_triangles(mesh: Mesh) -> int:
+	if mesh == null:
+		return 0
+	var tris := 0
+	for s in mesh.get_surface_count():
+		var arrays := mesh.surface_get_arrays(s)
+		if arrays.is_empty():
+			continue
+		var indices = arrays[Mesh.ARRAY_INDEX]
+		var verts = arrays[Mesh.ARRAY_VERTEX]
+		if indices != null and indices.size() > 0:
+			tris += int(indices.size() / 3)
+		elif verts != null:
+			tris += int(verts.size() / 3)
+	return tris
+
+
 func _load_track() -> void:
 	var path := MatchConfig.track_scene_path()
 	var packed := load(path) as PackedScene
@@ -84,6 +261,7 @@ func _load_track() -> void:
 		return
 	track = packed.instantiate() as Node3D
 	track_root.add_child(track)
+	_lighten_track_mesh_library(track)
 
 
 func _spawn_field() -> void:
@@ -195,6 +373,14 @@ func _spawn_vehicle(spawn: Transform3D, as_player: bool, vehicle_entry: Dictiona
 	var model_path := str(vehicle_entry.get("scene_path", ""))
 	if not model_path.is_empty():
 		_swap_model(veh, model_path)
+	if USE_CAR_MESH_LODS:
+		_apply_race_chassis_lod(veh, str(vehicle_entry.get("id", "")))
+		if veh.has_method("rebind_model_parts"):
+			veh.rebind_model_parts()
+		if veh.has_method("apply_race_lod_wheels"):
+			veh.apply_race_lod_wheels()
+	# Shadows off still helps FPS without breaking materials.
+	_disable_geometry_shadows(veh.get_node_or_null("Container") as Node3D)
 
 	# Snap to ground under spawn so cars sit on GridMap asphalt, not float/clip
 	var pos := _snap_spawn_to_ground(spawn.origin)
@@ -253,7 +439,7 @@ func _swap_model(veh: Vehicle, glb_path: String) -> void:
 	var container := veh.get_node_or_null("Container") as Node3D
 	if container == null:
 		return
-	var old := container.get_node_or_null("Model")
+	var old: Node = container.get_node_or_null("Model")
 	if old:
 		old.free()
 	var packed := load(glb_path) as PackedScene
@@ -269,6 +455,77 @@ func _swap_model(veh: Vehicle, glb_path: String) -> void:
 		model.position = Vector3(0, 0.44, 0)
 	if veh.has_method("rebind_model_parts"):
 		veh.rebind_model_parts()
+
+
+func _apply_race_chassis_lod(veh: Vehicle, vehicle_id: String) -> void:
+	## Cars stay full quality (clustered car LODs looked broken).
+	if not USE_CAR_MESH_LODS:
+		return
+	if veh == null or vehicle_id.is_empty():
+		return
+	var model := veh.get_node_or_null("Container/Model") as Node3D
+	if model == null:
+		return
+	var chassis := model.get_node_or_null("Chassis") as Node3D
+	if chassis == null:
+		return
+	var lod_name := _race_lod_filename_for_vehicle(vehicle_id)
+	if lod_name.is_empty():
+		return
+	var lod_path := "res://models/race_lod/%s" % lod_name
+	if not ResourceLoader.exists(lod_path):
+		return
+	var packed := load(lod_path) as PackedScene
+	if packed == null:
+		return
+	var xf := chassis.transform
+	var parent := chassis.get_parent()
+	chassis.free()
+	var lod_root := packed.instantiate() as Node3D
+	if lod_root == null:
+		return
+	lod_root.name = "Chassis"
+	lod_root.transform = xf
+	parent.add_child(lod_root)
+	var tris := 0
+	for node in lod_root.find_children("*", "MeshInstance3D", true, false):
+		var mi := node as MeshInstance3D
+		if mi:
+			tris += _count_mesh_triangles(mi.mesh)
+	print("[RacePerf] chassis LOD for %s -> %s (~%d tris)" % [vehicle_id, lod_path, tris])
+
+
+func _race_lod_filename_for_vehicle(vehicle_id: String) -> String:
+	match vehicle_id:
+		"ravage":
+			return "ravage.glb"
+		"molten":
+			return "molten.glb"
+		"thunderclaw":
+			return "thunderclaw.glb"
+		"wraith":
+			return "wraith.glb"
+		"venom":
+			return "venom.glb"
+		"bulldoze":
+			return "BullDoze.glb"
+		"specter":
+			return "specter.glb"
+		"torrent":
+			return "torrent.glb"
+		"wreckmonger":
+			return "wreckmonger.glb"
+		_:
+			return ""
+
+
+func _disable_geometry_shadows(root: Node3D) -> void:
+	if root == null:
+		return
+	for descendant in root.find_children("*", "GeometryInstance3D", true, false):
+		var geo := descendant as GeometryInstance3D
+		if geo:
+			geo.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 
 func _get_spawn_transform() -> Transform3D:
@@ -648,12 +905,16 @@ func _commit_race_progress(player_won: bool) -> void:
 	if _race_summary_committed:
 		return
 	_race_summary_committed = true
+	var rewards_enabled := not MatchConfig.uses_laps() or MatchConfig.lap_count > 1
 	_newly_unlocked_vehicle_ids = GarageProfile.commit_completed_race({
 		"race_id": _race_session_id,
 		"completed": true,
-		"player_first": player_won and _get_player_finish_place() == 1,
+		# Survival victories do not create a finish-line place, but they still
+		# count as a first-place result for rewards, stats, and unlocks.
+		"player_first": player_won,
 		"difficulty": MatchConfig.ai_difficulty,
 		"mode": MatchConfig.mode,
+		"rewards_enabled": rewards_enabled,
 		"player_kills_by_vehicle_id": _player_kills_by_vehicle_id.duplicate(true),
 		"player_eliminations": _player_elimination_count(),
 		"player_drone_eliminations": _player_drone_eliminations,

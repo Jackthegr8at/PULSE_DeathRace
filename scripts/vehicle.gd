@@ -24,6 +24,7 @@ enum VehicleType {
 const MissileScene: PackedScene = preload("res://scenes/combat/Missile3D.tscn")
 const HomingMissileScene: PackedScene = preload("res://scenes/combat/HomingMissile3D.tscn")
 const CustomWheelScene: PackedScene = preload("res://models/wheel.glb")
+# Prefer race_lod wheels at race time when available (set in apply_race_lod_wheels).
 const RAVAGE_HEALTH_MULTIPLIER := 1.15
 const BULLDOZE_RAM_DAMAGE := 7.5
 const BULLDOZE_MIN_IMPACT_SPEED := 1.5
@@ -250,6 +251,11 @@ var _steer_smoothed: float = 0.0
 ## Cycles modular suspension raycasts (4 wheels → 2 rays/frame for cheaper physics).
 var _suspension_phase: int = 0
 var _wheel_suspension_delta: Dictionary = {}
+## Vehicle spheres naturally try to climb over one another. Track vehicle-only
+## contacts so their vertical response can be suppressed without changing road
+## or wall collisions.
+var _vehicle_contacts: Dictionary = {}
+var _road_clearance: float = -1.0
 
 
 func get_vehicle_position() -> Vector3:
@@ -273,12 +279,14 @@ func _ready() -> void:
 	missile_ammo = starting_missile_ammo
 	add_to_group("vehicles")
 	rebind_model_parts()
+	_disable_model_shadows()
 	_ensure_thruster_fx()
 	_ensure_molten_tip_fx()
 	_ensure_thunderclaw_electrode_fx()
-	_ensure_damage_smoke_fx()
+	# Damage smoke is created lazily when HP drops (see _update_damage_smoke_fx).
 	_ensure_cloak_fx()
 	_ensure_surge_body_fx()
+	# Dirt trails for everyone — AI uses a lighter particle budget in _upgrade_skid_trails.
 	_upgrade_skid_trails()
 	_ensure_hp_bar()
 	health_changed.emit(health, max_health)
@@ -287,6 +295,11 @@ func _ready() -> void:
 		# Vehicle spheres on layer 8 (matches kit)
 		sphere.collision_layer = 8
 		sphere.collision_mask = 1 | 8
+		# A crowded 2x2 grid can touch several cars plus a wall at once. Reporting
+		# more contacts keeps vehicle enter/exit tracking reliable.
+		sphere.max_contacts_reported = 8
+		if not sphere.body_exited.is_connected(_on_sphere_body_exited):
+			sphere.body_exited.connect(_on_sphere_body_exited)
 
 
 func _apply_vehicle_traits() -> void:
@@ -508,8 +521,8 @@ func _ensure_thruster_fx() -> void:
 		local_pos = thruster_default_offset
 
 	var len_s := thruster_length_scale
-	# AI: one cheap core jet only (no spark stream / light) — big multiplayer FPS win.
-	var core_amount := 22 if is_player else 10
+	# Player: fuller jet; AI: slightly cheaper but still visible with sparks.
+	var core_amount := 18 if is_player else 12
 	_thruster_core = _make_thruster_particles(
 		Color(c.r, c.g, c.b, 0.95),
 		fade_hot,
@@ -523,28 +536,29 @@ func _ensure_thruster_fx() -> void:
 	)
 	_thruster_core.name = "ThrusterCore"
 	_thruster_core.position = local_pos
-	_thruster_core.fixed_fps = 30
+	_thruster_core.fixed_fps = 30 if is_player else 20
 	_thruster_core.interpolate = true
 	parent.add_child(_thruster_core)
 
-	if is_player:
-		_thruster_spark = _make_thruster_particles(
-			Color(h.r, h.g, h.b, 1.0),
-			fade,
-			10,
-			0.08 * len_s + 0.04,
-			4.5 * len_s,
-			0.08,
-			0.18,
-			0.24,
-			true
-		)
-		_thruster_spark.name = "ThrusterSpark"
-		_thruster_spark.position = local_pos
-		_thruster_spark.fixed_fps = 30
-		_thruster_spark.interpolate = true
-		parent.add_child(_thruster_spark)
+	_thruster_spark = _make_thruster_particles(
+		Color(h.r, h.g, h.b, 1.0),
+		fade,
+		10 if is_player else 6,
+		0.08 * len_s + 0.04,
+		4.5 * len_s,
+		0.08,
+		0.18,
+		0.24,
+		true
+	)
+	_thruster_spark.name = "ThrusterSpark"
+	_thruster_spark.position = local_pos
+	_thruster_spark.fixed_fps = 30 if is_player else 20
+	_thruster_spark.interpolate = true
+	parent.add_child(_thruster_spark)
 
+	# Omni lights are expensive in multiplayer — player only.
+	if is_player:
 		_thruster_light = OmniLight3D.new()
 		_thruster_light.name = "ThrusterLight"
 		_thruster_light.light_color = c
@@ -804,6 +818,7 @@ func _physics_process(delta: float) -> void:
 			vehicle_model.global_transform = vehicle_model.global_transform.interpolate_with(xform, 0.2).orthonormalized()
 
 	colliding = raycast.is_colliding() if raycast else false
+	_stabilize_vehicle_contacts(delta)
 
 	var target_speed := input.z
 	if target_speed > 0.0:
@@ -1118,6 +1133,7 @@ func restore_health(amount: float) -> bool:
 		return false
 	health = minf(max_health, health + amount)
 	health_changed.emit(health, max_health)
+	_update_hp_bar_visual()
 	return true
 
 
@@ -2274,6 +2290,7 @@ func _ensure_hp_bar() -> void:
 	_hp_root.position = Vector3(0, 2.1, 0)
 
 	var bg := MeshInstance3D.new()
+	bg.name = "Background"
 	bg.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	var bg_mesh := BoxMesh.new()
 	bg_mesh.size = Vector3(HP_BAR_WIDTH, 0.12, 0.04)
@@ -2286,6 +2303,7 @@ func _ensure_hp_bar() -> void:
 	_hp_root.add_child(bg)
 
 	_hp_fill = MeshInstance3D.new()
+	_hp_fill.name = "Fill"
 	_hp_fill.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	var fill_mesh := BoxMesh.new()
 	fill_mesh.size = Vector3(HP_BAR_WIDTH, 0.1, 0.05)
@@ -2418,6 +2436,16 @@ func effect_suspension(delta: float) -> void:
 	vehicle_body.position = vehicle_body.position.lerp(target_pos, clampf(delta * 12.0, 0.0, 1.0))
 
 
+func _disable_model_shadows() -> void:
+	## Dense chassis meshes make shadow maps extremely expensive with 4+ cars.
+	if vehicle_model == null:
+		return
+	for descendant in vehicle_model.find_children("*", "GeometryInstance3D", true, false):
+		var geo := descendant as GeometryInstance3D
+		if geo:
+			geo.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+
 func _effect_modular_suspension(delta: float) -> void:
 	## Visual-only wheel contact. Physics remains on Sphere; these pivots keep
 	## the rendered tyres on the road and prevent them from entering the chassis.
@@ -2521,6 +2549,36 @@ func effect_wheels(delta: float) -> void:
 		wheel_fr.rotation.y = lerp_angle(wheel_fr.rotation.y, wheel_yaw, delta * 8.0)
 
 
+func apply_race_lod_wheels() -> void:
+	## Swap modular wheel meshes to race_lod variants when present.
+	var lod_path := "res://models/race_lod/wheel.glb"
+	if not ResourceLoader.exists(lod_path):
+		lod_path = "res://models/race_lod/wheel_b.glb"
+	if not ResourceLoader.exists(lod_path):
+		return
+	var packed := load(lod_path) as PackedScene
+	if packed == null:
+		return
+	for pivot in [wheel_fl, wheel_fr, wheel_bl, wheel_br]:
+		if pivot == null:
+			continue
+		var old: Node = pivot.get_node_or_null("Wheel")
+		var xf := Transform3D.IDENTITY
+		if old is Node3D:
+			xf = (old as Node3D).transform
+			old.free()
+		var wheel := packed.instantiate() as Node3D
+		if wheel == null:
+			continue
+		wheel.name = "Wheel"
+		wheel.transform = xf
+		pivot.add_child(wheel)
+		for descendant in wheel.find_children("*", "GeometryInstance3D", true, false):
+			var geo := descendant as GeometryInstance3D
+			if geo:
+				geo.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+
 func effect_engine(delta: float) -> void:
 	if engine_sound == null:
 		return
@@ -2552,7 +2610,9 @@ func effect_trails() -> void:
 	if screech_sound == null:
 		return
 	var target_volume: float = -80.0
-	# Screech still tracks hard slides, not casual road dust.
+	# Screech: player only (AI skids still show dust without audio clutter).
+	if not is_player:
+		return
 	var screech_on: bool = drift_intensity > 0.28 and speed_n > 0.15
 	if screech_on:
 		target_volume = remap(clampf(drift_intensity, 0.25, 2.0), 0.25, 2.0, -10.0, 0.0)
@@ -2641,6 +2701,54 @@ func _vehicle_from_collision_body(body: Node) -> Vehicle:
 	return null
 
 
+func _has_vehicle_contact() -> bool:
+	for body_id in _vehicle_contacts.keys():
+		var reference := _vehicle_contacts.get(body_id) as WeakRef
+		if reference == null or reference.get_ref() == null:
+			_vehicle_contacts.erase(body_id)
+	return not _vehicle_contacts.is_empty()
+
+
+func _stabilize_vehicle_contacts(delta: float) -> void:
+	## Preserve native horizontal collision response while preventing two round
+	## vehicle bodies from converting a side impact into an upward launch.
+	if sphere == null or raycast == null or not raycast.is_colliding():
+		return
+
+	var road_point := raycast.get_collision_point()
+	var current_clearance := sphere.global_position.y - road_point.y
+	var touching_vehicle := _has_vehicle_contact()
+	if not touching_vehicle:
+		# Learn the normal ride height continuously so this also works on elevated
+		# road tiles and gentle height changes. Do not learn while airborne, or a
+		# recent bump could become the new normal ride height.
+		if absf(sphere.linear_velocity.y) > 0.25:
+			return
+		if _road_clearance < 0.0:
+			_road_clearance = current_clearance
+		else:
+			_road_clearance = lerpf(
+				_road_clearance,
+				current_clearance,
+				clampf(delta * 8.0, 0.0, 1.0)
+			)
+		return
+
+	if _road_clearance < 0.0:
+		_road_clearance = current_clearance
+
+	var velocity := sphere.linear_velocity
+	if velocity.y > 0.0:
+		velocity.y = 0.0
+
+	# A small tolerance avoids visible jitter from ordinary road seams. If the
+	# sphere has already started climbing, smoothly drive it back to ride height.
+	var excess_height := current_clearance - (_road_clearance + 0.035)
+	if excess_height > 0.0:
+		velocity.y = minf(velocity.y, -excess_height * 18.0)
+	sphere.linear_velocity = velocity
+
+
 func _try_apply_ram_damage(body: Node) -> void:
 	if vehicle_type != VehicleType.BULLDOZE:
 		return
@@ -2667,6 +2775,9 @@ func _try_apply_ram_damage(body: Node) -> void:
 
 
 func _on_sphere_body_entered(body: Node) -> void:
+	var other_vehicle := _vehicle_from_collision_body(body)
+	if other_vehicle != null and other_vehicle != self:
+		_vehicle_contacts[body.get_instance_id()] = weakref(body)
 	_try_apply_ram_damage(body)
 	if impact_sound == null:
 		return
@@ -2680,6 +2791,10 @@ func _on_sphere_body_entered(body: Node) -> void:
 		var impact_velocity := absf(linear_velocity.dot(basis_z))
 		impact_sound.volume_db = clampf(remap(impact_velocity, 0.0, 6.0, -20.0, 0.0), -20.0, 0.0)
 		impact_sound.play()
+
+
+func _on_sphere_body_exited(body: Node) -> void:
+	_vehicle_contacts.erase(body.get_instance_id())
 
 
 # --- Combat / identity VFX helpers ---
@@ -2757,10 +2872,12 @@ func _ensure_damage_smoke_fx() -> void:
 
 
 func _update_damage_smoke_fx(_delta: float) -> void:
-	if _damage_smoke == null or not is_instance_valid(_damage_smoke):
-		return
 	var ratio := health / maxf(max_health, 1.0)
 	var critical := is_alive and ratio <= 0.32
+	if critical and (_damage_smoke == null or not is_instance_valid(_damage_smoke)):
+		_ensure_damage_smoke_fx()
+	if _damage_smoke == null or not is_instance_valid(_damage_smoke):
+		return
 	_damage_smoke.emitting = critical
 	if not critical:
 		return

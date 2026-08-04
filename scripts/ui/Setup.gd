@@ -17,7 +17,9 @@ var _selected_mode: MatchConfig.Mode = MatchConfig.Mode.HYBRID
 var _selected_track: MatchConfig.TrackId = MatchConfig.TrackId.KENNEY_DEFAULT
 var _selected_ai_difficulty: MatchConfig.AIDifficulty = MatchConfig.AIDifficulty.NOVICE
 var _lap_count: int = 5
+var _ai_count: int = 3
 var _crate_count: int = 5
+var _last_live_crate_count: int = 5
 var _missiles_per_crate: int = 2
 
 var _canvas: Control
@@ -25,17 +27,21 @@ var _display_font: Font
 var _mode_buttons: Dictionary = {}
 var _track_buttons: Dictionary = {}
 var _difficulty_buttons: Dictionary = {}
+var _difficulty_highlights: Dictionary = {}
 var _focus_buttons: Array[Button] = []
 var _lap_value: Label
+var _practice_warning: Label
 var _crate_value: Label
 var _ammo_value: Label
 var _ai_badge_value: Label
-var _opponents_value: Label
-var _race_type_value: Label
+var _ai_count_value: Label
 var _crates_state_value: Label
 var _preview_image: TextureRect
 var _selected_vehicle_value: Label
 var _selected_drone_value: Label
+var _drone_panel_highlight: CanvasItem
+var _garage_panel_highlight: CanvasItem
+var _crates_panel_highlight: CanvasItem
 
 
 func _ready() -> void:
@@ -43,7 +49,11 @@ func _ready() -> void:
 	_selected_track = MatchConfig.track_id
 	_selected_ai_difficulty = MatchConfig.ai_difficulty
 	_lap_count = MatchConfig.lap_count
+	_ai_count = clampi(MatchConfig.ai_count, 1, 7)
 	_crate_count = MatchConfig.crate_count
+	_last_live_crate_count = maxi(MatchConfig.last_live_crate_count, 1)
+	if _crate_count > 0:
+		_last_live_crate_count = _crate_count
 	_missiles_per_crate = MatchConfig.missiles_per_crate
 	_create_font()
 	_build_screen()
@@ -63,6 +73,7 @@ func _build_screen() -> void:
 	_mode_buttons.clear()
 	_track_buttons.clear()
 	_difficulty_buttons.clear()
+	_difficulty_highlights.clear()
 	_focus_buttons.clear()
 
 	var backdrop := TextureRect.new()
@@ -111,6 +122,7 @@ func _build_screen() -> void:
 	_build_choice_targets()
 	_build_stepper_targets()
 	_build_dynamic_values()
+	_build_top_match_controls()
 	_build_ai_difficulty_selector()
 	_build_drone_bay_target()
 	_build_garage_target()
@@ -169,79 +181,111 @@ func _add_stepper_target(name_text: String, at: Vector2, action: Callable) -> vo
 
 func _build_dynamic_values() -> void:
 	_lap_value = _value_label("LapValue", Vector2(372, 621), Vector2(49, 48), 29, YELLOW)
+	_practice_warning = _value_label(
+		"PracticeWarning",
+		Vector2(126, 532),
+		Vector2(370, 30),
+		18,
+		YELLOW
+	)
+	_practice_warning.text = "PRACTICE RACE - REWARDS DISABLED"
 	_crate_value = _value_label("CrateValue", Vector2(372, 703), Vector2(49, 48), 29, YELLOW)
 	_crate_value.pivot_offset = _crate_value.size * 0.5
 	_crate_value.rotation_degrees = 1
 	_ammo_value = _value_label("AmmoValue", Vector2(372, 784), Vector2(49, 48), 29, YELLOW)
-	_ai_badge_value = _value_label("AiBadgeValue", Vector2(1379, 45), Vector2(34, 36), 27, Color.WHITE)
-	_opponents_value = _value_label("OpponentsValue", Vector2(990, 726), Vector2(36, 42), 32, PURPLE)
-	_opponents_value.pivot_offset = _opponents_value.size * 0.5
-	_opponents_value.rotation_degrees = 1
-	_race_type_value = _value_label("RaceTypeValue", Vector2(684, 716), Vector2(124, 38), 27, CYAN, HORIZONTAL_ALIGNMENT_LEFT)
-	_race_type_value.pivot_offset = _race_type_value.size * 0.5
-	_race_type_value.rotation_degrees = 1
-	_crates_state_value = _value_label("CratesStateValue", Vector2(1260, 732), Vector2(94, 38), 27, YELLOW, HORIZONTAL_ALIGNMENT_LEFT)
+	# The badge artwork already contains "AI". Keep the dynamic count in the
+	# open area to its right instead of letting the glyphs overlap.
+	_ai_badge_value = _value_label("AiBadgeValue", Vector2(1411, 52), Vector2(30, 36), 27, Color.WHITE)
+
+
+func _build_top_match_controls() -> void:
+	var ai_heading := _value_label("AiCountHeading", Vector2(870, 35), Vector2(92, 29), 19, Color.WHITE)
+	ai_heading.text = "AI"
+	_ai_count_value = _value_label("AiCountValue", Vector2(891, 61), Vector2(52, 38), 30, CYAN)
+	_add_top_stepper_target("AiCountMinus", "−", Vector2(830, 62), _change_ai_count.bind(-1))
+	_add_top_stepper_target("AiCountPlus", "+", Vector2(958, 62), _change_ai_count.bind(1))
+
+	var crates_toggle := _transparent_button("CratesToggle", Vector2(1027, 28), Vector2(247, 87))
+	_crates_panel_highlight = _create_polygon_highlight(
+		_canvas,
+		"CratesPanelHighlight",
+		Vector2(1028, 29),
+		YELLOW,
+		PackedVector2Array([
+			Vector2(18, 8), Vector2(224, 9), Vector2(234, 18),
+			Vector2(230, 67), Vector2(220, 75), Vector2(18, 74), Vector2(9, 64), Vector2(11, 20),
+		])
+	)
+	_bind_fitted_highlight(crates_toggle, _crates_panel_highlight)
+	crates_toggle.pressed.connect(_toggle_crates)
+	_canvas.add_child(crates_toggle)
+	_focus_buttons.append(crates_toggle)
+	var crates_heading := _value_label("CratesToggleHeading", Vector2(1094, 36), Vector2(154, 27), 18, Color.WHITE)
+	crates_heading.text = "CRATES"
+	_crates_state_value = _value_label("CratesStateValue", Vector2(1094, 62), Vector2(154, 38), 28, YELLOW)
 
 
 func _build_ai_difficulty_selector() -> void:
-	var heading := _value_label("AiDifficultyHeading", Vector2(575, 820), Vector2(365, 30), 20, CYAN)
+	var panel := _angled_panel_root("AiDifficultyPanel", Vector2(554, 684), Vector2(286, 102), 1.0)
+	var heading := _panel_label(panel, "AiDifficultyHeading", Vector2(12, 7), Vector2(260, 29), 21, CYAN)
 	heading.text = "AI DIFFICULTY"
-	_add_difficulty_target("DifficultyNovice", "NOVICE", Vector2(575, 852), MatchConfig.AIDifficulty.NOVICE)
-	_add_difficulty_target("DifficultyMedium", "MEDIUM", Vector2(700, 852), MatchConfig.AIDifficulty.MEDIUM)
-	_add_difficulty_target("DifficultyHard", "HARD", Vector2(825, 852), MatchConfig.AIDifficulty.HARD)
+	_add_difficulty_target(panel, "DifficultyNovice", "NOVICE", Vector2(14, 43), MatchConfig.AIDifficulty.NOVICE)
+	_add_difficulty_target(panel, "DifficultyMedium", "MEDIUM", Vector2(98, 43), MatchConfig.AIDifficulty.MEDIUM)
+	_add_difficulty_target(panel, "DifficultyHard", "HARD", Vector2(182, 43), MatchConfig.AIDifficulty.HARD)
 
 
 func _build_garage_target() -> void:
-	var garage := _transparent_button("Garage", Vector2(1050, 806), Vector2(245, 62))
-	garage.text = "GARAGE"
-	garage.add_theme_font_override("font", _display_font)
-	garage.add_theme_font_size_override("font_size", 26)
-	garage.add_theme_color_override("font_color", Color.WHITE)
-	garage.add_theme_color_override("font_hover_color", CYAN)
-	garage.add_theme_color_override("font_focus_color", CYAN)
-	garage.add_theme_stylebox_override("normal", _highlight_style(Color("11191c"), 0.62, 2))
-	garage.add_theme_stylebox_override("hover", _highlight_style(CYAN, 0.18, 3))
-	garage.add_theme_stylebox_override("focus", _highlight_style(CYAN, 0.18, 3))
+	var panel := _angled_panel_root("GaragePanel", Vector2(1126, 684), Vector2(280, 104), 1.0)
+	_garage_panel_highlight = _create_polygon_highlight(panel, "GaragePanelHighlight", Vector2.ZERO, CYAN, _panel_polygon(panel.size))
+	var garage := _transparent_button("Garage", Vector2.ZERO, panel.size)
+	_bind_fitted_highlight(garage, _garage_panel_highlight)
 	garage.pressed.connect(_on_garage_pressed)
-	_canvas.add_child(garage)
+	panel.add_child(garage)
 	_focus_buttons.append(garage)
-	_selected_vehicle_value = _value_label(
+	var heading := _panel_label(panel, "GarageHeading", Vector2(14, 12), Vector2(252, 32), 27, Color.WHITE)
+	heading.text = "GARAGE"
+	_selected_vehicle_value = _panel_label(
+		panel,
 		"SelectedVehicle",
-		Vector2(1050, 850),
-		Vector2(245, 31),
-		18,
+		Vector2(14, 51),
+		Vector2(252, 32),
+		20,
 		CYAN
 	)
 
 
 func _build_drone_bay_target() -> void:
-	var drone_bay := _transparent_button("DroneBay", Vector2(790, 806), Vector2(245, 62))
-	drone_bay.text = "DRONE BAY"
-	drone_bay.add_theme_font_override("font", _display_font)
-	drone_bay.add_theme_font_size_override("font_size", 26)
-	drone_bay.add_theme_color_override("font_color", Color.WHITE)
-	drone_bay.add_theme_color_override("font_hover_color", PURPLE)
-	drone_bay.add_theme_color_override("font_focus_color", PURPLE)
-	drone_bay.add_theme_stylebox_override("normal", _highlight_style(Color("11191c"), 0.62, 2))
-	drone_bay.add_theme_stylebox_override("hover", _highlight_style(PURPLE, 0.18, 3))
-	drone_bay.add_theme_stylebox_override("focus", _highlight_style(PURPLE, 0.18, 3))
+	var panel := _angled_panel_root("DronePanel", Vector2(844, 683), Vector2(276, 104), 1.0)
+	_drone_panel_highlight = _create_polygon_highlight(panel, "DronePanelHighlight", Vector2.ZERO, PURPLE, _panel_polygon(panel.size))
+	var drone_bay := _transparent_button("DroneBay", Vector2.ZERO, panel.size)
+	_bind_fitted_highlight(drone_bay, _drone_panel_highlight)
 	drone_bay.pressed.connect(_on_drone_bay_pressed)
-	_canvas.add_child(drone_bay)
+	panel.add_child(drone_bay)
 	_focus_buttons.append(drone_bay)
-	_selected_drone_value = _value_label(
+	var heading := _panel_label(panel, "DroneBayHeading", Vector2(13, 12), Vector2(250, 32), 27, Color.WHITE)
+	heading.text = "DRONE"
+	_selected_drone_value = _panel_label(
+		panel,
 		"SelectedDrone",
-		Vector2(790, 850),
-		Vector2(245, 31),
-		18,
+		Vector2(13, 51),
+		Vector2(250, 32),
+		20,
 		PURPLE
 	)
 
 
-func _add_difficulty_target(name_text: String, label_text: String, at: Vector2, difficulty: MatchConfig.AIDifficulty) -> void:
-	var button := _transparent_button(name_text, at, Vector2(115, 56))
+func _add_difficulty_target(panel: Control, name_text: String, label_text: String, at: Vector2, difficulty: MatchConfig.AIDifficulty) -> void:
+	var highlight := _create_polygon_highlight(
+		panel,
+		"%sHighlight" % name_text,
+		at,
+		CYAN,
+		PackedVector2Array([Vector2(7, 5), Vector2(70, 6), Vector2(74, 11), Vector2(70, 41), Vector2(8, 40), Vector2(4, 35), Vector2(5, 11)])
+	)
+	var button := _transparent_button(name_text, at, Vector2(78, 48))
 	button.text = label_text
 	button.add_theme_font_override("font", _display_font)
-	button.add_theme_font_size_override("font_size", 22)
+	button.add_theme_font_size_override("font_size", 20)
 	button.add_theme_color_override("font_color", Color.WHITE)
 	button.add_theme_color_override("font_hover_color", CYAN)
 	button.add_theme_color_override("font_focus_color", CYAN)
@@ -250,9 +294,124 @@ func _add_difficulty_target(name_text: String, label_text: String, at: Vector2, 
 	button.add_theme_constant_override("outline_size", 4)
 	button.set_meta("accent", CYAN)
 	button.pressed.connect(_select_ai_difficulty.bind(difficulty))
-	_canvas.add_child(button)
+	button.mouse_entered.connect(_show_difficulty_highlight.bind(difficulty))
+	button.mouse_exited.connect(_refresh_difficulty_highlights)
+	button.focus_entered.connect(_show_difficulty_highlight.bind(difficulty))
+	button.focus_exited.connect(_refresh_difficulty_highlights)
+	panel.add_child(button)
 	_difficulty_buttons[difficulty] = button
+	_difficulty_highlights[difficulty] = highlight
 	_focus_buttons.append(button)
+
+
+func _add_top_stepper_target(name_text: String, label_text: String, at: Vector2, action: Callable) -> void:
+	var button := _transparent_button(name_text, at, Vector2(52, 38))
+	button.text = label_text
+	button.add_theme_font_override("font", _display_font)
+	button.add_theme_font_size_override("font_size", 27)
+	button.add_theme_color_override("font_color", Color.WHITE)
+	button.add_theme_color_override("font_hover_color", CYAN)
+	button.add_theme_color_override("font_focus_color", CYAN)
+	button.add_theme_color_override("font_pressed_color", CYAN)
+	button.add_theme_color_override("font_outline_color", Color("020405"))
+	button.add_theme_constant_override("outline_size", 4)
+	button.pressed.connect(action)
+	_canvas.add_child(button)
+	_focus_buttons.append(button)
+
+
+func _angled_panel_root(name_text: String, at: Vector2, dimensions: Vector2, angle_degrees: float) -> Control:
+	var panel := Control.new()
+	panel.name = name_text
+	_place(panel, at, dimensions)
+	panel.pivot_offset = dimensions * 0.5
+	panel.rotation_degrees = angle_degrees
+	_canvas.add_child(panel)
+	return panel
+
+
+func _panel_label(
+	panel: Control,
+	name_text: String,
+	at: Vector2,
+	dimensions: Vector2,
+	font_size: int,
+	color: Color
+) -> Label:
+	var label := Label.new()
+	label.name = name_text
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	label.add_theme_font_override("font", _display_font)
+	label.add_theme_font_size_override("font_size", font_size)
+	label.add_theme_color_override("font_color", color)
+	label.add_theme_color_override("font_outline_color", Color("020405"))
+	label.add_theme_constant_override("outline_size", 4)
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_place(label, at, dimensions)
+	panel.add_child(label)
+	return label
+
+
+func _panel_polygon(dimensions: Vector2) -> PackedVector2Array:
+	return PackedVector2Array([
+		Vector2(17, 8),
+		Vector2(dimensions.x - 17, 9),
+		Vector2(dimensions.x - 9, 17),
+		Vector2(dimensions.x - 12, dimensions.y - 18),
+		Vector2(dimensions.x - 20, dimensions.y - 10),
+		Vector2(18, dimensions.y - 11),
+		Vector2(10, dimensions.y - 19),
+		Vector2(11, 17),
+	])
+
+
+func _create_polygon_highlight(
+	parent: Node,
+	name_text: String,
+	at: Vector2,
+	accent: Color,
+	points: PackedVector2Array
+) -> CanvasItem:
+	var group := Node2D.new()
+	group.name = name_text
+	group.position = at
+	group.visible = false
+
+	var fill := Polygon2D.new()
+	fill.polygon = points
+	fill.color = Color(accent.r, accent.g, accent.b, 0.075)
+	group.add_child(fill)
+
+	var border := Line2D.new()
+	border.points = points
+	border.closed = true
+	border.width = 1.5
+	border.default_color = Color(accent.r, accent.g, accent.b, 0.72)
+	border.antialiased = true
+	group.add_child(border)
+
+	parent.add_child(group)
+	return group
+
+
+func _bind_fitted_highlight(button: Button, highlight: CanvasItem) -> void:
+	button.mouse_entered.connect(func() -> void: highlight.visible = true)
+	button.mouse_exited.connect(func() -> void: highlight.visible = button.has_focus())
+	button.focus_entered.connect(func() -> void: highlight.visible = true)
+	button.focus_exited.connect(func() -> void: highlight.visible = button.is_hovered())
+
+
+func _show_difficulty_highlight(difficulty: MatchConfig.AIDifficulty) -> void:
+	for key in _difficulty_highlights:
+		(_difficulty_highlights[key] as CanvasItem).visible = int(key) == int(difficulty)
+
+
+func _refresh_difficulty_highlights() -> void:
+	for key in _difficulty_highlights:
+		var button := _difficulty_buttons[key] as Button
+		var selected := int(key) == int(_selected_ai_difficulty)
+		(_difficulty_highlights[key] as CanvasItem).visible = selected or button.is_hovered() or button.has_focus()
 
 
 func _value_label(name_text: String, at: Vector2, dimensions: Vector2, font_size: int, color: Color, alignment: HorizontalAlignment = HORIZONTAL_ALIGNMENT_CENTER) -> Label:
@@ -309,32 +468,31 @@ func _refresh_all() -> void:
 	for difficulty in _difficulty_buttons:
 		var difficulty_button := _difficulty_buttons[difficulty] as Button
 		var selected: bool = int(difficulty) == int(_selected_ai_difficulty)
-		_paint_choice(difficulty_button, selected)
+		var empty := StyleBoxEmpty.new()
+		difficulty_button.add_theme_stylebox_override("normal", empty)
+		difficulty_button.add_theme_stylebox_override("hover", empty)
+		difficulty_button.add_theme_stylebox_override("focus", empty)
+		difficulty_button.add_theme_stylebox_override("pressed", empty)
 		difficulty_button.add_theme_color_override("font_color", CYAN if selected else Color.WHITE)
+	_refresh_difficulty_highlights()
 
 	var laps_enabled := _selected_mode != MatchConfig.Mode.LAST_STANDING
 	_lap_value.text = str(_lap_count) if laps_enabled else "—"
 	_lap_value.modulate = Color.WHITE if laps_enabled else Color(1, 1, 1, 0.4)
+	_practice_warning.visible = laps_enabled and _lap_count == 1
 	(_canvas.get_node("LapsMinus") as Button).disabled = not laps_enabled
 	(_canvas.get_node("LapsPlus") as Button).disabled = not laps_enabled
 	_crate_value.text = str(_crate_count)
 	_ammo_value.text = str(_missiles_per_crate)
-	_ai_badge_value.text = str(MatchConfig.ai_count)
-	_opponents_value.text = str(MatchConfig.ai_count)
+	_ai_badge_value.text = str(_ai_count)
+	_ai_count_value.text = str(_ai_count)
 	_crates_state_value.text = "LIVE" if _crate_count > 0 else "OFF"
-
-	match _selected_mode:
-		MatchConfig.Mode.HYBRID:
-			_race_type_value.text = "COMBAT"
-		MatchConfig.Mode.RACE:
-			_race_type_value.text = "RACE"
-		MatchConfig.Mode.LAST_STANDING:
-			_race_type_value.text = "SURVIVE"
+	_crates_state_value.add_theme_color_override("font_color", YELLOW if _crate_count > 0 else Color("849095"))
 
 	_preview_image.texture = STARTER_PREVIEW if _selected_track == MatchConfig.TrackId.KENNEY_DEFAULT else FIGURE8_PREVIEW
 	if is_instance_valid(_selected_vehicle_value):
 		var selected_entry := VehicleCatalog.get_vehicle(GarageProfile.selected_vehicle_id())
-		_selected_vehicle_value.text = "SELECTED: %s" % str(selected_entry.get("display_name", "RAVAGE"))
+		_selected_vehicle_value.text = str(selected_entry.get("display_name", "RAVAGE")).to_upper()
 	if is_instance_valid(_selected_drone_value):
 		var equipped := GarageProfile.equipped_drone()
 		if str(equipped.get("id", "")).is_empty():
@@ -388,6 +546,24 @@ func _change_laps(delta: int) -> void:
 
 func _change_crate_count(delta: int) -> void:
 	_crate_count = clampi(_crate_count + delta, 0, 24)
+	if _crate_count > 0:
+		_last_live_crate_count = _crate_count
+	_refresh_all()
+	_store_match_settings()
+
+
+func _change_ai_count(delta: int) -> void:
+	_ai_count = clampi(_ai_count + delta, 1, 7)
+	_refresh_all()
+	_store_match_settings()
+
+
+func _toggle_crates() -> void:
+	if _crate_count > 0:
+		_last_live_crate_count = _crate_count
+		_crate_count = 0
+	else:
+		_crate_count = clampi(_last_live_crate_count, 1, 24)
 	_refresh_all()
 	_store_match_settings()
 
@@ -457,8 +633,10 @@ func _store_match_settings() -> void:
 	MatchConfig.mode = _selected_mode
 	MatchConfig.track_id = _selected_track
 	MatchConfig.ai_difficulty = _selected_ai_difficulty
+	MatchConfig.ai_count = _ai_count
 	if _selected_mode != MatchConfig.Mode.LAST_STANDING:
 		MatchConfig.lap_count = _lap_count
 	MatchConfig.crate_count = _crate_count
+	MatchConfig.last_live_crate_count = _last_live_crate_count
 	MatchConfig.missiles_per_crate = _missiles_per_crate
 	MatchConfig.save_match_settings()

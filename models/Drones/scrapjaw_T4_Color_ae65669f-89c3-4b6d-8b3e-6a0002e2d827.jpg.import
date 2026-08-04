@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://qrtu1f0njq7n"
-path="res://.godot/imported/scrapjaw_T4_Color_ae65669f-89c3-4b6d-8b3e-6a0002e2d827.jpg-90a2e85f8e96bf29ad4df8bc2f9126cc.ctex"
+path.s3tc="res://.godot/imported/scrapjaw_T4_Color_ae65669f-89c3-4b6d-8b3e-6a0002e2d827.jpg-90a2e85f8e96bf29ad4df8bc2f9126cc.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "61c2317b5efecbda84847908fa05d870"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://models/Drones/scrapjaw_T4_Color_ae65669f-89c3-4b6d-8b3e-6a0002e2d827.jpg"
-dest_files=["res://.godot/imported/scrapjaw_T4_Color_ae65669f-89c3-4b6d-8b3e-6a0002e2d827.jpg-90a2e85f8e96bf29ad4df8bc2f9126cc.ctex"]
+dest_files=["res://.godot/imported/scrapjaw_T4_Color_ae65669f-89c3-4b6d-8b3e-6a0002e2d827.jpg-90a2e85f8e96bf29ad4df8bc2f9126cc.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -40,4 +41,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0

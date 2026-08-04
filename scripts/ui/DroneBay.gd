@@ -3,6 +3,8 @@ extends Control
 
 const SETUP_SCENE := "res://scenes/Setup.tscn"
 const PREVIEW_SIZE := Vector2i(760, 520)
+const PREVIEW_SUPERSAMPLE := 1.5
+const PREVIEW_MAX_SIZE := Vector2i(1600, 1100)
 
 var _selected_drone_id: String = DroneCatalog.SCRAPJAW_ID
 var _selected_tier: int = 1
@@ -17,6 +19,8 @@ var _unequip_button: Button
 var _tier_buttons: Dictionary = {}
 var _preview_root: Node3D
 var _preview_model: Node3D
+var _preview_viewport: SubViewport
+var _preview_display: TextureRect
 var _dragging := false
 var _last_mouse_x := 0.0
 
@@ -146,19 +150,25 @@ func _build_preview() -> Control:
 		"panel",
 		GameStyle.setup_panel(Color("050a0e"), GameStyle.SETUP_CYAN.darkened(0.45), 2)
 	)
-	var viewport_container := SubViewportContainer.new()
-	viewport_container.stretch = true
-	viewport_container.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	viewport_container.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	viewport_container.custom_minimum_size = Vector2(430, 350)
-	frame.add_child(viewport_container)
+	_preview_display = TextureRect.new()
+	_preview_display.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_preview_display.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	_preview_display.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_preview_display.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_preview_display.custom_minimum_size = Vector2(430, 350)
+	_preview_display.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	frame.add_child(_preview_display)
 
-	var viewport := SubViewport.new()
-	viewport.size = PREVIEW_SIZE
-	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
-	viewport.transparent_bg = true
-	viewport.own_world_3d = true
-	viewport_container.add_child(viewport)
+	_preview_viewport = SubViewport.new()
+	_preview_viewport.size = PREVIEW_SIZE
+	_preview_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	_preview_viewport.transparent_bg = true
+	_preview_viewport.own_world_3d = true
+	_preview_viewport.msaa_3d = Viewport.MSAA_4X
+	_preview_viewport.screen_space_aa = Viewport.SCREEN_SPACE_AA_FXAA
+	frame.add_child(_preview_viewport)
+	_preview_display.texture = _preview_viewport.get_texture()
+	_preview_display.resized.connect(_sync_preview_viewport_size)
 
 	var environment := WorldEnvironment.new()
 	var env := Environment.new()
@@ -169,28 +179,53 @@ func _build_preview() -> Control:
 	env.ambient_light_energy = 0.82
 	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
 	environment.environment = env
-	viewport.add_child(environment)
+	_preview_viewport.add_child(environment)
 
 	var camera := Camera3D.new()
 	camera.position = Vector3(0, 1.4, 5.8)
 	camera.fov = 42
 	camera.look_at_from_position(camera.position, Vector3(0, 0.25, 0), Vector3.UP)
-	viewport.add_child(camera)
+	_preview_viewport.add_child(camera)
 	var key := DirectionalLight3D.new()
 	key.rotation_degrees = Vector3(-48, -32, 0)
 	key.light_color = Color("ffe7d7")
 	key.light_energy = 1.35
-	viewport.add_child(key)
+	_preview_viewport.add_child(key)
 	var rim := OmniLight3D.new()
 	rim.position = Vector3(-2.8, 2.2, -1.5)
 	rim.light_color = GameStyle.SETUP_PURPLE
 	rim.light_energy = 5.0
 	rim.omni_range = 8.0
-	viewport.add_child(rim)
+	_preview_viewport.add_child(rim)
 
 	_preview_root = Node3D.new()
-	viewport.add_child(_preview_root)
+	_preview_viewport.add_child(_preview_root)
+	_sync_preview_viewport_size.call_deferred()
 	return frame
+
+
+func _sync_preview_viewport_size() -> void:
+	if not is_instance_valid(_preview_display) or not is_instance_valid(_preview_viewport):
+		return
+	var display_size := _preview_display.size
+	if display_size.x < 2.0 or display_size.y < 2.0:
+		return
+	var target := Vector2(
+		display_size.x * PREVIEW_SUPERSAMPLE,
+		display_size.y * PREVIEW_SUPERSAMPLE
+	)
+	var cap_scale := minf(
+		1.0,
+		minf(
+			float(PREVIEW_MAX_SIZE.x) / target.x,
+			float(PREVIEW_MAX_SIZE.y) / target.y
+		)
+	)
+	target *= cap_scale
+	_preview_viewport.size = Vector2i(
+		maxi(roundi(target.x), 2),
+		maxi(roundi(target.y), 2)
+	)
 
 
 func _build_details() -> Control:

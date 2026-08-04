@@ -254,9 +254,11 @@ func _update_visual_attitude(delta: float) -> void:
 func _build_visual(scene_path: String) -> void:
 	if scene_path.is_empty():
 		return
-	var packed := load(scene_path) as PackedScene
+	# Race LODs disabled: clustered meshes lost materials/UVs and looked broken.
+	var load_path := scene_path
+	var packed := load(load_path) as PackedScene
 	if packed == null:
-		push_error("DroneController: failed to load %s" % scene_path)
+		push_error("DroneController: failed to load %s" % load_path)
 		return
 	_visual = Node3D.new()
 	_visual.name = "Visual"
@@ -268,6 +270,10 @@ func _build_visual(scene_path: String) -> void:
 	_visual.add_child(_model)
 	_model.rotation.y = deg_to_rad(DroneCatalog.get_model_yaw_degrees(drone_id))
 	_normalize_model()
+	for descendant in _model.find_children("*", "GeometryInstance3D", true, false):
+		var geo := descendant as GeometryInstance3D
+		if geo:
+			geo.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 
 func _normalize_model() -> void:
@@ -301,10 +307,11 @@ func _build_ambient_fx() -> void:
 	var fade := Color(c.r, c.g, c.b, 0.0)
 	var fade_hot := Color(hot.r, hot.g, hot.b, 0.0)
 
+	var owner_is_player := is_instance_valid(owner_vehicle) and owner_vehicle.is_player
 	_hover_thruster = _make_drone_particles(
 		Color(c.r, c.g, c.b, 0.9),
 		fade,
-		18,
+		14 if owner_is_player else 10,
 		0.18,
 		2.4,
 		0.14,
@@ -315,6 +322,7 @@ func _build_ambient_fx() -> void:
 	_hover_thruster.name = "HoverThruster"
 	_hover_thruster.position = Vector3(0, -0.28, 0.05)
 	_hover_thruster.emitting = true
+	_hover_thruster.fixed_fps = 24 if owner_is_player else 18
 	var thruster_mat := _hover_thruster.process_material as ParticleProcessMaterial
 	if thruster_mat:
 		thruster_mat.direction = Vector3(0, -1, 0)
@@ -326,7 +334,7 @@ func _build_ambient_fx() -> void:
 	_hover_sparks = _make_drone_particles(
 		Color(hot.r, hot.g, hot.b, 1.0),
 		fade_hot,
-		10,
+		10 if owner_is_player else 6,
 		0.12,
 		3.2,
 		0.05,
@@ -337,6 +345,7 @@ func _build_ambient_fx() -> void:
 	_hover_sparks.name = "HoverSparks"
 	_hover_sparks.position = Vector3(0, -0.26, 0.05)
 	_hover_sparks.emitting = true
+	_hover_sparks.fixed_fps = 24 if owner_is_player else 18
 	var spark_mat := _hover_sparks.process_material as ParticleProcessMaterial
 	if spark_mat:
 		spark_mat.direction = Vector3(0, -1, 0)
@@ -348,7 +357,7 @@ func _build_ambient_fx() -> void:
 	_lunge_trail = _make_drone_particles(
 		Color(hot.r, hot.g, hot.b, 0.95),
 		fade,
-		22,
+		16 if owner_is_player else 10,
 		0.28,
 		5.5,
 		0.12,
@@ -368,11 +377,12 @@ func _build_ambient_fx() -> void:
 		trail_mat.emission_sphere_radius = 0.05
 	add_child(_lunge_trail)
 
+	# Accent light on all drones (cheap omni, no shadows).
 	_accent_light = OmniLight3D.new()
 	_accent_light.name = "AccentLight"
 	_accent_light.light_color = c
-	_accent_light.light_energy = 0.9
-	_accent_light.omni_range = 2.4
+	_accent_light.light_energy = 0.9 if owner_is_player else 0.55
+	_accent_light.omni_range = 2.4 if owner_is_player else 1.8
 	_accent_light.shadow_enabled = false
 	_accent_light.position = Vector3(0, -0.1, 0)
 	add_child(_accent_light)

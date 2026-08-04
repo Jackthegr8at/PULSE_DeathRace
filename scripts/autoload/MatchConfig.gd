@@ -70,6 +70,7 @@ var track_id: TrackId = TrackId.KENNEY_DEFAULT
 
 ## Missile crate settings (Setup menu)
 var crate_count: int = 5 ## How many crates spawn on the track
+var last_live_crate_count: int = 5 ## Restored when the setup crate toggle is switched back on
 var missiles_per_crate: int = 2 ## Ammo granted when collecting one crate
 
 ## Strong references retained while moving through the loading screen. Keeping
@@ -196,10 +197,11 @@ func _load_settings() -> void:
 		return
 	mode = int(cfg.get_value("match", "mode", mode)) as Mode
 	lap_count = int(cfg.get_value("match", "lap_count", lap_count))
-	ai_count = int(cfg.get_value("match", "ai_count", ai_count))
+	ai_count = clampi(int(cfg.get_value("match", "ai_count", ai_count)), 1, 7)
 	ai_difficulty = int(cfg.get_value("match", "ai_difficulty", ai_difficulty)) as AIDifficulty
 	track_id = int(cfg.get_value("match", "track_id", track_id)) as TrackId
-	crate_count = int(cfg.get_value("match", "crate_count", crate_count))
+	crate_count = clampi(int(cfg.get_value("match", "crate_count", crate_count)), 0, 24)
+	last_live_crate_count = clampi(int(cfg.get_value("match", "last_live_crate_count", maxi(crate_count, 1))), 1, 24)
 	missiles_per_crate = int(cfg.get_value("match", "missiles_per_crate", missiles_per_crate))
 
 
@@ -211,6 +213,7 @@ func save_match_settings() -> void:
 	cfg.set_value("match", "ai_difficulty", int(ai_difficulty))
 	cfg.set_value("match", "track_id", int(track_id))
 	cfg.set_value("match", "crate_count", crate_count)
+	cfg.set_value("match", "last_live_crate_count", last_live_crate_count)
 	cfg.set_value("match", "missiles_per_crate", missiles_per_crate)
 	var err := cfg.save(SETTINGS_PATH)
 	if err != OK:
@@ -224,5 +227,6 @@ func reset_to_defaults() -> void:
 	ai_difficulty = AIDifficulty.NOVICE
 	track_id = TrackId.KENNEY_DEFAULT
 	crate_count = 5
+	last_live_crate_count = 5
 	missiles_per_crate = 2
 	_clear_ai_roster()

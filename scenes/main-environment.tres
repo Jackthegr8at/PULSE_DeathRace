@@ -20,7 +20,7 @@ tonemap_exposure = 0.9
 # SSAO is expensive for little gain on this top-down race camera.
 ssao_enabled = false
 ssil_enabled = false
-# Soft glow for Pulse FX; keep levels low for FPS.
+# Soft glow for Pulse FX identity.
 glow_enabled = true
 glow_levels/2 = 0.35
 glow_levels/3 = 0.4

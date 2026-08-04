@@ -42,6 +42,12 @@ func _apply_for_current_size() -> void:
 	var pixel_count := int(viewport_size.x * viewport_size.y)
 	var target_scale := _scale_for_viewport_size(viewport_size, pixel_count)
 	var target_lod_threshold := _lod_threshold_for_scale(target_scale)
+	# Don't override a race-scene budget that already lowered scale / raised LOD bias.
+	if _is_race_scene():
+		if viewport.scaling_3d_scale < target_scale:
+			target_scale = viewport.scaling_3d_scale
+		if viewport.mesh_lod_threshold > target_lod_threshold:
+			target_lod_threshold = viewport.mesh_lod_threshold
 	if is_equal_approx(target_scale, _applied_scale) \
 			and is_equal_approx(viewport.mesh_lod_threshold, target_lod_threshold):
 		return
@@ -67,6 +73,13 @@ func _apply_for_current_size() -> void:
 		"FSR" if target_scale < 1.0 else "native",
 		target_lod_threshold,
 	])
+
+
+func _is_race_scene() -> bool:
+	var scene := get_tree().current_scene if get_tree() else null
+	if scene == null:
+		return false
+	return scene.scene_file_path.ends_with("/Race3D.tscn") or scene.name == "Race3D"
 
 
 func _scale_for_viewport_size(viewport_size: Vector2, pixel_count: int) -> float:

@@ -152,6 +152,10 @@ func _show_credit_reward(reward: Dictionary) -> void:
 		credit_reward.visible = false
 		return
 	credit_reward.visible = true
+	if not bool(reward.get("rewards_enabled", true)):
+		credit_breakdown.text = "PRACTICE RACE  •  REWARDS DISABLED"
+		credit_total.text = "0\nNO REWARD"
+		return
 	var placement := int(reward.get("placement_reward", 0))
 	var elimination_count := int(reward.get("elimination_count", 0))
 	var elimination_reward := int(reward.get("elimination_reward", 0))
